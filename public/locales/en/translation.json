@@ -1,0 +1,149 @@
+{
+    "header":{
+        "section1":{
+            "title":"Microbiology"
+        },
+        "section2":{
+            "title":"Clinical data"
+        }
+    },
+    "login":{
+        "text1":"User",
+        "text2":"Password",
+        "text3":"Sign in",
+        "text4":"Select Hospital",
+        "text5":"Install",
+        "text6":"Hospital",
+        "text7":"Don't have an acount?",
+        "text8":"Sign up",
+        "text9":"Sign in",
+        "error":{
+            "user":"The user name or password are incorrect.",
+            "net":"Network error, please contact administrator",
+            "empty":"You must enter username and password",
+            "hospital":"You must select a hospital"
+        }
+    },
+    "signup":{
+        "text1":"Email",
+        "text2":"e.g username@sjd.es",
+        "text3":"Password",
+        "text4":"Confirm password",
+        "text5":"Hospital",
+        "text6":"Already have an account?",
+        "text7":"Sign in",
+        "text8":"Sign up",
+        "text9":"Select Service",
+        "error":{
+            "email":"You must enter a correct email.",
+            "email-organization":"Check your email it should end with ",
+            "net":"Network error, please contact administrator",
+            "empty":"Password must be at least 4 characters",
+            "hospital":"You must select a hospital",
+            "confirm":"Passwords do not match",
+            "service":"You must select a service"
+        }
+    },
+    "restore":{
+        "text1":"Change password",
+        "text2":"Change",
+        "text3":"Password has been updated successfully"
+    },
+    "consent":{
+        "button":{
+            "text1":"Back",
+            "text2":"Next"
+        },
+        "message":{
+            "text1":"Welcome to appATB",
+            "text2":"User has been created successfully"
+        }
+    },
+    "home":{
+        "section1":{
+            "title":"Microbiology",
+            "text":"Bacteria and groups of bacteria found in the hospital.",
+            "link":"Ir a microbiología" 
+        },
+        "section2":{
+            "title":"Clinical",
+            "text":"Provenance, origin of bacteria and diagnostic.",
+            "link":"Ir a microbiología" 
+        }
+    },
+    "microbiology":{
+        "section1":{
+            "title":"Bacteria"
+        },
+        "section2":{
+            "title":"Groups of bacteria"
+        },
+        "section3":{
+            "title":"Resistance patterns"
+        }
+    },
+    "clinical":{
+        "section1":{
+            "title":"Acquisition"
+        },
+        "section2":{
+            "title":"Source"
+        },
+        "section3":{
+            "title":"Focus"
+        },
+        "section4":{
+            "title":"Diagnostic"
+        }
+    },
+    "antibiogram":{
+        "section1":{
+            "title":"Antibiograms"
+        },
+        "section2":{
+            "title":"Bacteremias"
+        },
+        "section3":{
+            "title":"Bacteremia"
+        },
+        "table1":"susceptible",
+        "table2":"increased exposure",
+        "table3":"resistant"
+    },
+    "other":{
+        "section1":{
+            "title":"Configuration"
+        }
+    },
+    "bacteremia":{
+        "text1":"Id internal",
+        "text2":"Age",
+        "text3":"Sex",
+        "text4":"Empiric antibiotic",
+        "text5":"Reason"
+    },
+    "filter":{
+        "title":"Filter",
+        "pr":"Resistance patterns",
+        "gpr":"Bacteria group",
+        "subgpr":"Bacteria subgroup",
+        "source":"Soruce of bacteraemia",
+        "focus":"Focus",
+        "diagnostic":"Diagnostic",
+        "acquisition":"Acquisition",
+        "bacteria":"Bacteria",
+        "buttom":"Send",
+        "text10":"Age",
+        "text11":"Age Min",
+        "text12":"Age Max",
+        "text13":"Gender"
+    },
+    "tab1":{
+        "text1":"Graphic",
+        "text2":"Data"
+    },
+    "tab2":{
+        "text1":"Antibiogram",
+        "text2":"Clinical"
+    }
+}

@@ -1,0 +1,74 @@
+{
+  "name": "client-fhir",
+  "version": "0.1.1",
+  "private": true,
+  "dependencies": {
+    "-": "^0.0.1",
+    "@emotion/react": "^11.11.4",
+    "@emotion/styled": "^11.11.0",
+    "@fortawesome/free-solid-svg-icons": "^6.4.0",
+    "@fortawesome/react-fontawesome": "^0.2.0",
+    "@mui/base": "^5.0.0-beta.40",
+    "@mui/material": "^5.15.14",
+    "@react-keycloak/web": "^3.4.0",
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.6.0",
+    "base-64": "^1.0.0",
+    "bootstrap": "^5.3.0",
+    "chart.js": "^4.3.0",
+    "firebase": "^10.5.2",
+    "firebase-tools": "^13.8.2",
+    "g": "^2.0.1",
+    "i18next": "^23.5.1",
+    "i18next-browser-languagedetector": "^7.1.0",
+    "i18next-http-backend": "^2.2.2",
+    "keycloak-js": "^25.0.4",
+    "react": "^18.2.0",
+    "react-bootstrap": "^2.7.4",
+    "react-chartjs-2": "^5.2.0",
+    "react-datepicker": "^4.25.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.4.1",
+    "react-i18next": "^13.2.2",
+    "react-icons": "^4.11.0",
+    "react-router-dom": "^6.12.1",
+    "react-scripts": "5.0.1",
+    "react-select": "^5.7.7",
+    "victory": "^36.6.11",
+    "web-vitals": "^2.1.4",
+    "workbox-core": "^7.0.0",
+    "workbox-expiration": "^7.0.0",
+    "workbox-precaching": "^7.0.0",
+    "workbox-routing": "^7.0.0",
+    "workbox-strategies": "^7.0.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^8.4.1"
+  }
+}

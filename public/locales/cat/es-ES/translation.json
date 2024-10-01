@@ -1,0 +1,10 @@
+{
+    "home":{
+        "section1":{
+            "title":"Microbiología",
+            "text":" Bacterias y grupos de bacterias encontradas en el hospital.",
+            "link":"Ir a microbiología" 
+        }
+    }
+
+}
