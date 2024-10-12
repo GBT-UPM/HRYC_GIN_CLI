@@ -74,7 +74,8 @@ export default function QuestionPanel({
       {type === "display" ?
       <h1 className="questionTextDisplay">{question}</h1>
       :<h1 className="questionText">{question}</h1>}
-      {type === "TEXT" && (
+
+      {type === "string" && (
         <input
           type="text"
           placeholder="Your answer"
@@ -99,16 +100,6 @@ export default function QuestionPanel({
                 checkChoiceResponse(code) ? " checkmark2 checkmark2-after" : "checkmark2"
               }></span>
        
-              {/*} 
-            {
-              checkChoiceResponse(code) ? 
-              <span className="checkmark2">
-                <span className="checkmark2-after"></span>
-              </span>
-              :
-              <span className="checkmark2"></span>
-            }
-       {*/}
           </label>
         );
       })
@@ -173,68 +164,7 @@ export default function QuestionPanel({
 
             : null
             } 
-      {/*}
-      {type === "choice" && options.length >=10 &&
-        options.map((item, index) => {
-          const display = item.valueCoding.display;
-          const code = item.valueCoding.code;
-
-          return (
-            <div
-              className={checkChoiceResponse(code) ? "f--green container2" : "container2"}
-              onClick={(e) => handleChoice(e, code, display)}>
-              {display}
-              <input type="radio" name={linkId} checked={checkChoiceResponse(code)} disabled={isDisabled} />
-              <span
-                className={
-                  isResponseEmpty ? "checkmark--red checkmark" : "checkmark"
-                }></span>
-            </div>
-          );
-        })}
- 
-
-      {type === "text" && (
-        <div className="w--100">
-          <div className="multi-text__wrapper">
-            <div>a.</div>
-            <input
-              value={getTextAnswer(1)}
-              type="text"
-              disabled={isDisabled}
-              placeholder="Your answer"
-              className="textInput"
-              onInput={(e) =>
-                updateResponses(e.target.value, questionNumber, "text", linkId, null, 1)
-              }></input>
-          </div>
-          <div className="multi-text__wrapper">
-            <div>b.</div>
-            <input
-              value={getTextAnswer(2)}
-              type="text"
-              disabled={isDisabled}
-              placeholder="Your answer"
-              className="textInput"
-              onInput={(e) =>
-                updateResponses(e.target.value, questionNumber, "text", linkId, null, 2)
-              }></input>
-          </div>
-          <div className="multi-text__wrapper">
-            <div>c.</div>
-            <input
-              value={getTextAnswer(3)}
-              type="text"
-              disabled={isDisabled}
-              placeholder="Your answer"
-              className="textInput"
-              onInput={(e) =>
-                updateResponses(e.target.value, questionNumber, "text", linkId, null, 3)
-              }></input>
-          </div>
-        </div>
-      )}
-         {*/}
+      
          </div>
     </>
   );

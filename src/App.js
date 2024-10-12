@@ -6,9 +6,8 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 
 
 import i18n from "./i18n"
-import ConsentScreen from "./screens/ConsentScreen";
-import BienScreen from "./screens/BienScreen";
-import HomeScreen from "./screens/HomeScreen";
+
+import HomeScreen from "./screens/MainScreen";
 
 
 
@@ -19,11 +18,6 @@ function App() {
     <>{/*<Notification />*/}
     <Routes>
       <Route path="/" element={<HomeScreen />} />
-      <Route path="/pat" element={<PatientScreen />} />
-      <Route path="/register" element={<SignupScreen />} />
-      <Route path="/restore" element={<RestoreScreen />} />
-      <Route path="/consent" element={<ConsentScreen />} />
-      <Route path="/bien" element={<BienScreen />} />
     </Routes></>
 
     
