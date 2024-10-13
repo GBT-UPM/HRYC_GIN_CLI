@@ -10,6 +10,7 @@ import ApiService from "../services/ApiService";
 import Header from "../components/Header";
 import QuestionPanel from "../components/QuestionPanel";
 import Panel from "../components/Panel";
+import QuestionnaireForm from "../components/QuestionnaireForm";
 
 Chart.register(CategoryScale);
 
@@ -40,7 +41,7 @@ export default function MainScreen() {
   };
   const fetchQuestionnaire = async () => {
     try {
-      const response = await ApiService(keycloak.token, 'GET', `/fhir/Questionnaire?identifier=BR-Q02`, {});
+      const response = await ApiService(keycloak.token, 'GET', `/fhir/Questionnaire?identifier=10920335`, {});
       if (response.status === 200) {
         const data = await response.json();
         console.log(data)
@@ -180,7 +181,12 @@ export default function MainScreen() {
               <div>
                 <h2>Sección de Administración</h2>
                 <p>Cuestionanio</p>
-                {questionnaire && generateQuestions()}
+                {questionnaire ? (
+                  <QuestionnaireForm questionnaire={questionnaire.resourceData} />
+                ):(
+                      null
+                )}
+              
               {/*}  <div>
                   <h2>List of Prescribers</h2>
                   <ul>
