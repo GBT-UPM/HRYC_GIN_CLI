@@ -1,0 +1,79 @@
+.questionnaire-container {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+  }
+  
+  .questionnaire-title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #2c3e50;
+  }
+  
+  .questionnaire-group {
+    margin-bottom: 20px;
+  }
+  
+  .questionnaire-group-title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #34495e;
+  }
+  
+  .questionnaire-item {
+    margin-bottom: 15px;
+  }
+  
+  .questionnaire-item label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #7f8c8d;
+  }
+  
+  .questionnaire-item input,
+  .questionnaire-item select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    font-size: 16px;
+  }
+  
+  .questionnaire-responses {
+    margin-top: 20px;
+    padding: 10px;
+    border: 1px solid #ecf0f1;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+  }
+  
+  .questionnaire-responses h3 {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #2c3e50;
+  }
+  
+  .questionnaire-responses pre {
+    background-color: #ecf0f1;
+    padding: 10px;
+    border-radius: 4px;
+    overflow-x: auto;
+  }
+  .error-message {
+    color: red;
+    font-weight: bold;
+    margin-top: 10px;
+  }
+  .required-asterisk {
+    color: red;
+    margin-left: 5px;
+  }
+  
+  .error-message {
+    color: red;
+    font-weight: bold;
+    margin-top: 10px;
+  }
