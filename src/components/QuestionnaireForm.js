@@ -5,7 +5,7 @@ import ApiService from "../services/ApiService";
 const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
   const [answers, setAnswers] = useState([]);
   const [error, setError] = useState(null);
-  const handleInputChange = (linkId, type, value) => {
+  const handleInputChange = (text,linkId, type, value,display) => {
     setAnswers((prevAnswers) => {
       const existingAnswerIndex = prevAnswers.findIndex(
         (answer) => answer.linkId === linkId
@@ -19,11 +19,11 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
         }
         return prevAnswers;
       }
-      const newAnswer = { linkId, answer: [] };
+      const newAnswer = { text,linkId, answer: [] };
 
       switch (type) {
         case "choice":
-          newAnswer.answer = [{ valueCoding: { code: value, display: value } }];
+          newAnswer.answer = [{ valueCoding: { code: value, display: display } }];
           break;
         case "date":
           newAnswer.answer = [{ valueDate: value }];
@@ -92,7 +92,9 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
         return (
           <select
             value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueCoding?.code || initialValue.valueCoding?.code || ""}
-            onChange={(e) => handleInputChange(item.linkId, item.type, e.target.value)}
+            onChange={(e) => {
+              const selectedOption = e.target.options[e.target.selectedIndex]; 
+              handleInputChange(item.text, item.linkId, item.type, e.target.value,selectedOption.text)}}
           >
             <option value="">Select an option</option>
             {item.answerOption.map((option) => (
@@ -107,7 +109,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
           <input
             type="date"
             value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueDate || initialValue.valueDate || ""}
-            onChange={(e) => handleInputChange(item.linkId, item.type, e.target.value)}
+            onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
           />
         );
       case "decimal":
@@ -116,7 +118,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
             type="number"
             step="0.1"
             value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueDecimal || initialValue.valueDecimal || ""}
-            onChange={(e) => handleInputChange(item.linkId, item.type, e.target.value)}
+            onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
           />
         );
       case "integer":
@@ -125,7 +127,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
             type="number"
             step="1"
             value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueInteger || initialValue.valueInteger || ""}
-            onChange={(e) => handleInputChange(item.linkId, item.type, e.target.value)}
+            onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
           />
         );
       case "string":
@@ -134,7 +136,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
           <input
             type="text"
             value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueString || initialValue.valueString || ""}
-            onChange={(e) => handleInputChange(item.linkId, item.type, e.target.value)}
+            onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
           />
         );
       default:

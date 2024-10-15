@@ -1,0 +1,20 @@
+.responses-summary {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+
+  }
+  
+  .responses-summary h3 {
+    margin-top: 0;
+  }
+  
+  .responses-summary ul {
+    list-style-type: none;
+    padding-left: 0;
+  }
+  
+  .responses-summary ul li {
+    margin-bottom: 10px;
+  }

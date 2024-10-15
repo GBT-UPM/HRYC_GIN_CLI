@@ -12,6 +12,7 @@ import QuestionPanel from "../components/QuestionPanel";
 import Panel from "../components/Panel";
 import QuestionnaireForm from "../components/QuestionnaireForm";
 import Sidebar from "../components/Sidebar";
+import ResponsesSummary from "../components/ResponsesSummary";
 
 Chart.register(CategoryScale);
 
@@ -24,6 +25,7 @@ export default function MainScreen() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [answers, setAnswers] = useState([]);
+  const [responses, setResponses] = useState([]);
   // Función para obtener los datos del paciente
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -45,7 +47,9 @@ export default function MainScreen() {
       setError("Error al obtener los datos del paciente.");
     }
   };
-
+  const QBack = async (anwers) => {
+setResponses([])
+  }
 
   const handleSave = async (anwers) => {
     const confirmSave = window.confirm("¿Está seguro de que desea guardar las respuestas?");
@@ -56,12 +60,14 @@ export default function MainScreen() {
       item: anwers,
     };
     console.log("Saved Responses:", questionnaireResponse);
+    
     // Aquí puedes añadir la lógica para enviar las respuestas a un servidor o guardarlas localmente
     try {
       const response = await ApiService(keycloak.token, 'POST', `/fhir/QuestionnaireResponse`, questionnaireResponse);
       if (response.status === 200) {
 
         console.log(response)
+        setResponses(questionnaireResponse.item)
       } else {
         throw new Error(`Error en la respuesta: ${response.status}`);
       }
@@ -112,7 +118,11 @@ export default function MainScreen() {
               {isAdmin ? (
                 <div>
                   {questionnaire ? (
-                    <QuestionnaireForm event={handleSave} answersF={answers} questionnaire={questionnaire.resourceData} />
+                    responses.length === 0 ?(
+                      <QuestionnaireForm event={handleSave} answersF={answers} questionnaire={questionnaire.resourceData} />
+                    ):(
+                      <ResponsesSummary event={QBack} responses={responses} />
+                    )
                   ) : (
                     null
                   )}
