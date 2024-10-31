@@ -26,13 +26,15 @@ export default function MainScreen() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [answers, setAnswers] = useState([]);
   const [responses, setResponses] = useState([]);
+  const [questionnaireResponses, setQuestionnaireResponses] = useState([]);
+  
   // Función para obtener los datos del paciente
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
   const fetchQuestionnaire = async () => {
     try {
-      const response = await ApiService(keycloak.token, 'GET', `/fhir/Questionnaire?identifier=5770525`, {});
+      const response = await ApiService(keycloak.token, 'GET', `/fhir/Questionnaire?name=registro_ginecologico`, {});
       if (response.status === 200) {
         const data = await response.json();
         console.log(data)
@@ -60,14 +62,17 @@ setResponses([])
       item: anwers,
     };
     console.log("Saved Responses:", questionnaireResponse);
-    
+    console.log("Saved Responses:", questionnaireResponses);
+    questionnaireResponses.push(questionnaireResponse);
+    for (const qResponse of questionnaireResponses) {
+      // Aquí puedes procesar cada respuesta
     // Aquí puedes añadir la lógica para enviar las respuestas a un servidor o guardarlas localmente
     try {
-      const response = await ApiService(keycloak.token, 'POST', `/fhir/QuestionnaireResponse`, questionnaireResponse);
+      const response = await ApiService(keycloak.token, 'POST', `/fhir/QuestionnaireResponse`, qResponse);
       if (response.status === 200) {
 
         console.log(response)
-        setResponses(questionnaireResponse.item)
+    //    setResponses(questionnaireResponse.item)
       } else {
         throw new Error(`Error en la respuesta: ${response.status}`);
       }
@@ -75,6 +80,23 @@ setResponses([])
       console.error("Error al obtener los datos del paciente:", error);
       setError("Error al obtener los datos del paciente.");
     }
+
+  }
+  };
+  const handleContinue = async (anwers) => {
+    const confirmSave = window.confirm("¿Está seguro de que desea guardar las respuestas?");
+    if (!confirmSave) return;
+    const questionnaireResponse = {
+      resourceType: "QuestionnaireResponse",
+      status: "completed",
+      item: anwers,
+    };
+    console.log("Saved Responses:", questionnaireResponse);
+    var a=questionnaireResponses.push(questionnaireResponse)
+    console.log(questionnaireResponses)
+    setQuestionnaireResponses(questionnaireResponses)
+    // Aquí puedes añadir la lógica para enviar las respuestas a un servidor o guardarlas localmente
+    
   };
   const closeSession = async () => {
     keycloak.logout();
@@ -119,7 +141,7 @@ setResponses([])
                 <div>
                   {questionnaire ? (
                     responses.length === 0 ?(
-                      <QuestionnaireForm event={handleSave} answersF={answers} questionnaire={questionnaire.resourceData} />
+                      <QuestionnaireForm eventContinue={handleContinue} event={handleSave} questionnaire={questionnaire.resourceData} />
                     ):(
                       <ResponsesSummary event={QBack} responses={responses} />
                     )

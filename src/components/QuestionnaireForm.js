@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import '../assets/css/QuestionnaireForm.css';
 import ApiService from "../services/ApiService";
 
-const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
+const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
   const [answers, setAnswers] = useState([]);
   const [error, setError] = useState(null);
+  const [disabledFields, setDisabledFields] = useState([]);
   const handleInputChange = (text,linkId, type, value,display) => {
     setAnswers((prevAnswers) => {
       const existingAnswerIndex = prevAnswers.findIndex(
@@ -68,8 +69,8 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
             : answer === undefined;
         case "=":
           if (condition.answerCoding) {
-            console.log(answer)
-            console.log(Array.isArray(answer.answer))
+            //console.log(answer)
+           // console.log(Array.isArray(answer.answer))
             return (
               answer.answer &&
               Array.isArray(answer.answer) &&
@@ -86,7 +87,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
 
   const renderInput = (item) => {
     const initialValue = item.initial?.[0] || {};
-
+    const isDisabled = disabledFields.includes(item.linkId);
     switch (item.type) {
       case "choice":
         return (
@@ -95,6 +96,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
             onChange={(e) => {
               const selectedOption = e.target.options[e.target.selectedIndex]; 
               handleInputChange(item.text, item.linkId, item.type, e.target.value,selectedOption.text)}}
+              disabled={isDisabled}
           >
             <option value="">Select an option</option>
             {item.answerOption.map((option) => (
@@ -110,6 +112,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
             type="date"
             value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueDate || initialValue.valueDate || ""}
             onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
+            disabled={isDisabled}
           />
         );
       case "decimal":
@@ -119,6 +122,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
             step="0.1"
             value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueDecimal || initialValue.valueDecimal || ""}
             onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
+            disabled={isDisabled}
           />
         );
       case "integer":
@@ -128,6 +132,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
             step="1"
             value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueInteger || initialValue.valueInteger || ""}
             onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
+            disabled={isDisabled}
           />
         );
       case "string":
@@ -137,6 +142,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
             type="text"
             value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueString || initialValue.valueString || ""}
             onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
+            disabled={isDisabled}
           />
         );
       default:
@@ -171,14 +177,28 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
       return true;
     }
   }
+   const handleReset = () => {
+    const preservedLinkIds = [
+      "5800515049283", // Nombre
+      "138324799523",  // NHC
+      "3772124358948", // Edad
+      "9825756855092", // FUR
+      "4903966501003"  // ¿Hay alguna masa anexial?
+    ];
 
+    setAnswers((prevAnswers) => {
+      return prevAnswers.filter(answer => preservedLinkIds.includes(answer.linkId));
+    });
+    setDisabledFields(preservedLinkIds);
+    setError(null);
+  };
   const renderGroup = (itemGroup) => {
  //   if (!checkEnableWhen(itemGroup.enableWhen)) return null;
     return (
       <div key={itemGroup.linkId} className="questionnaire-group">
         <h3 className="questionnaire-group-title">{itemGroup.text}</h3>
         {itemGroup.item.map((item) => (
-          <div key={item.linkId} className="questionnaire-item">
+          <div id={item.linkId} key={item.linkId} className="questionnaire-item">
             <label>
               {item.text}
               {item.required && <span className="required-asterisk">*</span>}
@@ -201,7 +221,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
           return renderGroup(item);
         } else {
           return (
-            <div key={item.linkId} className="questionnaire-item">
+            <div id={item.linkId}  key={item.linkId} className="questionnaire-item">
               <label>{item.text}</label>
               {item.required && <span className="required-asterisk">*</span>}
               {renderInput(item)}
@@ -215,6 +235,7 @@ const QuestionnaireForm = ({ questionnaire,event,answersF }) => {
         <pre>{JSON.stringify({ resourceType: "QuestionnaireResponse", status: "completed", item: answers }, null, 2)}</pre>
       </div>
       <button className="save-btn" onClick={()=>{if(validate()){event(answers)}}}>Guardar Respuestas</button>
+      <button className="save-btn" onClick={()=>{if(validate()){eventContinue(answers); handleReset()}}}>Añadir masa anexial</button>
     </div>
   );
 };

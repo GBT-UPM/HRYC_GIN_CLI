@@ -6,7 +6,6 @@ services:
       - "3000:3000"
     volumes:
       - .:/app
-      - /app/node_modules
     stdin_open: true
     tty: true
     user: "${UID}:${GID}" # Asignar el usuario
