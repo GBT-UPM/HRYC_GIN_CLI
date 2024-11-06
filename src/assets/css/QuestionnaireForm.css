@@ -1,17 +1,33 @@
-.questionnaire-container {
+/*.questionnaire-container {
     font-family: Arial, sans-serif;
     margin: 20px;
+  }*/
+  .questionnaire-container {
+    display: flex;
+    flex-wrap: wrap; /* Permite que los elementos se envuelvan a la siguiente línea si no caben en una sola línea */
+    gap: 10px; /* Espacio entre los elementos */
+    padding: 20px;
+    color: #7f8c8d;
   }
-  
+  .questionnaire-container-group {
+    display: flex;
+    flex-wrap: wrap; /* Permite que los elementos se envuelvan a la siguiente línea si no caben en una sola línea */
+    gap: 10px; /* Espacio entre los elementos */
+  }
   .questionnaire-title {
     font-size: 24px;
     font-weight: bold;
     margin-bottom: 20px;
     color: #2c3e50;
+    padding-top: 30px;
+  padding-left: 20px;
   }
   
   .questionnaire-group {
     margin-bottom: 20px;
+    background: #f6f6ff;
+    padding: 10px;
+    width: 100%;
   }
   
   .questionnaire-group-title {
@@ -29,11 +45,12 @@
     display: block;
     font-weight: bold;
     margin-bottom: 5px;
-    color: #7f8c8d;
+
     float: inline-start;
   }
   
   .questionnaire-item input,
+  .questionnaire-item textarea,
   .questionnaire-item select {
     width: 100%;
     padding: 8px;
@@ -78,3 +95,39 @@
     font-weight: bold;
     margin-top: 10px;
   }
+
+/* Nuevos estilos */
+/*.questionnaire-item {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 15px;
+}*/
+.questionnaire-item {
+ /* flex: 1 1 200px;*/ /* Permite que los elementos crezcan y se encojan, con un tamaño base de 200px */
+  min-width: 200px; /* Asegura que los elementos no se encojan por debajo de 200px */
+  box-sizing: border-box; /* Incluye el padding y el borde en el tamaño total */
+  width: 100%;
+}
+
+/* Estilos para input y select */
+input, select {
+  width: 100%; /* Controla la anchura */
+  padding: 10px; /* Añade espacio interno */
+  margin: 5px 0; /* Añade espacio externo */
+  border: 1px solid #ccc; /* Añade un borde */
+  border-radius: 4px; /* Bordes redondeados */
+  box-sizing: border-box; /* Incluye el padding y el borde en el tamaño total */
+  font-size: 16px; /* Tamaño de fuente */
+}
+
+select {
+  background-color: #f9f9f9; /* Color de fondo */
+  appearance: none; /* Elimina el estilo por defecto del navegador */
+  -webkit-appearance: none; /* Elimina el estilo por defecto del navegador en WebKit */
+  -moz-appearance: none; /* Elimina el estilo por defecto del navegador en Firefox */
+}
+
+select:disabled, input:disabled {
+  background-color: #e9e9e9; /* Color de fondo para elementos deshabilitados */
+  cursor: not-allowed; /* Cambia el cursor para elementos deshabilitados */
+}

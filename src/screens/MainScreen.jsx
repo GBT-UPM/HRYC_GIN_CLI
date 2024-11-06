@@ -13,6 +13,7 @@ import Panel from "../components/Panel";
 import QuestionnaireForm from "../components/QuestionnaireForm";
 import Sidebar from "../components/Sidebar";
 import ResponsesSummary from "../components/ResponsesSummary";
+import Footer from "../components/Footer";
 
 Chart.register(CategoryScale);
 
@@ -54,8 +55,8 @@ setResponses([])
   }
 
   const handleSave = async (anwers) => {
-    const confirmSave = window.confirm("¿Está seguro de que desea guardar las respuestas?");
-    if (!confirmSave) return;
+    // const confirmSave = window.confirm("¿Está seguro de que desea guardar las respuestas?");
+    // if (!confirmSave) return;
     const questionnaireResponse = {
       resourceType: "QuestionnaireResponse",
       status: "completed",
@@ -72,7 +73,7 @@ setResponses([])
       if (response.status === 200) {
 
         console.log(response)
-    //    setResponses(questionnaireResponse.item)
+        setResponses(questionnaireResponse.item)
       } else {
         throw new Error(`Error en la respuesta: ${response.status}`);
       }
@@ -80,12 +81,12 @@ setResponses([])
       console.error("Error al obtener los datos del paciente:", error);
       setError("Error al obtener los datos del paciente.");
     }
-
   }
+   // Extraer todos los .item de los elementos de questionnaireResponses
+   const allItems = questionnaireResponses.flatMap(qResponse => qResponse.item);
   };
   const handleContinue = async (anwers) => {
-    const confirmSave = window.confirm("¿Está seguro de que desea guardar las respuestas?");
-    if (!confirmSave) return;
+
     const questionnaireResponse = {
       resourceType: "QuestionnaireResponse",
       status: "completed",
@@ -108,7 +109,6 @@ setResponses([])
       // checkUserRoles();
       const realmRoles = keycloak.tokenParsed?.realm_access?.roles || [];
       const clientRoles = keycloak.tokenParsed?.resource_access?.['my-api-client']?.roles || [];
-      console.log(keycloak)
       if (realmRoles.includes('practitioner') || clientRoles.includes('practitioner')) {
         setIsAdmin(true);
         // Si el usuario es administrador, hacer llamada para obtener Practitioners
@@ -156,6 +156,7 @@ setResponses([])
                   <p>Esta es una sección visible para usuarios regulares.</p>
                 </div>
               )}
+              {/* <Footer/> */}
             </div>
           </div></>
 

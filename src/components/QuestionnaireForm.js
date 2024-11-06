@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import '../assets/css/QuestionnaireForm.css';
 import ApiService from "../services/ApiService";
+import Modal from "./Modal";
 
 const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
   const [answers, setAnswers] = useState([]);
   const [error, setError] = useState(null);
   const [disabledFields, setDisabledFields] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const handleInputChange = (text,linkId, type, value,display) => {
     setAnswers((prevAnswers) => {
       const existingAnswerIndex = prevAnswers.findIndex(
@@ -57,11 +59,14 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
 
   const checkEnableWhen = (enableWhen) => {
     if (!enableWhen) return true;
+
     return enableWhen.every((condition) => {
       const answer = answers.find(
         (answer) => answer.linkId === condition.question
       );
       if (!answer) return false;
+      console.log(answer.text)
+      console.log(condition.operator)
       switch (condition.operator) {
         case "exists":
           return condition.answerBoolean
@@ -79,6 +84,20 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
             );
           }
           return false;
+        case "!=":
+          if (condition.answerCoding) {
+            console.log("---")
+            console.log(answer.answer[0].valueCoding.code)
+            console.log(condition.answerCoding.code)
+            console.log("---")
+            return (
+              answer.answer &&
+              Array.isArray(answer.answer) &&
+              answer.answer.length > 0 &&
+              answer.answer[0].valueCoding.code !== condition.answerCoding.code
+            );
+          }
+            return false;
         default:
           return false;
       }
@@ -98,7 +117,7 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
               handleInputChange(item.text, item.linkId, item.type, e.target.value,selectedOption.text)}}
               disabled={isDisabled}
           >
-            <option value="">Select an option</option>
+            <option value="">Seleccione una opción</option>
             {item.answerOption.map((option) => (
               <option key={option.valueCoding.code} value={option.valueCoding.code}>
                 {option.valueCoding.display}
@@ -136,10 +155,17 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
           />
         );
       case "string":
-      case "text":
         return (
           <input
             type="text"
+            value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueString || initialValue.valueString || ""}
+            onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
+            disabled={isDisabled}
+          />
+        );
+      case "text":
+        return (
+          <textarea
             value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueString || initialValue.valueString || ""}
             onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
             disabled={isDisabled}
@@ -192,51 +218,81 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
     setDisabledFields(preservedLinkIds);
     setError(null);
   };
+  const parseStyleString = (styleString) => {
+    return styleString.split(';').reduce((styleObject, styleProperty) => {
+      const [property, value] = styleProperty.split(':');
+      if (property && value) {
+        const camelCaseProperty = property.trim().replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+        styleObject[camelCaseProperty] = value.trim();
+      }
+      return styleObject;
+    }, {});
+  };
   const renderGroup = (itemGroup) => {
- //   if (!checkEnableWhen(itemGroup.enableWhen)) return null;
     return (
       <div key={itemGroup.linkId} className="questionnaire-group">
         <h3 className="questionnaire-group-title">{itemGroup.text}</h3>
-        {itemGroup.item.map((item) => (
-          <div id={item.linkId} key={item.linkId} className="questionnaire-item">
-            <label>
-              {item.text}
-              {item.required && <span className="required-asterisk">*</span>}
-            </label>
-            
-            {renderInput(item)}
-          </div>
-        ))}
+        <div className="questionnaire-container-group">
+        {itemGroup.item.map((item) => {
+          const styleString = item._text?.extension?.find(ext => ext.url === "http://hl7.org/fhir/StructureDefinition/rendering-style")?.valueString || "";
+          const style = parseStyleString(styleString);
+          if (!checkEnableWhen(item.enableWhen)) return null;
+          return item.type === "group" ? (
+            renderGroup(item)
+          ) : (
+            <div id={item.linkId} key={item.linkId} className="questionnaire-item" style={style}>
+              <label>
+                {item.text}
+                {item.required && <span className="required-asterisk">*</span>}
+              </label>
+              {renderInput(item)}
+            </div>
+          );
+        })}
+        </div>
       </div>
     );
   };
 
   return (
+    <><h2 className="questionnaire-title">{questionnaire.title}</h2>
     <div className="questionnaire-container">
-      <h2 className="questionnaire-title">{questionnaire.title}</h2>
-      
       {questionnaire.item.map((item) => {
-       if (!checkEnableWhen(item.enableWhen)) return null;
-        if (item.type === "group") {
+        console.log("-----: " + item.text);
+        if (!checkEnableWhen(item.enableWhen)) return null;
+        if (item.type === "group" ) {
           return renderGroup(item);
         } else {
+          const styleString = item._text?.extension?.find(ext => ext.url === "http://hl7.org/fhir/StructureDefinition/rendering-style")?.valueString || "";
+          const style = parseStyleString(styleString);
+  
           return (
-            <div id={item.linkId}  key={item.linkId} className="questionnaire-item">
-              <label>{item.text}</label>
-              {item.required && <span className="required-asterisk">*</span>}
+            <div id={item.linkId} key={item.linkId} className="questionnaire-item" style={style}>
+              <label>{item.text}
+                {item.required && <span className="required-asterisk">*</span>}
+              </label>
               {renderInput(item)}
             </div>
           );
         }
       })}
-       {error && <div className="error-message">{error}</div>}
-      <div className="questionnaire-responses">
+      {error && <div className="error-message">{error}</div>}
+      </div>
+      <div style={{display:"none"}} className="questionnaire-responses">
         <h3>Respuestas:</h3>
         <pre>{JSON.stringify({ resourceType: "QuestionnaireResponse", status: "completed", item: answers }, null, 2)}</pre>
       </div>
-      <button className="save-btn" onClick={()=>{if(validate()){event(answers)}}}>Guardar Respuestas</button>
-      <button className="save-btn" onClick={()=>{if(validate()){eventContinue(answers); handleReset()}}}>Añadir masa anexial</button>
-    </div>
+      <button className="save-btn" onClick={() => { if (validate()) { setIsModalOpen(true) } } }>Guardar Respuestas</button>
+      {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+        <h2>Confirmación</h2>
+        <p>Se van a guardar lor resultados del cuestionario</p>
+        <p>Puede <b>guardar</b> los resultados o <b>continuar</b> añadiendo nuevas masas anexiales</p>
+        <button className="save" onClick={() => { if (validate()) { event(answers); setIsModalOpen(false); } }}>Guardar</button>
+        <button className="continue" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); setIsModalOpen(false)} } }>Continuar</button>
+        <button className="cancel" onClick={() => setIsModalOpen(false)}>Cancelar</button>
+      </Modal>
+    </>
   );
 };
 

@@ -1,0 +1,88 @@
+/* Modal overlay */
+.custom-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7); /* Más oscuro para mayor contraste */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  transition: opacity 0.3s ease; /* Transición suave */
+}
+
+/* Modal content */
+.custom-modal-content {
+  background-color: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); /* Sombra más pronunciada */
+  position: relative;
+  width: 90%;
+  max-width: 600px; /* Más ancho para mayor visibilidad */
+  animation: slide-down 0.3s ease; /* Animación de deslizamiento */
+}
+
+/* Close button */
+.custom-modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 24px; /* Tamaño de fuente más grande */
+  cursor: pointer;
+  color: #333; /* Color más oscuro */
+  transition: color 0.2s ease; /* Transición suave */
+}
+
+.custom-modal-close:hover {
+  color: #ff5a5f; /* Color de hover */
+}
+
+/* Animación de deslizamiento */
+@keyframes slide-down {
+  from {
+    transform: translateY(-20%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Botones dentro del modal */
+.custom-modal-content button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  margin: 10px 5px;
+  transition: background-color 0.2s ease;
+}
+.save {
+  background-color: #4CAF50 !important;
+}
+.continue {
+  background-color: #2196F3 !important;
+}
+.cancel {
+  background-color: #9E9E9E !important;
+}
+.custom-modal-content button:hover {
+  background-color: #0056b3;
+}
+
+.custom-modal-content button.cancel {
+  background-color: #6c757d;
+}
+
+.custom-modal-content button.cancel:hover {
+  background-color: #5a6268;
+}
