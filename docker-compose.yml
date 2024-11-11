@@ -9,8 +9,4 @@ services:
       - /app/node_modules
     stdin_open: true
     tty: true
-<<<<<<< HEAD
-
-=======
     user: "${UID}:${GID}" # Asignar el usuario
->>>>>>> 8cf752b87700c797ab0ee24ccd68a88e9724547f

@@ -200,6 +200,7 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
       setError("Por favor, complete todos los campos requeridos.");
       return false;
     }else{
+      setError(null);
       return true;
     }
   }
@@ -276,16 +277,16 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
           );
         }
       })}
-      {error && <div className="error-message">{error}</div>}
       </div>
       <div style={{display:"none"}} className="questionnaire-responses">
         <h3>Respuestas:</h3>
         <pre>{JSON.stringify({ resourceType: "QuestionnaireResponse", status: "completed", item: answers }, null, 2)}</pre>
       </div>
-      <button className="save-btn" onClick={() => { if (validate()) { setIsModalOpen(true) } } }>Guardar Respuestas</button>
+      <button className="save-btn" onClick={() => { validate(); setIsModalOpen(true) } }>Guardar Respuestas</button>
       {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h2>Confirmación</h2>
+        <p>{error && <div className="error-message">{error}</div>}</p>
         <p>Se van a guardar lor resultados del cuestionario</p>
         <p>Puede <b>guardar</b> los resultados o <b>continuar</b> añadiendo nuevas masas anexiales</p>
         <button className="save" onClick={() => { if (validate()) { event(answers); setIsModalOpen(false); } }}>Guardar</button>
