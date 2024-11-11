@@ -8,4 +8,4 @@ services:
       - .:/app
     stdin_open: true
     tty: true
-    user: "${UID}:${GID}" # Asignar el usuario
+
