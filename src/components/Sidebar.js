@@ -3,7 +3,7 @@ import LogoETSIT from "../assets/images/LOGO_ESCUELA.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import '../assets/css/Sidebar.css';
 import React, { useState } from 'react';
-const Sidebar = ({ sidebarOpen, toggleSidebar }) => {
+const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
     const [sections, setSections] = useState({
         historico: false,
         datos: false,
@@ -40,8 +40,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar }) => {
                     </button>
                     {sections.datos && (
                         <ul>
-                            <li><a href="#link3">Enlace 3</a></li>
-                            <li><a href="#link4">Enlace 4</a></li>
+                            <li><a href="#link3" onClick={download}>Descargar</a></li>
                         </ul>
                     )}
                 </div>
