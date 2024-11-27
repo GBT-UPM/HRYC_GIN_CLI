@@ -8,7 +8,12 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
   const [error, setError] = useState(null);
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+<<<<<<< HEAD
   const handleInputChange = (text, linkId, type, value, display) => {
+=======
+
+  const handleInputChange = (questionText,linkId, type, value,display) => {
+>>>>>>> 309248dbc0a7ddf3484132abff5e7a84485e9335
     setAnswers((prevAnswers) => {
       const existingAnswerIndex = prevAnswers.findIndex(
         (answer) => answer.linkId === linkId
@@ -22,11 +27,14 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
         }
         return prevAnswers;
       }
-      const newAnswer = { text,linkId, answer: [] };
+      const newAnswer = { questionText,linkId, answer: [] };
 
       switch (type) {
         case "choice":
-          newAnswer.answer = [{ valueCoding: { code: value, display: display } }];
+          //console.log(value)
+          //console.log(display)
+        //newAnswer.answer = [{ valueCoding: { code: value, display: display } }];
+         newAnswer.answer = value;
           break;
         case "date":
           newAnswer.answer = [{ valueDate: value }];
@@ -65,8 +73,6 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
         (answer) => answer.linkId === condition.question
       );
       if (!answer) return false;
-      console.log(answer.text)
-      console.log(condition.operator)
       switch (condition.operator) {
         case "exists":
           return condition.answerBoolean
@@ -74,8 +80,6 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
             : answer === undefined;
         case "=":
           if (condition.answerCoding) {
-            //console.log(answer)
-           // console.log(Array.isArray(answer.answer))
             return (
               answer.answer &&
               Array.isArray(answer.answer) &&
@@ -86,10 +90,6 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
           return false;
         case "!=":
           if (condition.answerCoding) {
-            console.log("---")
-            console.log(answer.answer[0].valueCoding.code)
-            console.log(condition.answerCoding.code)
-            console.log("---")
             return (
               answer.answer &&
               Array.isArray(answer.answer) &&
@@ -109,22 +109,145 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
     const isDisabled = disabledFields.includes(item.linkId);
     switch (item.type) {
       case "choice":
-        return (
-          <select
-            value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueCoding?.code || initialValue.valueCoding?.code || ""}
-            onChange={(e) => {
-              const selectedOption = e.target.options[e.target.selectedIndex]; 
-              handleInputChange(item.text, item.linkId, item.type, e.target.value,selectedOption.text)}}
+        const isDropDown =
+        item.extension?.some(
+          (ext) =>
+            ext.url === "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl" &&
+            ext.valueCodeableConcept?.coding?.some(
+              (coding) => coding.code === "drop-down"
+            )
+        ) ?? false;
+        // Extrae las opciones de respuesta, considerando `valueString` o `valueCoding.display`.
+        const options = item.answerOption.map((option) => {
+          if (option.valueString) {
+            return { value: option.valueString, label: option.valueString };
+          } else if (option.valueCoding) {
+            return { value: option.valueCoding.code, label: option.valueCoding.display };
+          }
+          return null;
+        }).filter(Boolean);
+        if (isDropDown) {
+          // Renderiza un dropdown.
+          return (
+            <select
+              value={answers.find((a) => a.linkId === item.linkId)?.answer[0]?.valueString ||
+                answers.find((a) => a.linkId === item.linkId)?.answer[0]?.valueCoding?.code ||
+                initialValue?.valueString || ""}
+              onChange={(e) => {
+                const selectedOption = e.target.options[e.target.selectedIndex];
+                handleInputChange(item.text, item.linkId, item.type, [{ valueString: e.target.value, valueCoding: { code: e.target.value, display:selectedOption.text } }], selectedOption.text);
+              }}
               disabled={isDisabled}
-          >
-            <option value="">Seleccione una opción</option>
-            {item.answerOption.map((option) => (
-              <option key={option.valueCoding.code} value={option.valueCoding.code}>
-                {option.valueCoding.display}
-              </option>
-            ))}
-          </select>
-        );
+            >
+              <option value="">Seleccione una opción</option>
+              {options.map((option, index) => (
+                <option key={index} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          );
+        }else if (item.repeats) {
+          // Renderiza un grupo de checkboxes para opciones múltiples.
+          return (
+            <div>
+              {options.map((option, index) => (
+                <div key={index}>
+                  <input
+                    type="checkbox"
+                    id={`${item.linkId}-${index}`}
+                    value={option.value}
+                    checked={answers
+                      .find((a) => a.linkId === item.linkId)
+                      ?.answer.some((ans) =>
+                        ans.valueString === option.value || ans.valueCoding?.code === option.value
+                      ) || false}
+                    onChange={(e) => {
+                      const selectedOptions = answers.find((a) => a.linkId === item.linkId)?.answer || [];
+                      const newSelectedOptions = e.target.checked
+                        ? [...selectedOptions, { valueString: option.value, valueCoding: { code: option.value } }]
+                        : selectedOptions.filter((ans) =>
+                            ans.valueString !== option.value && ans.valueCoding?.code !== option.value
+                          );
+                      handleInputChange(item.text, item.linkId, item.type, newSelectedOptions, option.label);
+                    }}
+                    disabled={isDisabled}
+                  />
+                  <label htmlFor={`${item.linkId}-${index}`}>{option.label}</label>
+                </div>
+              ))}
+            </div>
+          );
+        } else {
+          // Renderiza un grupo de botones de radio para una opción única.
+          return (
+            <div>
+              {options.map((option, index) => (
+                <div className="radio-container"  key={index}>
+                  <input
+                    type="radio"
+                    id={`${item.linkId}-${index}`}
+                    name={item.linkId}
+                    value={option.value}
+                    checked={answers
+                      .find((a) => a.linkId === item.linkId)
+                      ?.answer.some((ans) =>
+                        ans.valueString === option.value || ans.valueCoding?.code === option.value
+                      ) || false}
+                    onChange={(e) =>
+                      handleInputChange(item.text, item.linkId, item.type, [{ valueString: option.value, valueCoding: { code: option.value } }], option.label)
+                    }
+                    disabled={isDisabled}
+                  />
+                  <label htmlFor={`${item.linkId}-${index}`}>{option.label}</label>
+                </div>
+              ))}
+            </div>
+          );
+        }
+        /*if (item.repeats) {
+          return (
+            <div>
+              {item.answerOption.map((option, index) => (
+                <div key={index}>
+                  <input
+                    type="checkbox"
+                    id={`${item.linkId}-${index}`}
+                    value={option.valueString}
+                    checked={answers.find((a) => a.linkId === item.linkId)?.answer.some((ans) => ans.valueString === option.valueString) || false}
+                    onChange={(e) => {
+                      const selectedOptions = answers.find((a) => a.linkId === item.linkId)?.answer || [];
+                      const newSelectedOptions = e.target.checked
+                        ? [...selectedOptions, { valueString: option.valueString }]
+                        : selectedOptions.filter((ans) => ans.valueString !== option.valueString);
+                      handleInputChange(item.text, item.linkId, item.type, newSelectedOptions, option.valueString);
+                    }}
+                    disabled={isDisabled}
+                  />
+                  <label htmlFor={`${item.linkId}-${index}`}>{option.valueString}</label>
+                </div>
+              ))}
+            </div>
+          );
+        } else {
+          return (
+            <select
+              value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueString || initialValue.valueString || ""}
+              onChange={(e) => {
+                const selectedOption = e.target.options[e.target.selectedIndex];
+                handleInputChange(item.text, item.linkId, item.type, e.target.value, selectedOption.text);
+              }}
+              disabled={isDisabled}
+            >
+              <option value="">Seleccione una opción</option>
+              {item.answerOption.map((option, index) => (
+                <option key={index} value={option.valueString}>
+                  {option.valueString}
+                </option>
+              ))}
+            </select>
+          );
+        }*/
       case "date":
         return (
           <input
@@ -259,7 +382,6 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
     <><h2 className="questionnaire-title">{questionnaire.title}</h2>
     <div className="questionnaire-container">
       {questionnaire.item.map((item) => {
-        console.log("-----: " + item.text);
         if (!checkEnableWhen(item.enableWhen)) return null;
         if (item.type === "group" ) {
           return renderGroup(item);
@@ -278,7 +400,7 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
         }
       })}
       </div>
-      <div style={{display:"none"}} className="questionnaire-responses">
+      <div style={{display:"block"}} className="questionnaire-responses">
         <h3>Respuestas:</h3>
         <pre>{JSON.stringify({ resourceType: "QuestionnaireResponse", status: "completed", item: answers }, null, 2)}</pre>
       </div>
