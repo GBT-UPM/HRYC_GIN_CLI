@@ -8,7 +8,7 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
   const [error, setError] = useState(null);
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const handleInputChange = (text,linkId, type, value,display) => {
+  const handleInputChange = (text, linkId, type, value, display) => {
     setAnswers((prevAnswers) => {
       const existingAnswerIndex = prevAnswers.findIndex(
         (answer) => answer.linkId === linkId
@@ -197,7 +197,7 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
     });
 
     if (missingAnswers.length > 0) {
-      setError("Por favor, complete todos los campos requeridos.");
+      setError("Hay campos sin rellenar. ¿Continuar de todos modos?");
       return false;
     }else{
       setError(null);
@@ -287,8 +287,7 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h2>Confirmación</h2>
         <p>{error && <div className="error-message">{error}</div>}</p>
-        <p>Se van a guardar lor resultados del cuestionario</p>
-        <p>Puede <b>guardar</b> los resultados o <b>continuar</b> añadiendo nuevas masas anexiales</p>
+        <p>Puede <b>guardar</b> los resultados o <b>continuar</b> añadiendo más masas anexiales.</p>
         <button className="save" onClick={() => { if (validate()) { event(answers); setIsModalOpen(false); } }}>Guardar</button>
         <button className="continue" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); setIsModalOpen(false)} } }>Continuar</button>
         <button className="cancel" onClick={() => setIsModalOpen(false)}>Cancelar</button>
