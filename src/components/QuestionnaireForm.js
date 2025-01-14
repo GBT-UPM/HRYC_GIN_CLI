@@ -8,12 +8,8 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
   const [error, setError] = useState(null);
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-<<<<<<< HEAD
-  const handleInputChange = (text, linkId, type, value, display) => {
-=======
 
   const handleInputChange = (questionText,linkId, type, value,display) => {
->>>>>>> 309248dbc0a7ddf3484132abff5e7a84485e9335
     setAnswers((prevAnswers) => {
       const existingAnswerIndex = prevAnswers.findIndex(
         (answer) => answer.linkId === linkId
