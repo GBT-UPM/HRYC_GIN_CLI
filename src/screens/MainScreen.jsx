@@ -52,7 +52,7 @@ export default function MainScreen() {
   };
   const fetchQuestionnaire = async () => {
     try {
-      const response = await ApiService(keycloak.token, 'GET', `/fhir/Questionnaire?identifier=5770525`, {});
+      const response = await ApiService(keycloak.token, 'GET', `/fhir/Questionnaire?name=registro_ginecologico`, {});
       if (response.status === 200) {
         const data = await response.json();
         console.log(data)
@@ -110,9 +110,9 @@ export default function MainScreen() {
     // const confirmSave = window.confirm("¿Está seguro de que desea guardar las respuestas?");
     // if (!confirmSave) return;
     const firstResponse = anwers;
-    var specificAnswer = anwers.find(answer => answer.linkId === "138324799523");
+    var specificAnswer = anwers.find(answer => answer.linkId === "PAT_NHC");
     const patientId = specificAnswer?.answer?.[0]?.valueString || '';
-    specificAnswer = anwers.find(answer => answer.linkId === "9485775618610");
+    specificAnswer = anwers.find(answer => answer.linkId === "PAT_IND");
     const observation = specificAnswer?.answer?.[0]?.valueString || '';
     
     const encId = generateId();
