@@ -6,7 +6,7 @@ const Header = (props) => {
     <header class="header">
   <div class="logo-section">
     <img src={LogoHRYC} alt="Logo" class="logo"/>
-    <span class="app-name">Mi Aplicación</span>
+    <span class="app-name">AdnexaTech HRC</span>
   </div>
   
   <div class="user-section">

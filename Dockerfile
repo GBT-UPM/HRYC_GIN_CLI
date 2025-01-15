@@ -12,8 +12,9 @@ RUN npm install
 
 # Copiar el resto del código de la aplicación
 COPY . .
+#RUN chown -R node:node /app/node_modules
 # Cambiar a un usuario no root
-USER node
+#USER node
 # Exponer el puerto por defecto de React
 EXPOSE 3000
 
