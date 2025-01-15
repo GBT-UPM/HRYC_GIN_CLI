@@ -32,7 +32,7 @@ export default function MainScreen() {
   };
   const fetchQuestionnaire = async () => {
     try {
-      const response = await ApiService(keycloak.token, 'GET', `/fhir/Questionnaire?identifier=5770525`, {});
+      const response = await ApiService(keycloak.token, 'GET', `/fhir/Questionnaire?identifier=masas`, {});
       if (response.status === 200) {
         const data = await response.json();
         console.log(data)
