@@ -177,7 +177,7 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
         } else {
           // Renderiza un grupo de botones de radio para una opción única.
           return (
-            <div>
+            <div className="panel-radio">
               {options.map((option, index) => (
                 <div className="radio-container"  key={index}>
                   <input

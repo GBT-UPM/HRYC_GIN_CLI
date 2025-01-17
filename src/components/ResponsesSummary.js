@@ -48,9 +48,21 @@ const ResponsesSummary = ({ responses, event }) => {
     const generateReport = () => {
       const getValue = (id) => {
         const response = responses.find((resp) => resp.linkId.toLowerCase() === id.toLowerCase());
+        console.log(responses)
         if (response && response.answer.length > 0) {
-          const value = response.answer[0].valueCoding.display || '';   //Acceso al campo display. PROBLEMA: las preguntas de texto libre (como la conclusión) no tienen campo display
-          return value.toLowerCase();  // Convierto el valor a minúsculas
+
+          const answer = response.answer[0];
+
+          // Determinar el tipo de valor presente en la respuesta
+          if (answer.valueCoding && answer.valueCoding.display) {
+            return answer.valueCoding.display.toLowerCase(); // Campo display de valueCoding
+          } else if (answer.valueString) {
+            return answer.valueString.toLowerCase(); // Campo valueString
+          } else if (answer.valueInteger !== undefined) {
+            return answer.valueInteger.toString(); // Campo valueInteger convertido a string
+          } else if (answer.valueDate) {
+            return answer.valueDate; // Campo valueDate como está (ya es un string)
+            }
         }
         return '';  //Si no encuentra nada.
       };
