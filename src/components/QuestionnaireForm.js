@@ -325,11 +325,11 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
   }
    const handleReset = () => {
     const preservedLinkIds = [
-      "5800515049283", // Nombre
-      "138324799523",  // NHC
-      "3772124358948", // Edad
-      "9825756855092", // FUR
-      "4903966501003"  // ¿Hay alguna masa anexial?
+      "PAT_NOMBRE", // Nombre
+      "PAT_NHC",  // NHC
+      "PAT_EDAD", // Edad
+      "PAT_FUR", // FUR
+      "PAT_MA"  // ¿Hay alguna masa anexial?
     ];
 
     setAnswers((prevAnswers) => {
@@ -396,7 +396,7 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
         }
       })}
       </div>
-      <div style={{display:"block"}} className="questionnaire-responses">
+      <div style={{display:"none"}} className="questionnaire-responses">
         <h3>Respuestas:</h3>
         <pre>{JSON.stringify({ resourceType: "QuestionnaireResponse", status: "completed", item: answers }, null, 2)}</pre>
       </div>
