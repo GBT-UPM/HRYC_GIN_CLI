@@ -18,6 +18,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useEncounterTemplate } from "../hooks/useEncounterTemplate";
 import { useObservationTemplate } from "../hooks/useObservationTemplate";
 import { useImageStudyTemplate } from "../hooks/useImageStudyTemplate";
+import ResponsesProbability from "../components/ResponsesProbability";
 Chart.register(CategoryScale);
 
 const generateId = () => {
@@ -46,6 +47,8 @@ export default function QuestionnaireScreen() {
   const { generateEncounter } = useEncounterTemplate();
   const { generateObservation } = useObservationTemplate();
   const { generateImagingStudy } = useImageStudyTemplate();
+  //const {probability,setProbality}=useState(false);
+  const [probability, setProbality] = useState(false);
 
   const fetchQuestionnaire = async () => {
     try {
@@ -67,6 +70,26 @@ export default function QuestionnaireScreen() {
   const handleSave = async (anwers) => {
     // const confirmSave = window.confirm("¿Está seguro de que desea guardar las respuestas?");
     // if (!confirmSave) return;
+    console.log("CLICK SAVE")
+ 
+    const questionnaireResponse = {
+      resourceType: "QuestionnaireResponse",
+      status: "completed",
+      id: generateId(),
+      item: anwers,
+    };
+    console.log("Saved Responses3 (antes de setState):", questionnaireResponses);
+
+    // Misma idea: NO uses .push, haz un spread
+    setQuestionnaireResponses((prev) => [...prev, questionnaireResponse]);
+
+    // Aquí inmediatamente seguirá mostrando el viejo estado
+    console.log("Saved Responses3 (después de setState):", questionnaireResponses);
+
+    // Para ver el estado actualizado, puedes usar un useEffect
+    setProbality(true);
+
+/*
     const firstResponse = anwers;
     var specificAnswer = anwers.find(answer => answer.linkId === "PAT_NHC");
     const patientId = specificAnswer?.answer?.[0]?.valueString || '';
@@ -144,20 +167,23 @@ export default function QuestionnaireScreen() {
      const remainingResponses = questionnaireResponses.filter(qResponse => !successfulResponses.includes(qResponse));
      setQuestionnaireResponses(remainingResponses);
     const allItems = questionnaireResponses.flatMap(qResponse => qResponse.item);
-    setResponses(allItems);
+    setResponses(allItems);*/
   };
-  const handleContinue = async (anwers) => {
-
+  const handleContinue = async (answers) => {
     const questionnaireResponse = {
       resourceType: "QuestionnaireResponse",
       status: "completed",
       id: generateId(),
-      item: anwers,
+      item: answers,
     };
     console.log("Saved Responses:", questionnaireResponse);
-    setQuestionnaireResponses(questionnaireResponses)
-    // Aquí puedes añadir la lógica para enviar las respuestas a un servidor o guardarlas localmente
-
+  
+    // Agregar sin mutar el estado
+    setQuestionnaireResponses((prev) => [...prev, questionnaireResponse]);
+  
+    // ¡Ojo! Aquí, inmediatamente después de setState, `questionnaireResponses`
+    // todavía NO reflejará el nuevo valor. Para verlo, hazlo en un useEffect.
+    console.log("Saved Responses2 (inmed. after setState):", questionnaireResponses);
   };
   const QBack = async (anwers) => {
     setResponses([])
@@ -178,10 +204,11 @@ export default function QuestionnaireScreen() {
   return (
     <div>
       {questionnaire ? (
-        responses.length === 0 ? (
+        !probability ? (
           <QuestionnaireForm eventContinue={handleContinue} event={handleSave} questionnaire={questionnaire.resourceData} />
         ) : (
-          <ResponsesSummary event={QBack} responses={responses} />
+          // <ResponsesSummary event={QBack} responses={responses} />
+          <ResponsesProbability responses={questionnaireResponses} event={QBack} />
         )
       ) : (
         null

@@ -1,0 +1,277 @@
+import React, { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
+import '../assets/css/ResponsesSummary.css';
+import DOMPurify from 'dompurify';
+import '../assets/css/ResponsesProbability.css';
+const ResponsesProbability = ({ responses, event }) => {
+   const [reports, setReports] = useState([]);
+   const [observations, setObservations] = useState([]);
+    /* // Función para renderizar las respuestas 
+    const renderAnswer = (answer) => {
+      if (answer.valueCoding) {
+        return `${answer.valueCoding.display} (${answer.valueCoding.code})`;
+      }
+      if (answer.valueDecimal !== undefined) {
+        return answer.valueDecimal;
+      }
+      if (answer.valueString) {
+        return answer.valueString;
+      }
+      if (answer.valueDate) {
+        return answer.valueDate;
+      }
+      // Añadir más tipos de respuesta según sea necesario
+      return JSON.stringify(answer);
+    }; */
+    useEffect(() => {
+    console.log("ENTRA");
+    console.log(responses);
+
+    for (const response of responses) {
+      const repo = generateReport(response)
+      setReports((prev) => [...prev, repo]);
+    }
+
+  }, []);
+    // Función para calcular logit(p)
+    const calcularLogit = (contorno, sombra, vascAreaSolida, vascPapila) =>{
+      let logit = -3.625;
+
+      //Cálculo coeficientes
+      if (contorno === 'irregular') logit += 1.299;
+
+      if (sombra === 'no') logit += 1.847;
+
+      if (vascAreaSolida === 'nula (score color 1)' || vascAreaSolida === 'leve (score color 2)') logit += 2.209;
+      else if (vascAreaSolida === 'moderada (score color 3)' || vascAreaSolida === 'abundante (score color 4)') logit += 2.967
+
+      if (vascPapila === 'nula (score color 1)' || vascPapila === 'leve (score color 2)') logit += 1.253;
+      else if (vascPapila === 'moderada (score color 3)' || vascPapila === 'abundante (score color 4)') logit +=1.988;
+
+      return logit;
+    }
+
+    // Función para calcular la probabilidad.
+    const calcularProbabilidad = (logit) => {
+      return 1 / (1 + Math.exp(-logit));
+    };
+
+    // Función para generar el informe médico
+    const generateReport = (res) => {
+
+      const getValue = (id) => {
+        const response = res.item.find((resp) => resp.linkId.toLowerCase() === id.toLowerCase());
+ 
+        if (response && response.answer.length > 0) {
+
+          const answer = response.answer[0];
+
+          // Determinar el tipo de valor presente en la respuesta
+          if (answer.valueCoding && answer.valueCoding.display) {
+            return answer.valueCoding.display.toLowerCase(); // Campo display de valueCoding
+          } else if (answer.valueString) {
+            return answer.valueString.toLowerCase(); // Campo valueString
+          } else if (answer.valueInteger !== undefined) {
+            return answer.valueInteger.toString(); // Campo valueInteger convertido a string
+          } else if (answer.valueDate) {
+            return answer.valueDate; // Campo valueDate como está (ya es un string)
+            }
+        }
+        return '';  //Si no encuentra nada.
+      };
+
+      const PAT_MA = getValue('PAT_MA');
+      const MA_TIPO = getValue('MA_TIPO');
+      const MA_ESTRUCTURA = getValue('MA_ESTRUCTURA');
+      const MA_LADO = getValue('MA_LADO');
+      const MA_M1 = getValue('MA_M1');
+      const MA_M2 = getValue('MA_M2');
+      const MA_M3 = getValue('MA_M3');
+      const MA_VOL = (parseFloat(MA_M1) * parseFloat(MA_M2) * parseFloat(MA_M3) * 0.52).toFixed(2);
+      const MA_SOL_CONTORNO = getValue('MA_SOL_CONTORNO');
+      const MA_CONTENIDO = getValue('MA_CONTENIDO');
+      const MA_SOL_VASC = getValue('MA_SOL_VASC');
+      const MA_Q_CONTORNO = getValue('MA_Q_CONTORNO');
+      const MA_Q_GROSOR = getValue('MA_Q_GROSOR');
+      const MA_Q_VASC = getValue('MA_Q_VASC');
+      const MA_Q_P = getValue('MA_Q_P');
+      const MA_Q_P_M1 = getValue('MA_Q_P_M1');
+      const MA_Q_P_M2 = getValue('MA_Q_P_M2');
+      const MA_Q_P_CONTORNO = getValue('MA_Q_P_CONTORNO');
+      const MA_Q_P_VASC = getValue('MA_Q_P_VASC');
+      const MA_Q_T = getValue('MA_Q_T');
+      const MA_Q_T_TIPO = getValue('MA_Q_T_TIPO');
+      const MA_Q_T_GROSOR = getValue('MA_Q_T_GROSOR');
+      const MA_Q_T_VASC = getValue('MA_Q_T_VASC');
+      const MA_Q_T_N = getValue('MA_Q_T_N');
+      const MA_Q_AS = getValue('MA_Q_AS');
+      const MA_Q_AS_N = getValue('MA_Q_AS_N');
+      const MA_Q_AS_M1 = getValue('MA_Q_AS_M1');
+      const MA_Q_AS_M2 = getValue('MA_Q_AS_M2');
+      const MA_Q_AS_M3 = getValue('MA_Q_AS_M3');
+      const MA_Q_AS_VASC = getValue('MA_Q_AS_VASC');
+      const MA_SA = getValue('MA_SA');
+      const MA_PS = getValue('MA_PS');
+      const MA_PS_M1 = getValue('MA_PS_M1');
+      const MA_PS_M2 = getValue('MA_PS_M2');
+      const MA_PS_M3 = getValue('MA_PS_M3');
+      const MA_ASC = getValue('MA_ASC');
+      const MA_ASC_TIPO = getValue('MA_ASC_TIPO');
+      const MA_CARC = getValue('MA_CARC');
+      const RES_CONCL = getValue('RES_CONCL');
+
+      //Calcular logit y probabilidad      
+      const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
+      const probabilidad = calcularProbabilidad(logit);
+      
+      const RES_SCORE = probabilidad.toFixed(4);    //no sé si esto se mostraría en el informe o solo para información del médico.
+    
+      //Construcción del informe
+      let report = '';
+
+
+      if (PAT_MA === 'no') {                  //Si NO hay masa anexial
+        const OD_M1 = getValue('OD_M1');
+        const OD_M2 = getValue('OD_M2');
+        const OD_FOL = getValue('OD_FOL');
+        const OI_M1 = getValue('OI_M1');
+        const OI_M2 = getValue('OI_M2');
+        const OI_FOL = getValue('OI_FOL');
+
+        report += `Anejo derecho de ${OD_M1} x ${OD_M2} mm con ${OD_FOL}.\n `;
+        report += `Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL}.\n`;
+      
+      } else {    //Si SÍ hay masa anexial
+          if (MA_TIPO === 'sólida') {   //Masa anexial SÓLIDA
+            if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {   //Estructura o lateralidad INDEFINIDAS
+              report += `De dependencia <b>indefinida</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_SOL_CONTORNO}</b>, de contenido <b>${MA_CONTENIDO}</b> y vascularización <b>${MA_SOL_VASC}</b>.<br/>`; 
+            } else {    
+              report += `Dependiente de <b>${MA_ESTRUCTURA} ${MA_LADO}</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_SOL_CONTORNO}</b>, de contenido <b>${MA_CONTENIDO}</b> y vascularización <b>${MA_SOL_VASC}</b>.<br/>`;
+            }
+          } else if (MA_TIPO === 'quística' || MA_TIPO === 'sólido_quística') {   //Masa anexial QUÍSTICA o SÓLIDO-QUÍSTICA
+            if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {     //Estructura o lateralidad INDEFINIDAS
+              report += `De dependencia <b>indefinida</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_Q_CONTORNO}</b> y de contenido <b>${MA_CONTENIDO}</b>.<br/>`;
+            } else {
+              report += `Dependiente de <b>${MA_ESTRUCTURA} ${MA_LADO}</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_SOL_CONTORNO}</b> y de contenido <b>${MA_CONTENIDO}</b>.<br/>`;
+            }
+            
+            report += `La pared mide <b>${MA_Q_GROSOR}</b> y su vascularización es <b>${MA_Q_VASC}</b>.<br/>`;
+
+            if (MA_Q_CONTORNO === 'irregular') {    //Contorno irregular.
+              report += `Contiene <b>${MA_Q_P}</b> papila/s, la mayor de ellas de ${MA_Q_P_M1} x ${MA_Q_P_M2} mm de morfología <b>${MA_Q_P_CONTORNO}</b>, con vascularización <b>${MA_Q_P_VASC}</b>.<br/>`;
+            }
+            
+            if (MA_Q_T === 'sí') {      //Presencia de tabiques.
+              report += `Los tabiques son <b>${MA_Q_T_TIPO}</b>, de grosor <b>${MA_Q_T_GROSOR}</b> y vascularización <b>${MA_Q_T_VASC}</b>. La formación tiene <b>${MA_Q_T_N}</b> lóculos.<br/>`;
+            }
+
+            if (MA_Q_AS === 'sí') {   //Área sólida.
+              report += `Contiene <b>${MA_Q_AS_N}</b> porción/es sólida/s, la mayor de ellas tiene un tamaño de ${MA_Q_AS_M1} x ${MA_Q_AS_M2} x <b>${MA_Q_AS_M3}</b> mm con vascularización <b>${MA_Q_AS_VASC}</b>.<br/>`;
+            }
+          }
+          //Esto ya no depende del tipo de masa anexial.
+
+          if (MA_SA === 'sí') {   //Sombra acústica posterior.
+            report += `Presenta sombra posterior.<br/>`;
+          }
+
+          if (MA_PS === 'sí') {   //Parénquima ovárico sano.
+            report += `Tiene parénquima ovárico sano, de tamaño ${MA_PS_M1} x ${MA_PS_M2} x ${MA_PS_M3} mm.<br/>`;      
+          }
+
+          if (MA_ASC === 'sí') {    //Ascitis.
+            report += `Presenta ascitis de tipo <b>${MA_ASC_TIPO}</b>.<br/>`;
+          }
+
+          if (MA_CARC === 'sí') {   //Carcinomatosis.
+            report += 'Hay carcinomatosis.<br/>';
+          }
+
+          //report += `La probabilidad de que la masa anexial sea maligna es de <b>${RES_SCORE}</b>. <br/>`;
+        }
+
+        return {
+          text: report,
+          score: RES_SCORE
+        };
+    };
+  /**
+   * Maneja el cambio de texto en la observación del reporte de índice `index`.
+   */
+    const handleObservationChange = (index, newValue) => {
+      setObservations((prev) => {
+        const updated = [...prev];
+        updated[index] = newValue;
+        return updated;
+      });
+    };
+    function MyComponent({ reportHtml }) {
+      const sanitizedHtml = DOMPurify.sanitize(reportHtml);
+      
+      return <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />;
+    }
+    /**
+     * Ejemplo de función que maneje el click del botón en cada reporte.
+     * Podrías hacer lo que necesites (guardar, eliminar, etc.)
+     */
+    const handleReportButtonClick = (index) => {
+      console.log(`Botón en reporte #${index} clicado. Observación: ${observations[index]}`);
+      // Aquí la lógica que quieras al dar clic (enviar a servidor, etc.)
+    };
+    return (
+      <div className="responses-summary">
+      <h3>Informe Médico</h3>
+
+      {/* Iterar sobre los reportes */}
+      {reports.map((report, index) => (
+        <div key={index} className="report-item">
+          <h4>Masa anexial #{index + 1}</h4>
+
+          {/* Ejemplo: mostrar alguna información del objeto `report` */}
+          <div className="parts">
+            <span className='tlabel'>Probabilidad de malignidad: </span><span className='text' dangerouslySetInnerHTML={{ __html: report.score }} />
+          </div>
+          <div className="parts">
+            <div className='tlabel'>Informe:</div>
+            <div className='text' dangerouslySetInnerHTML={{ __html: report.text }} />
+          </div>
+          {/* Campo de texto para observación */}
+          <label className='tlabel'>
+            Observaciones Finales:
+            <input
+              type="text"
+              value={observations[index] || ""}
+              onChange={(e) => handleObservationChange(index, e.target.value)}
+            />
+          </label>
+
+          {/* Botón para este reporte 
+          <button onClick={() => handleReportButtonClick(index)}>
+            Descarga Informe
+          </button>
+          */}
+        </div>
+      ))}
+
+      {/* Botón final para volver */}
+      <button className="save-btn" onClick={event}>
+        Volver al cuestionario
+      </button>
+    </div>
+    );
+  };
+  
+  ResponsesProbability.propTypes = {
+    responses: PropTypes.arrayOf(
+      PropTypes.shape({
+        linkId: PropTypes.string.isRequired,
+        answer: PropTypes.arrayOf(PropTypes.object).isRequired,
+      })
+    ).isRequired,
+    event: PropTypes.func.isRequired,
+  };
+  
+  export default ResponsesProbability;
+
+
+
