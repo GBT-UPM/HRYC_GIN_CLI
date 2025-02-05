@@ -3,8 +3,10 @@ import LogoETSIT from "../assets/images/LOGO_ESCUELA.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import '../assets/css/Sidebar.css';
 import React, { useState } from 'react';
+import { Home } from "@mui/icons-material";
 const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
     const [sections, setSections] = useState({
+        Home:true,
         historico: false,
         datos: false,
         enlaces: false,
@@ -23,6 +25,11 @@ const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
             </button>
             <img src={LogoETSIT} alt="LogoEscuela" class="logoEscuela" />
             <div className="sections">
+                <div className="sidebar-section">
+                    <ul>
+                     <li> <a href="/">Inicio</a></li>
+                    </ul>
+                </div>
                 <div className="sidebar-section">
                     <button className="section-toggle-btn" onClick={() => toggleSection('historico')}>
                         Histórico <FontAwesomeIcon icon={sections.historico ? faChevronUp : faChevronDown} />

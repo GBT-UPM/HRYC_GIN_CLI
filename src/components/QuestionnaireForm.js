@@ -329,8 +329,7 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
       "PAT_NHC",  // NHC
       "PAT_EDAD", // Edad
       "PAT_FUR", // FUR
-      "PAT_MA",  // ¿Hay alguna masa anexial?
-      "PAT_IND"  // Indicación de la ecografía
+      "PAT_MA"  // ¿Hay alguna masa anexial?
     ];
 
     setAnswers((prevAnswers) => {
@@ -397,7 +396,7 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
         }
       })}
       </div>
-      <div style={{display:"block"}} className="questionnaire-responses">
+      <div style={{display:"none"}} className="questionnaire-responses">
         <h3>Respuestas:</h3>
         <pre>{JSON.stringify({ resourceType: "QuestionnaireResponse", status: "completed", item: answers }, null, 2)}</pre>
       </div>
