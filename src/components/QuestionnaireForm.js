@@ -9,6 +9,34 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  /**
+ * Recorre recursivamente el cuestionario (items e hijos) para
+ * obtener todos los linkId habilitados dados los 'answers' actuales.
+ * Si un ítem padre no está habilitado, tampoco lo estarán sus hijos.
+ */
+function getEnabledLinkIds(items, currentAnswers) {
+  let enabledIds = [];
+
+  for (const item of items) {
+    // Verificamos si este ítem está habilitado con sus condiciones
+    const thisItemEnabled = checkEnableWhen(item.enableWhen, currentAnswers);
+
+    if (thisItemEnabled) {
+      // Agregamos este linkId
+      enabledIds.push(item.linkId);
+
+      // Si el ítem es de tipo 'group', procesamos sus hijos
+      if (item.type === "group" && item.item) {
+        const childEnabledIds = getEnabledLinkIds(item.item, currentAnswers);
+        enabledIds = [...enabledIds, ...childEnabledIds];
+      }
+    }
+    // Si no está habilitado, no bajamos a sus hijos (no se agregan).
+  }
+
+  return enabledIds;
+}
+
   const handleInputChange = (questionText,linkId, type, value,display) => {
     setAnswers((prevAnswers) => {
       const existingAnswerIndex = prevAnswers.findIndex(
@@ -49,63 +77,90 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
           return prevAnswers;
       }
 
+      let updatedAnswers = [];
       if (existingAnswerIndex >= 0) {
-        const updatedAnswers = [...prevAnswers];
+        updatedAnswers = [...prevAnswers];
         updatedAnswers[existingAnswerIndex] = newAnswer;
-        return updatedAnswers;
       } else {
-        return [...prevAnswers, newAnswer];
+        updatedAnswers = [...prevAnswers, newAnswer];
       }
-   
-    });
-   
-  };
 
-  const checkEnableWhen = (enableWhen) => {
-    if (!enableWhen) return true;
-
-    return enableWhen.every((condition) => {
-      const answer = answers.find(
-        (answer) => answer.linkId === condition.question
+      // --- Nuevo paso para limpiar respuestas de ítems no habilitados ---
+      const enabledLinkIds = getEnabledLinkIds(questionnaire.item, updatedAnswers);
+      const cleanedAnswers = updatedAnswers.filter((ans) =>
+        enabledLinkIds.includes(ans.linkId)
       );
-      if (!answer) return false;
-      switch (condition.operator) {
-        case "exists":
-          return condition.answerBoolean
-            ? answer !== undefined
-            : answer === undefined;
-        case "=":
-          if (condition.answerCoding) {
-            return (
-              answer.answer &&
-              Array.isArray(answer.answer) &&
-              answer.answer.length > 0 &&
-              answer.answer[0].valueCoding.code === condition.answerCoding.code
-            );
-          }
-          return false;
-        case "!=":
-          if (condition.answerCoding) {
-            return (
-              answer.answer &&
-              Array.isArray(answer.answer) &&
-              answer.answer.length > 0 &&
-              answer.answer[0].valueCoding.code !== condition.answerCoding.code
-            );
-          }
-            return false;
-        default:
-          return false;
-      }
-    });
-  };
 
-  const renderInput = (item) => {
-    const initialValue = item.initial?.[0] || {};
-    const isDisabled = disabledFields.includes(item.linkId);
-    switch (item.type) {
-      case "choice":
-        const isDropDown =
+      return cleanedAnswers;
+   
+    });
+   
+  };
+/**
+ * Determina si un ítem (y su descendencia) está habilitado,
+ * evaluando sus condiciones enableWhen y la habilitación del padre.
+ */
+function checkEnableWhen(enableWhen, currentAnswers) {
+  if (!enableWhen) return true;
+
+  return enableWhen.every((condition) => {
+    const answer = currentAnswers.find((a) => a.linkId === condition.question);
+    // Si no hay respuesta para la pregunta que condiciona, no se cumple
+    if (!answer) return false;
+
+    switch (condition.operator) {
+      case "exists":
+        return condition.answerBoolean
+          ? answer !== undefined
+          : answer === undefined;
+      case "=":
+        // ejemplo con answerCoding
+        if (condition.answerCoding) {
+          return (
+            answer.answer &&
+            Array.isArray(answer.answer) &&
+            answer.answer.some(
+              (ans) => ans.valueCoding?.code === condition.answerCoding.code
+            )
+          );
+        }
+        return false;
+      case "!=":
+        if (condition.answerCoding) {
+          return (
+            answer.answer &&
+            Array.isArray(answer.answer) &&
+            answer.answer.every(
+              (ans) => ans.valueCoding?.code !== condition.answerCoding.code
+            )
+          );
+        }
+        return false;
+      default:
+        return false;
+    }
+  });
+}
+  
+/**
+   * Ajustado para que reciba también 'answers'.
+   * Se llama en tiempo de render para saber si mostrar o no el ítem.
+   */
+const isItemEnabled = (item) => {
+  return checkEnableWhen(item.enableWhen, answers);
+};
+
+/**
+ * Renderiza el input correspondiente dependiendo del tipo.
+ */
+const renderInput = (item) => {
+  const initialValue = item.initial?.[0] || {};
+  const isDisabled = disabledFields.includes(item.linkId);
+  const currentAnswer = answers.find((a) => a.linkId === item.linkId);
+
+  switch (item.type) {
+    case "choice":
+      const isDropDown =
         item.extension?.some(
           (ext) =>
             ext.url === "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl" &&
@@ -113,190 +168,248 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
               (coding) => coding.code === "drop-down"
             )
         ) ?? false;
-        // Extrae las opciones de respuesta, considerando `valueString` o `valueCoding.display`.
-        const options = item.answerOption.map((option) => {
+
+      // Preparar las opciones (valueString o valueCoding)
+      const options = item.answerOption
+        .map((option) => {
           if (option.valueString) {
             return { value: option.valueString, label: option.valueString };
           } else if (option.valueCoding) {
-            return { value: option.valueCoding.code, label: option.valueCoding.display };
+            return {
+              value: option.valueCoding.code,
+              label: option.valueCoding.display,
+            };
           }
           return null;
-        }).filter(Boolean);
-        if (isDropDown) {
-          // Renderiza un dropdown.
-          return (
-            <select
-              value={answers.find((a) => a.linkId === item.linkId)?.answer[0]?.valueString ||
-                answers.find((a) => a.linkId === item.linkId)?.answer[0]?.valueCoding?.code ||
-                initialValue?.valueString || ""}
-              onChange={(e) => {
-                const selectedOption = e.target.options[e.target.selectedIndex];
-                handleInputChange(item.text, item.linkId, item.type, [{ valueString: e.target.value, valueCoding: { code: e.target.value, display:selectedOption.text } }], selectedOption.text);
-              }}
-              disabled={isDisabled}
-            >
-              <option value="">Seleccione una opción</option>
-              {options.map((option, index) => (
-                <option key={index} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          );
-        }else if (item.repeats) {
-          // Renderiza un grupo de checkboxes para opciones múltiples.
-          return (
-            <div>
-              {options.map((option, index) => (
+        })
+        .filter(Boolean);
+
+      // 1) Dropdown
+      if (isDropDown) {
+        return (
+          <select
+            value={
+              currentAnswer?.answer?.[0]?.valueString ||
+              currentAnswer?.answer?.[0]?.valueCoding?.code ||
+              initialValue?.valueString ||
+              ""
+            }
+            onChange={(e) => {
+              const selectedOption = e.target.options[e.target.selectedIndex];
+              handleInputChange(
+                item.text,
+                item.linkId,
+                item.type,
+                [
+                  {
+                    valueString: e.target.value,
+                    valueCoding: {
+                      code: e.target.value,
+                      display: selectedOption.text,
+                    },
+                  },
+                ],
+                selectedOption.text
+              );
+            }}
+            disabled={isDisabled}
+          >
+            <option value="">Seleccione una opción</option>
+            {options.map((option, index) => (
+              <option key={index} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        );
+      }
+      // 2) Checkboxes (si item.repeats = true)
+      else if (item.repeats) {
+        return (
+          <div>
+            {options.map((option, index) => {
+              const isChecked =
+                currentAnswer?.answer?.some(
+                  (ans) =>
+                    ans.valueString === option.value ||
+                    ans.valueCoding?.code === option.value
+                ) || false;
+              return (
                 <div key={index}>
                   <input
                     type="checkbox"
                     id={`${item.linkId}-${index}`}
                     value={option.value}
-                    checked={answers
-                      .find((a) => a.linkId === item.linkId)
-                      ?.answer.some((ans) =>
-                        ans.valueString === option.value || ans.valueCoding?.code === option.value
-                      ) || false}
+                    checked={isChecked}
                     onChange={(e) => {
-                      const selectedOptions = answers.find((a) => a.linkId === item.linkId)?.answer || [];
+                      const selectedOptions = currentAnswer?.answer || [];
                       const newSelectedOptions = e.target.checked
-                        ? [...selectedOptions, { valueString: option.value, valueCoding: { code: option.value } }]
-                        : selectedOptions.filter((ans) =>
-                            ans.valueString !== option.value && ans.valueCoding?.code !== option.value
+                        ? [
+                            ...selectedOptions,
+                            {
+                              valueString: option.value,
+                              valueCoding: { code: option.value },
+                            },
+                          ]
+                        : selectedOptions.filter(
+                            (ans) =>
+                              ans.valueString !== option.value &&
+                              ans.valueCoding?.code !== option.value
                           );
-                      handleInputChange(item.text, item.linkId, item.type, newSelectedOptions, option.label);
+                      handleInputChange(
+                        item.text,
+                        item.linkId,
+                        item.type,
+                        newSelectedOptions,
+                        option.label
+                      );
                     }}
                     disabled={isDisabled}
                   />
-                  <label htmlFor={`${item.linkId}-${index}`}>{option.label}</label>
+                  <label htmlFor={`${item.linkId}-${index}`}>
+                    {option.label}
+                  </label>
                 </div>
-              ))}
-            </div>
-          );
-        } else {
-          // Renderiza un grupo de botones de radio para una opción única.
-          return (
-            <div className="panel-radio">
-              {options.map((option, index) => (
-                <div className="radio-container"  key={index}>
+              );
+            })}
+          </div>
+        );
+      }
+      // 3) Radio buttons
+      else {
+        return (
+          <div className="panel-radio">
+            {options.map((option, index) => {
+              const isChecked =
+                currentAnswer?.answer?.some(
+                  (ans) =>
+                    ans.valueString === option.value ||
+                    ans.valueCoding?.code === option.value
+                ) || false;
+              return (
+                <div className="radio-container" key={index}>
                   <input
                     type="radio"
                     id={`${item.linkId}-${index}`}
                     name={item.linkId}
                     value={option.value}
-                    checked={answers
-                      .find((a) => a.linkId === item.linkId)
-                      ?.answer.some((ans) =>
-                        ans.valueString === option.value || ans.valueCoding?.code === option.value
-                      ) || false}
-                    onChange={(e) =>
-                      handleInputChange(item.text, item.linkId, item.type, [{ valueString: option.value, valueCoding: { code: option.value } }], option.label)
+                    checked={isChecked}
+                    onChange={() =>
+                      handleInputChange(
+                        item.text,
+                        item.linkId,
+                        item.type,
+                        [
+                          {
+                            valueString: option.value,
+                            valueCoding: {
+                              code: option.value,
+                              display: option.label,
+                            },
+                          },
+                        ],
+                        option.label
+                      )
                     }
                     disabled={isDisabled}
                   />
-                  <label htmlFor={`${item.linkId}-${index}`}>{option.label}</label>
+                  <label htmlFor={`${item.linkId}-${index}`}>
+                    {option.label}
+                  </label>
                 </div>
-              ))}
-            </div>
-          );
-        }
-        /*if (item.repeats) {
-          return (
-            <div>
-              {item.answerOption.map((option, index) => (
-                <div key={index}>
-                  <input
-                    type="checkbox"
-                    id={`${item.linkId}-${index}`}
-                    value={option.valueString}
-                    checked={answers.find((a) => a.linkId === item.linkId)?.answer.some((ans) => ans.valueString === option.valueString) || false}
-                    onChange={(e) => {
-                      const selectedOptions = answers.find((a) => a.linkId === item.linkId)?.answer || [];
-                      const newSelectedOptions = e.target.checked
-                        ? [...selectedOptions, { valueString: option.valueString }]
-                        : selectedOptions.filter((ans) => ans.valueString !== option.valueString);
-                      handleInputChange(item.text, item.linkId, item.type, newSelectedOptions, option.valueString);
-                    }}
-                    disabled={isDisabled}
-                  />
-                  <label htmlFor={`${item.linkId}-${index}`}>{option.valueString}</label>
-                </div>
-              ))}
-            </div>
-          );
-        } else {
-          return (
-            <select
-              value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueString || initialValue.valueString || ""}
-              onChange={(e) => {
-                const selectedOption = e.target.options[e.target.selectedIndex];
-                handleInputChange(item.text, item.linkId, item.type, e.target.value, selectedOption.text);
-              }}
-              disabled={isDisabled}
-            >
-              <option value="">Seleccione una opción</option>
-              {item.answerOption.map((option, index) => (
-                <option key={index} value={option.valueString}>
-                  {option.valueString}
-                </option>
-              ))}
-            </select>
-          );
-        }*/
-      case "date":
-        return (
-          <input
-            type="date"
-            value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueDate || initialValue.valueDate || ""}
-            onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
-            disabled={isDisabled}
-          />
+              );
+            })}
+          </div>
         );
-      case "decimal":
-        return (
-          <input
-            type="number"
-            step="0.1"
-            value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueDecimal || initialValue.valueDecimal || ""}
-            onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
-            disabled={isDisabled}
-          />
-        );
-      case "integer":
-        return (
-          <input
-            type="number"
-            step="1"
-            value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueInteger || initialValue.valueInteger || ""}
-            onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
-            disabled={isDisabled}
-          />
-        );
-      case "string":
-        return (
-          <input
-            type="text"
-            value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueString || initialValue.valueString || ""}
-            onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
-            disabled={isDisabled}
-          />
-        );
-      case "text":
-        return (
-          <textarea
-            value={answers.find((a) => a.linkId === item.linkId)?.answer[0].valueString || initialValue.valueString || ""}
-            onChange={(e) => handleInputChange(item.text,item.linkId, item.type, e.target.value)}
-            disabled={isDisabled}
-          />
-        );
-      default:
-        return null;
-    }
-  };
+      }
+
+    case "date":
+      return (
+        <input
+          type="date"
+          value={
+            currentAnswer?.answer?.[0]?.valueDate ||
+            initialValue.valueDate ||
+            ""
+          }
+          onChange={(e) =>
+            handleInputChange(item.text, item.linkId, item.type, e.target.value)
+          }
+          disabled={isDisabled}
+        />
+      );
+    case "decimal":
+      return (
+        <input
+          type="number"
+          step="0.1"
+          value={
+            currentAnswer?.answer?.[0]?.valueDecimal ||
+            initialValue.valueDecimal ||
+            ""
+          }
+          onChange={(e) =>
+            handleInputChange(item.text, item.linkId, item.type, e.target.value)
+          }
+          disabled={isDisabled}
+        />
+      );
+    case "integer":
+      return (
+        <input
+          type="number"
+          step="1"
+          value={
+            currentAnswer?.answer?.[0]?.valueInteger ||
+            initialValue.valueInteger ||
+            ""
+          }
+          onChange={(e) =>
+            handleInputChange(item.text, item.linkId, item.type, e.target.value)
+          }
+          disabled={isDisabled}
+        />
+      );
+    case "string":
+      return (
+        <input
+          type="text"
+          value={
+            currentAnswer?.answer?.[0]?.valueString ||
+            initialValue.valueString ||
+            ""
+          }
+          onChange={(e) =>
+            handleInputChange(item.text, item.linkId, item.type, e.target.value)
+          }
+          disabled={isDisabled}
+        />
+      );
+    case "text":
+      return (
+        <textarea
+          value={
+            currentAnswer?.answer?.[0]?.valueString ||
+            initialValue.valueString ||
+            ""
+          }
+          onChange={(e) =>
+            handleInputChange(item.text, item.linkId, item.type, e.target.value)
+          }
+          disabled={isDisabled}
+        />
+      );
+    default:
+      return null;
+  }
+};
+  /**
+   * Dado un listado de ítems (puede ser el root o un item.group),
+   * retorna todos los que tengan required = true (y recursivamente sus hijos).
+   */
   const getRequiredItems = (items) => {
     let requiredItems = [];
-    items.forEach(item => {
+    items.forEach((item) => {
       if (item.required) {
         requiredItems.push(item);
       }
@@ -306,23 +419,28 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
     });
     return requiredItems;
   };
-  const validate = () => {
-    // Validar campos requeridos
+
+   /**
+   * Valida los campos requeridos que estén habilitados.
+   */
+   const validate = () => {
     const requiredItems = getRequiredItems(questionnaire.item);
-    const missingAnswers = requiredItems.filter(item => {
-      if (!checkEnableWhen(item.enableWhen)) return false;
-      const answer = answers.find(a => a.linkId === item.linkId);
+
+    // Solo se requieren los ítems que verdaderamente estén habilitados
+    const missingAnswers = requiredItems.filter((item) => {
+      if (!isItemEnabled(item)) return false; // si no está habilitado, no se valida
+      const answer = answers.find((a) => a.linkId === item.linkId);
       return !answer || !answer.answer || answer.answer.length === 0;
     });
 
     if (missingAnswers.length > 0) {
-      setError("Hay campos sin rellenar. ¿Continuar de todos modos?");
+      setError("Hay campos requeridos sin rellenar. ¿Continuar de todos modos?");
       return false;
-    }else{
+    } else {
       setError(null);
       return true;
     }
-  }
+  };
    const handleReset = () => {
     const preservedLinkIds = [
       "PAT_NOMBRE", // Nombre
@@ -348,55 +466,82 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
       return styleObject;
     }, {});
   };
-  const renderGroup = (itemGroup) => {
-    return (
-      <div key={itemGroup.linkId} className="questionnaire-group">
-        <h3 className="questionnaire-group-title">{itemGroup.text}</h3>
-        <div className="questionnaire-container-group">
-        {itemGroup.item.map((item) => {
-          const styleString = item._text?.extension?.find(ext => ext.url === "http://hl7.org/fhir/StructureDefinition/rendering-style")?.valueString || "";
-          const style = parseStyleString(styleString);
-          if (!checkEnableWhen(item.enableWhen)) return null;
-          return item.type === "group" ? (
-            renderGroup(item)
-          ) : (
-            <div id={item.linkId} key={item.linkId} className="questionnaire-item" style={style}>
-              <label>
-                {item.text}
-                {item.required && <span className="required-asterisk">*</span>}
-              </label>
-              {renderInput(item)}
-            </div>
-          );
-        })}
+    /**
+   * Renderiza un grupo (item.type === "group") y sus hijos.
+   */
+    const renderGroup = (itemGroup) => {
+      return (
+        <div key={itemGroup.linkId} className="questionnaire-group">
+          <h3 className="questionnaire-group-title">{itemGroup.text}</h3>
+          <div className="questionnaire-container-group">
+            {itemGroup.item.map((child) => {
+              const styleString =
+                child._text?.extension?.find(
+                  (ext) =>
+                    ext.url === "http://hl7.org/fhir/StructureDefinition/rendering-style"
+                )?.valueString || "";
+              const style = parseStyleString(styleString);
+  
+              // Solo renderizamos si el ítem está habilitado
+              if (!isItemEnabled(child)) return null;
+  
+              return child.type === "group" ? (
+                renderGroup(child)
+              ) : (
+                <div
+                  id={child.linkId}
+                  key={child.linkId}
+                  className="questionnaire-item"
+                  style={style}
+                >
+                  <label>
+                    {child.text}
+                    {child.required && <span className="required-asterisk">*</span>}
+                  </label>
+                  {renderInput(child)}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
-    );
-  };
+      );
+    };
 
   return (
     <><h2 className="questionnaire-title">{questionnaire.title}</h2>
     <div className="questionnaire-container">
-      {questionnaire.item.map((item) => {
-        if (!checkEnableWhen(item.enableWhen)) return null;
-        if (item.type === "group" ) {
-          return renderGroup(item);
-        } else {
-          const styleString = item._text?.extension?.find(ext => ext.url === "http://hl7.org/fhir/StructureDefinition/rendering-style")?.valueString || "";
-          const style = parseStyleString(styleString);
-  
-          return (
-            <div id={item.linkId} key={item.linkId} className="questionnaire-item" style={style}>
-              <label>{item.text}
-                {item.required && <span className="required-asterisk">*</span>}
-              </label>
-              {renderInput(item)}
-            </div>
-          );
-        }
-      })}
+        {questionnaire.item.map((item) => {
+          // Si no está habilitado, no lo mostramos
+          if (!isItemEnabled(item)) return null;
+
+          if (item.type === "group") {
+            return renderGroup(item);
+          } else {
+            const styleString =
+              item._text?.extension?.find(
+                (ext) =>
+                  ext.url === "http://hl7.org/fhir/StructureDefinition/rendering-style"
+              )?.valueString || "";
+            const style = parseStyleString(styleString);
+
+            return (
+              <div
+                id={item.linkId}
+                key={item.linkId}
+                className="questionnaire-item"
+                style={style}
+              >
+                <label>
+                  {item.text}
+                  {item.required && <span className="required-asterisk">*</span>}
+                </label>
+                {renderInput(item)}
+              </div>
+            );
+          }
+        })}
       </div>
-      <div style={{display:"none"}} className="questionnaire-responses">
+      <div style={{display:"block"}} className="questionnaire-responses">
         <h3>Respuestas:</h3>
         <pre>{JSON.stringify({ resourceType: "QuestionnaireResponse", status: "completed", item: answers }, null, 2)}</pre>
       </div>

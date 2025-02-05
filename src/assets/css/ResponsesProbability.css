@@ -1,0 +1,17 @@
+.report-item {
+  padding: 30px;
+  margin-top: 15px;
+  margin-bottom: 10px;
+  font-family: sans-serif;
+}
+.text{
+  margin-bottom: 20px;
+}
+.parts{
+  margin-top: 10px;
+}
+.tlabel{
+  color: #4d6378;
+  font-weight: bold;
+  font-size: medium;
+}
