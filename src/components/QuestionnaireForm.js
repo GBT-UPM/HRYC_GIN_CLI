@@ -447,6 +447,7 @@ const renderInput = (item) => {
       "PAT_NHC",  // NHC
       "PAT_EDAD", // Edad
       "PAT_FUR", // FUR
+      "PAT_IND", // Indicación ecografía
       "PAT_MA"  // ¿Hay alguna masa anexial?
     ];
 
@@ -550,9 +551,9 @@ const renderInput = (item) => {
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h2>Confirmación</h2>
         <p>{error && <div className="error-message">{error}</div>}</p>
-        <p>Puede <b>guardar</b> los resultados o <b>continuar</b> añadiendo más masas anexiales.</p>
-        <button className="save" onClick={() => { if (validate()) { event(answers); setIsModalOpen(false); } }}>Guardar</button>
-        <button className="continue" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); setIsModalOpen(false)} } }>Continuar</button>
+        <p>Puede <b>continuar</b> con el informe o <b>añadir</b> más masas anexiales.</p>
+        <button className="save" onClick={() => { if (validate()) { event(answers); setIsModalOpen(false); } }}>Continuar</button>
+        <button className="continue" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); setIsModalOpen(false)} } }>Añadir masa anexial</button>
         <button className="cancel" onClick={() => setIsModalOpen(false)}>Cancelar</button>
       </Modal>
     </>

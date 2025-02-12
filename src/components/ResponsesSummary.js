@@ -105,7 +105,7 @@ const ResponsesSummary = ({ responses, event }) => {
       const MA_ASC = getValue('MA_ASC');
       const MA_ASC_TIPO = getValue('MA_ASC_TIPO');
       const MA_CARC = getValue('MA_CARC');
-      const RES_CONCL = getValue('RES_CONCL');
+      //const RES_CONCL = getValue('RES_CONCL');
 
       //Calcular logit y probabilidad      
       const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
@@ -173,7 +173,7 @@ const ResponsesSummary = ({ responses, event }) => {
             report += 'Hay carcinomatosis.\n';
           }
 
-          report += `La probabilidad de que la masa anexial sea maligna es de ${RES_SCORE}. \n Conclusión: ${RES_CONCL}`;
+          report += `La probabilidad de que la masa anexial sea maligna es de ${RES_SCORE}. \n`;
         }
 
         return report;
