@@ -261,8 +261,17 @@ const ResponsesProbability = ({ responses, event }) => {
       });
   
       // Guarda el PDF
-      doc.save("informe.pdf");
-    };
+      //doc.save("informe.pdf");
+        // Configura el PDF para que se imprima automáticamente
+      doc.autoPrint();
+
+      // Abre el PDF en una nueva ventana o pestaña para que se muestre el diálogo de impresión
+      // Opción 1: Usando un URL de tipo blob
+      window.open(doc.output('bloburl'), '_blank');
+
+      // Opción 2: Usando dataURL (descomenta la siguiente línea y comenta la opción 1 si prefieres esta)
+      // window.open(doc.output('dataurlnewwindow'), '_blank');
+      };
     
     return (
       <div className="responses-summary">
