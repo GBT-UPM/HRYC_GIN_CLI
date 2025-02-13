@@ -204,6 +204,7 @@ const ResponsesProbability = ({ responses, event }) => {
         updated[index] = newValue;
         return updated;
       });
+      console.log("----->"+observations);
     };
     function MyComponent({ reportHtml }) {
       const sanitizedHtml = DOMPurify.sanitize(reportHtml);
@@ -214,9 +215,10 @@ const ResponsesProbability = ({ responses, event }) => {
      * Ejemplo de función que maneje el click del botón en cada reporte.
      * Podrías hacer lo que necesites (guardar, eliminar, etc.)
      */
-    const handleReportButtonClick = (index) => {
+    const handleSaveButtonClick = (index) => {
       console.log(`Botón en reporte #${index} clicado. Observación: ${observations[index]}`);
       // Aquí la lógica que quieras al dar clic (enviar a servidor, etc.)
+
     };
     return (
       <div className="responses-summary">
@@ -256,6 +258,9 @@ const ResponsesProbability = ({ responses, event }) => {
       {/* Botón final para volver */}
       <button className="save-btn" onClick={event}>
         Volver al cuestionario
+      </button>
+      <button className="save-btn" onClick={handleSaveButtonClick}>
+        guardar
       </button>
     </div>
     );
