@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import '../assets/css/ResponsesSummary.css';
 import DOMPurify from 'dompurify';
 import '../assets/css/ResponsesProbability.css';
+import jsPDF from 'jspdf';
+import LogoHRYC from "../assets/images/LogoHRYC.jpg";
 const ResponsesProbability = ({ responses, event }) => {
    const [reports, setReports] = useState([]);
    const [observations, setObservations] = useState([]);
@@ -220,6 +222,48 @@ const ResponsesProbability = ({ responses, event }) => {
       // Aquí la lógica que quieras al dar clic (enviar a servidor, etc.)
 
     };
+    const handlePrintButtonClick = () => {
+      var specificAnswer = responses.find(answer => answer.linkId === "PAT_NOMBRE");
+      var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NOMBRE".toLowerCase());
+      console.log(response)
+      const patientName = response?.answer?.[0]?.valueString || '';
+      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_EDAD".toLowerCase());
+      const patientAge = response?.answer?.[0]?.valueInteger || '';
+      const doc = new jsPDF();
+      doc.addImage(LogoHRYC, "JPEG", 10, 10,90,15);
+
+      doc.text(patientName +" "+patientAge+" años", 10, 50);
+      let yPosition = 60; // Posición inicial en Y para el primer bloque de texto
+  
+      reports.forEach((report, index) => {
+        // Reemplaza <br> por saltos de línea
+        const htmlConSaltos = report.text.replace(/<br\s*\/?>/gi, "\n");
+  
+        // Crea un elemento temporal para interpretar el HTML
+        const tempDiv = document.createElement("div");
+        tempDiv.innerHTML = htmlConSaltos;
+  
+        // Extrae el texto plano (ahora con saltos de línea donde estaban los <br>)
+        let plainText = tempDiv.innerText;
+  
+        // Opcional: normaliza el texto (por ejemplo, eliminando múltiples saltos de línea consecutivos)
+        const normalizedText = plainText.replace(/\n+/g, "\n").trim();
+  
+        // Usa splitTextToSize para dividir el texto en líneas según el ancho máximo
+        const maxWidth = 180; // Ancho máximo en el PDF (ajusta según tus necesidades)
+        const textLines = doc.splitTextToSize(normalizedText, maxWidth);
+        doc.setFontSize(13);
+        // Agrega el bloque de texto al PDF
+        doc.text(textLines, 10, yPosition);
+  
+        // Actualiza la posición en Y para el siguiente reporte
+        yPosition += textLines.length * 10 + 10;
+      });
+  
+      // Guarda el PDF
+      doc.save("informe.pdf");
+    };
+    
     return (
       <div className="responses-summary">
       <h3>Informe Médico</h3>
@@ -261,6 +305,9 @@ const ResponsesProbability = ({ responses, event }) => {
       </button>
       <button className="save-btn" onClick={handleSaveButtonClick}>
         guardar
+      </button>
+      <button className="save-btn" onClick={handlePrintButtonClick}>
+        guardar e imprimir
       </button>
     </div>
     );
