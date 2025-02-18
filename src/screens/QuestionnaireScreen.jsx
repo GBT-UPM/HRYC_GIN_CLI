@@ -21,10 +21,10 @@ import { useImageStudyTemplate } from "../hooks/useImageStudyTemplate";
 import ResponsesProbability from "../components/ResponsesProbability";
 Chart.register(CategoryScale);
 
-const generateId = () => {
+export const generateId = () => {
   return uuidv4(); // Genera un UUID único
 };
-const generatePeriod = () => {
+export const generatePeriod = () => {
   const now = new Date(); // Momento actual
   const end = now.toISOString(); // Fin del período (momento actual)
 
@@ -32,6 +32,7 @@ const generatePeriod = () => {
 
   return { start, end };
 };
+
 export default function QuestionnaireScreen() {
   const { keycloak, initialized } = useKeycloak();
   const [questionnaire, setQuestionnaire] = useState(null);
@@ -78,13 +79,13 @@ export default function QuestionnaireScreen() {
       id: generateId(),
       item: anwers,
     };
-    console.log("Saved Responses3 (antes de setState):", questionnaireResponses);
+    console.log("Saved Responses (antes de setState):", questionnaireResponses);
 
     // Misma idea: NO uses .push, haz un spread
     setQuestionnaireResponses((prev) => [...prev, questionnaireResponse]);
 
     // Aquí inmediatamente seguirá mostrando el viejo estado
-    console.log("Saved Responses3 (después de setState):", questionnaireResponses);
+    console.log("Saved Responses (después de setState):", questionnaireResponses);
 
     // Para ver el estado actualizado, puedes usar un useEffect
     setProbality(true);

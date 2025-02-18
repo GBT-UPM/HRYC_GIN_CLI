@@ -546,7 +546,7 @@ const renderInput = (item) => {
         <h3>Respuestas:</h3>
         <pre>{JSON.stringify({ resourceType: "QuestionnaireResponse", status: "completed", item: answers }, null, 2)}</pre>
       </div>
-      <button className="save-btn" onClick={() => { validate(); setIsModalOpen(true) } }>Guardar Respuestas</button>
+      <button className="save-btn" onClick={() => { validate(); setIsModalOpen(true) } }>Siguiente</button>
       {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h2>Confirmación</h2>

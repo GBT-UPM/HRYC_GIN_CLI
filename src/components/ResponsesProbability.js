@@ -5,9 +5,37 @@ import DOMPurify from 'dompurify';
 import '../assets/css/ResponsesProbability.css';
 import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
+
+import { useKeycloak } from '@react-keycloak/web';
+import { useEncounterTemplate } from "../hooks/useEncounterTemplate";
+import { useObservationTemplate } from "../hooks/useObservationTemplate";
+import { useImageStudyTemplate } from "../hooks/useImageStudyTemplate";
+import ApiService from '../services/ApiService';
+import { generateId } from '../screens/QuestionnaireScreen';
+import { generatePeriod } from '../screens/QuestionnaireScreen';
+
+
 const ResponsesProbability = ({ responses, event }) => {
-   const [reports, setReports] = useState([]);
-   const [observations, setObservations] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [observations, setObservations] = useState([]);
+  //nuevo
+  const [questionnaireResponses, setQuestionnaireResponses] = useState([]);
+  const [probability, setProbality] = useState(false);
+  const [encounterId, setEncounterId] = useState("");
+  const [error, setError] = useState(null);
+  const [allResponses, setAllResponses] = useState([]);
+  const { keycloak, initialized } = useKeycloak();
+  const [questionnaire, setQuestionnaire] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [answers, setAnswers] = useState([]);
+  const [practitioner, setPractitioner] = useState("");
+  const [practitionerName, setPractitionerName] = useState("");
+  const { generateEncounter } = useEncounterTemplate();
+  const { generateObservation } = useObservationTemplate();
+  const { generateImagingStudy } = useImageStudyTemplate();
+
+
     /* // Función para renderizar las respuestas 
     const renderAnswer = (answer) => {
       if (answer.valueCoding) {
@@ -27,7 +55,7 @@ const ResponsesProbability = ({ responses, event }) => {
     }; */
     useEffect(() => {
     console.log("ENTRA");
-    console.log(responses);
+    console.log("Respuestas:" + responses);
 
     for (const response of responses) {
       const repo = generateReport(response)
@@ -206,7 +234,7 @@ const ResponsesProbability = ({ responses, event }) => {
         updated[index] = newValue;
         return updated;
       });
-      console.log("----->"+observations);
+      console.log("Conclusión: " + observations);
     };
     function MyComponent({ reportHtml }) {
       const sanitizedHtml = DOMPurify.sanitize(reportHtml);
@@ -217,11 +245,129 @@ const ResponsesProbability = ({ responses, event }) => {
      * Ejemplo de función que maneje el click del botón en cada reporte.
      * Podrías hacer lo que necesites (guardar, eliminar, etc.)
      */
-    const handleSaveButtonClick = (index) => {
-      console.log(`Botón en reporte #${index} clicado. Observación: ${observations[index]}`);
-      // Aquí la lógica que quieras al dar clic (enviar a servidor, etc.)
+    const handleSaveButtonClick = async (index) => {
+      console.log(`Botón de guardado clicado`);
 
+      console.log("Index: " + index);
+
+      const questionnaireResponse = {
+        resourceType: "QuestionnaireResponse",
+        status: "completed",
+        id: generateId(),
+        item: index,
+      };
+      console.log("Saved Responses (antes de setState):", questionnaireResponses);
+  
+      setQuestionnaireResponses((prev) => [...prev, questionnaireResponse]);
+  
+      console.log("Saved Responses (después de setState):", questionnaireResponses);
+  
+      setProbality(true);
+  
+      //const firstResponse = responses[index];
+      var specificAnswer = responses.find(answer => answer.linkId === "PAT_NHC");
+      const patientId = specificAnswer?.answer?.[0]?.valueString || '';
+      console.log("NHC paciente: " + patientId);
+      specificAnswer = responses.find(answer => answer.linkId === "PAT_IND");
+      const observation = specificAnswer?.answer?.[0]?.valueString || '';
+  
+      const encId = generateId();
+      const obsId = generateId();
+      const imgStuId = generateId();
+      const serieId = generateId();
+      setEncounterId(encId);
+      const Encounter = generateEncounter(encId, patientId, practitioner, practitionerName, generatePeriod());
+      const Observation = generateObservation(obsId, encId, patientId, imgStuId, observation);
+      const ImageStudy = generateImagingStudy(imgStuId, encId, patientId, serieId);
+  
+      const successfulResponses = [];
+      try {
+        const encounter = await ApiService(keycloak.token, 'POST', `/fhir/Encounter`, Encounter);
+        if (encounter.status === 200) {
+  
+          const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, Observation);
+          console.log("observation: " + observation.status)
+          const imageStudy = await ApiService(keycloak.token, 'POST', `/fhir/ImagingStudy`, ImageStudy);
+          console.log("imageStudy: " + imageStudy.status)
+  
+          const questionnaireResponse = {
+            resourceType: "QuestionnaireResponse",
+            status: "completed",
+            id: generateId(),
+            item: index,
+          };
+          
+          var a = questionnaireResponses;
+          a.push(questionnaireResponse);
+          setQuestionnaireResponses(a);
+          //var b = encounterId;
+          //console.log(b);
+          
+          //setQuestionnaireResponses((prev) => [...prev, questionnaireResponse]);
+  
+          for (const qResponse of questionnaireResponses) {
+            // Aquí puedes procesar cada respuesta
+            console.log("Response --------------")
+            // Aquí puedes añador la lógica para enviar las respuestas a un servidor o guardarlas localmente 
+            try {
+              qResponse.partOf = [
+                {
+                  reference: `Encounter/${encId}`
+                }
+              ];
+              const response = await ApiService(keycloak.token, 'POST', `/fhir/QuestionnaireResponse`, qResponse);
+              if (response.status === 200) {
+                console.log(response)
+                successfulResponses.push(qResponse);
+              } else {
+                throw new Error(`Error en la respuesta: ${response.status}`);
+              }
+            } catch (error) {
+              console.error("Error al guardar la respuesta:", error);
+              setError("Error al guardar la respuesta.");
+            }
+          }
+  
+        } else {
+          throw new Error(`Error en el encounter: ${encounter.status}`);
+        }
+      } catch (error) {
+        console.error("Error al guardar el encounter:", error);
+        setError("Error al guardar el encounter.");
+      }
+  
+      const remainingResponses = questionnaireResponses.filter(qResponse => !successfulResponses.includes(qResponse));
+      setQuestionnaireResponses(remainingResponses);
+      const allItems = questionnaireResponses.flatMap(qResponse => qResponse.item);
+      setAllResponses(allItems);
+      /*
+      // Guardar en base de datos
+      try {
+        const response = await fetch('/api/saveResponses', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ responses: questionnaireResponses })
+        });
+
+        console.log("Respuesta del servidor:", response);
+  
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Respuestas guardadas en la base de datos:', result);
+          alert('Respuestas guardadas con éxito');
+        } else {
+          console.error('Error al guardar las respuestas en la base de datos:', response.statusText);
+          alert('Error al guardar las respuestas en la base de datos');
+        }
+      } catch (error) {
+        console.error('Error de red o servidor al guardar respuestas:', error);
+        alert('Error al conectar con el servidor para guardar respuestas');
+      }
+      */
     };
+
     const handlePrintButtonClick = () => {
       var specificAnswer = responses.find(answer => answer.linkId === "PAT_NOMBRE");
       var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NOMBRE".toLowerCase());
@@ -313,10 +459,10 @@ const ResponsesProbability = ({ responses, event }) => {
         Volver al cuestionario
       </button>
       <button className="save-btn" onClick={handleSaveButtonClick}>
-        guardar
+        Guardar
       </button>
       <button className="save-btn" onClick={handlePrintButtonClick}>
-        guardar e imprimir
+        Guardar e Imprimir
       </button>
     </div>
     );
