@@ -187,7 +187,12 @@ export default function QuestionnaireScreen() {
     console.log("Saved Responses2 (inmed. after setState):", questionnaireResponses);
   };
   const QBack = async (anwers) => {
-    setResponses([])
+    setQuestionnaireResponses([]);
+    setResponses([]);
+    // checkUserRoles();
+
+    fetchQuestionnaire();
+    setProbality(false);
   }
 
   useEffect(() => {

@@ -250,17 +250,6 @@ const ResponsesProbability = ({ responses, event }) => {
 
       console.log("Index: " + index);
 
-      const questionnaireResponse = {
-        resourceType: "QuestionnaireResponse",
-        status: "completed",
-        id: generateId(),
-        item: index,
-      };
-      console.log("Saved Responses (antes de setState):", questionnaireResponses);
-  
-      setQuestionnaireResponses((prev) => [...prev, questionnaireResponse]);
-  
-      console.log("Saved Responses (después de setState):", questionnaireResponses);
   
       setProbality(true);
   
@@ -290,22 +279,9 @@ const ResponsesProbability = ({ responses, event }) => {
           const imageStudy = await ApiService(keycloak.token, 'POST', `/fhir/ImagingStudy`, ImageStudy);
           console.log("imageStudy: " + imageStudy.status)
   
-          const questionnaireResponse = {
-            resourceType: "QuestionnaireResponse",
-            status: "completed",
-            id: generateId(),
-            item: index,
-          };
-          
-          var a = questionnaireResponses;
-          a.push(questionnaireResponse);
-          setQuestionnaireResponses(a);
-          //var b = encounterId;
-          //console.log(b);
-          
-          //setQuestionnaireResponses((prev) => [...prev, questionnaireResponse]);
+         
   
-          for (const qResponse of questionnaireResponses) {
+          for (const qResponse of responses) {
             // Aquí puedes procesar cada respuesta
             console.log("Response --------------")
             // Aquí puedes añador la lógica para enviar las respuestas a un servidor o guardarlas localmente 
@@ -327,7 +303,7 @@ const ResponsesProbability = ({ responses, event }) => {
               setError("Error al guardar la respuesta.");
             }
           }
-  
+            event();
         } else {
           throw new Error(`Error en el encounter: ${encounter.status}`);
         }
@@ -336,36 +312,6 @@ const ResponsesProbability = ({ responses, event }) => {
         setError("Error al guardar el encounter.");
       }
   
-      const remainingResponses = questionnaireResponses.filter(qResponse => !successfulResponses.includes(qResponse));
-      setQuestionnaireResponses(remainingResponses);
-      const allItems = questionnaireResponses.flatMap(qResponse => qResponse.item);
-      setAllResponses(allItems);
-      /*
-      // Guardar en base de datos
-      try {
-        const response = await fetch('/api/saveResponses', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ responses: questionnaireResponses })
-        });
-
-        console.log("Respuesta del servidor:", response);
-  
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Respuestas guardadas en la base de datos:', result);
-          alert('Respuestas guardadas con éxito');
-        } else {
-          console.error('Error al guardar las respuestas en la base de datos:', response.statusText);
-          alert('Error al guardar las respuestas en la base de datos');
-        }
-      } catch (error) {
-        console.error('Error de red o servidor al guardar respuestas:', error);
-        alert('Error al conectar con el servidor para guardar respuestas');
-      }
-      */
     };
 
     const handlePrintButtonClick = () => {
