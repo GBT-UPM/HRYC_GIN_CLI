@@ -19,6 +19,7 @@ import { useEncounterTemplate } from "../hooks/useEncounterTemplate";
 import { useObservationTemplate } from "../hooks/useObservationTemplate";
 import { useImageStudyTemplate } from "../hooks/useImageStudyTemplate";
 import ResponsesProbability from "../components/ResponsesProbability";
+import { useNavigate } from "react-router-dom";
 Chart.register(CategoryScale);
 
 export const generateId = () => {
@@ -50,7 +51,7 @@ export default function QuestionnaireScreen() {
   const { generateImagingStudy } = useImageStudyTemplate();
   //const {probability,setProbality}=useState(false);
   const [probability, setProbality] = useState(false);
-
+  const navigate = useNavigate();
   const fetchQuestionnaire = async () => {
     try {
       const response = await ApiService(keycloak.token, 'GET', `/fhir/Questionnaire?name=registro_ginecologico`, {});
@@ -193,6 +194,10 @@ export default function QuestionnaireScreen() {
 
     fetchQuestionnaire();
     setProbality(false);
+ 
+    
+        navigate('/');
+    
   }
 
   useEffect(() => {

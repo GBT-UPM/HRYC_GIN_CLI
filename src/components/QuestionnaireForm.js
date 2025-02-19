@@ -542,7 +542,7 @@ const renderInput = (item) => {
           }
         })}
       </div>
-      <div style={{display:"block"}} className="questionnaire-responses">
+      <div style={{display:"none"}} className="questionnaire-responses">
         <h3>Respuestas:</h3>
         <pre>{JSON.stringify({ resourceType: "QuestionnaireResponse", status: "completed", item: answers }, null, 2)}</pre>
       </div>
