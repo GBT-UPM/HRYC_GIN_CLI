@@ -253,11 +253,16 @@ const ResponsesProbability = ({ responses, event }) => {
       setProbality(true);
   
       //const firstResponse = responses[index];
-      var specificAnswer = responses.find(answer => answer.linkId === "PAT_NHC");
+     /* var specificAnswer = responses.item.find(answer => answer.linkId === "PAT_NHC");
       const patientId = specificAnswer?.answer?.[0]?.valueString || '';
       console.log("NHC paciente: " + patientId);
-      specificAnswer = responses.find(answer => answer.linkId === "PAT_IND");
-      const observation = specificAnswer?.answer?.[0]?.valueString || '';
+      specificAnswer = responses.item.find(answer => answer.linkId === "PAT_IND");
+      const observation = specificAnswer?.answer?.[0]?.valueString || '';*/
+      var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NHC".toLowerCase());
+      console.log(response)
+      const patientId = response?.answer?.[0]?.valueString || '';
+     // response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_IND".toLowerCase());
+     // const observationImagen = response?.answer?.[0]?.valueString || '';
   
       const encId = generateId();
       const obsId = generateId();
@@ -265,7 +270,7 @@ const ResponsesProbability = ({ responses, event }) => {
       const serieId = generateId();
       setEncounterId(encId);
       const Encounter = generateEncounter(encId, patientId, practitioner, practitionerName, generatePeriod());
-      const Observation = generateObservation(obsId, encId, patientId, imgStuId, observation);
+      //const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observationImagen);
       const ImageStudy = generateImagingStudy(imgStuId, encId, patientId, serieId);
   
       const successfulResponses = [];
@@ -273,13 +278,13 @@ const ResponsesProbability = ({ responses, event }) => {
         const encounter = await ApiService(keycloak.token, 'POST', `/fhir/Encounter`, Encounter);
         if (encounter.status === 200) {
   
-          const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, Observation);
-          console.log("observation: " + observation.status)
+          //const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
+          //console.log("observation: " + observation.status)
           const imageStudy = await ApiService(keycloak.token, 'POST', `/fhir/ImagingStudy`, ImageStudy);
           console.log("imageStudy: " + imageStudy.status)
   
          
-  
+          let index=0
           for (const qResponse of responses) {
             // Aquí puedes procesar cada respuesta
             console.log("Response --------------")
@@ -297,12 +302,16 @@ const ResponsesProbability = ({ responses, event }) => {
               } else {
                 throw new Error(`Error en la respuesta: ${response.status}`);
               }
+              const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
+              const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
+              console.log("observation: " + observation.status)
+              index++;
             } catch (error) {
               console.error("Error al guardar la respuesta:", error);
               setError("Error al guardar la respuesta.");
             }
           }
-            event();
+        event();
         } else {
           throw new Error(`Error en el encounter: ${encounter.status}`);
         }
@@ -314,7 +323,7 @@ const ResponsesProbability = ({ responses, event }) => {
     };
 
     const handlePrintButtonClick = () => {
-      var specificAnswer = responses.find(answer => answer.linkId === "PAT_NOMBRE");
+  
       var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NOMBRE".toLowerCase());
       console.log(response)
       const patientName = response?.answer?.[0]?.valueString || '';
