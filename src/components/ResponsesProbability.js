@@ -250,7 +250,6 @@ const ResponsesProbability = ({ responses, event }) => {
 
       console.log("Index: " + index);
 
-  
       setProbality(true);
   
       //const firstResponse = responses[index];
