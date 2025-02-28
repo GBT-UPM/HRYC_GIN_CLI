@@ -549,9 +549,10 @@ const renderInput = (item) => {
       <button className="save-btn" onClick={() => { validate(); setIsModalOpen(true) } }>Siguiente</button>
       {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <h2>Confirmación</h2>
+        <h2>Confirmación</h2> 
         <p>{error && <div className="error-message">{error}</div>}</p>
         <p>Puede <b>continuar</b> con el informe o <b>añadir</b> más masas anexiales.</p>
+        <p><b>Si continúa no podrá volver a este cuestionario.</b></p>
         <button className="save" onClick={() => { if (validate()) { event(answers); setIsModalOpen(false); } }}>Continuar</button>
         <button className="continue" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); setIsModalOpen(false)} } }>Añadir masa anexial</button>
         <button className="cancel" onClick={() => setIsModalOpen(false)}>Cancelar</button>

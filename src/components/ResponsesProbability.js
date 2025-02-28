@@ -323,7 +323,8 @@ const ResponsesProbability = ({ responses, event }) => {
     };
 
     const handlePrintButtonClick = () => {
-  
+      handleSaveButtonClick();
+      console.log("Se han guardado los datos en la BD.")
       var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NOMBRE".toLowerCase());
       console.log(response)
       const patientName = response?.answer?.[0]?.valueString || '';
@@ -408,10 +409,10 @@ const ResponsesProbability = ({ responses, event }) => {
         </div>
       ))}
 
-      {/* Botón final para volver */}
+      {/* Botón final para volver 
       <button className="save-btn" onClick={event}>
         Volver al cuestionario
-      </button>
+      </button>*/}
       <button className="save-btn" onClick={handleSaveButtonClick}>
         Guardar
       </button>

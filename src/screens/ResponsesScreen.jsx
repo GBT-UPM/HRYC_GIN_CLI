@@ -42,9 +42,9 @@ const ResponsesScreen = () => {
     const [selectedRow, setSelectedRow] = useState(null);
     const { generateObservation } = useObservationHistologyTemplate();
     const histologyOptions = {
-        "Benigno": { code: "37310001", display: "Benign neoplasm (disorder)" },
-        "Maligno": { code: "363346000", display: "Malignant neoplastic disease (disorder)" },
-        "Desconocido / Incierto": { code: "70852002", display: "Neoplasm of uncertain or unknown behaviour (disorder)" }
+        "Benign neoplasm (disorder)": { code: "37310001", display: "Benigno" },
+        "Malignant neoplastic disease (disorder)": { code: "363346000", display: "Maligno" },
+        "Neoplasm of uncertain or unknown behaviour (disorder)": { code: "70852002", display: "Desconocido / Incierto" }
     };
     const fetchQuestionnaire = async () => {
         try {
@@ -137,7 +137,7 @@ const ResponsesScreen = () => {
         const patientId=selectedRow.patientId;
         const text=histology;
         const note=pathologyReport;
-        const Observation= generateObservation(obsId, encId,quesRId, patientId, code, display, text, note);
+        const Observation= generateObservation(obsId, encId, quesRId, patientId, code, display, text, note);
     //    const Observation= generateObservation(generateId(), selectedRow.encounterId, selectedRow.questionnaireResponse.id,selectedRow.patientId, code, display, histology, pathologyReport)
         const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, Observation);
         console.log("observation: "+observation.status)
