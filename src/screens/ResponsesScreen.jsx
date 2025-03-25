@@ -41,10 +41,15 @@ const ResponsesScreen = () => {
     const [histology, setHistology] = useState('');
     const [selectedRow, setSelectedRow] = useState(null);
     const { generateObservation } = useObservationHistologyTemplate();
+/*    const histologyOptions = {
+        "Benigno": { code: "37310001", display: "Benign neoplasm (disorder)" },
+        "Maligno": { code: "363346000", display: "Malignant neoplastic disease (disorder)" },
+        "Desconocido / Incierto": { code: "70852002", display: "Neoplasm of uncertain or unknown behaviour (disorder)" }
+    }; */
     const histologyOptions = {
-        "Benign neoplasm (disorder)": { code: "37310001", display: "Benigno" },
-        "Malignant neoplastic disease (disorder)": { code: "363346000", display: "Maligno" },
-        "Neoplasm of uncertain or unknown behaviour (disorder)": { code: "70852002", display: "Desconocido / Incierto" }
+        "Benigno": { code: "37310001", display: "Benigno" },
+        "Maligno": { code: "363346000", display: "Maligno" },
+        "Desconocido / Incierto": { code: "70852002", display: "Desconocido / Incierto" }
     };
     const fetchQuestionnaire = async () => {
         try {
@@ -139,11 +144,18 @@ const ResponsesScreen = () => {
         const note=pathologyReport;
         const Observation= generateObservation(obsId, encId, quesRId, patientId, code, display, text, note);
     //    const Observation= generateObservation(generateId(), selectedRow.encounterId, selectedRow.questionnaireResponse.id,selectedRow.patientId, code, display, histology, pathologyReport)
-        const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, Observation);
-        console.log("observation: "+observation.status)
-   
-       // console.log(updatedData);
-        setOpenHistoModal(false);
+        try {
+            const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, Observation);
+            console.log("observation: "+ observation.status)
+
+            if (observation.status === 200) {
+                await fetchQuestionnaire();
+        }
+            // console.log(updatedData);
+            setOpenHistoModal(false);
+        } catch (error) {
+            console.error("Error al guardar la observación:", error);
+        }
     };
     return (
         <Container className="container">
@@ -233,7 +245,7 @@ const ResponsesScreen = () => {
                                     <TableCell>{item.patientId}</TableCell>
                                     {/* <TableCell>{questionnaireResponse.status}</TableCell> */}
                                     <TableCell>{
-                                       observation !==null ? observation.valueCodeableConcept.text : "pendiente"
+                                       observation !==null ? observation.valueCodeableConcept.text : "Pendiente"
                                     }</TableCell> 
                                     <TableCell>{item.encounterText}</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>

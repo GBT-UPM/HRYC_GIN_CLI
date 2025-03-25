@@ -35,6 +35,10 @@ const ResponsesProbability = ({ responses, event }) => {
   const { generateObservation } = useObservationTemplate();
   const { generateImagingStudy } = useImageStudyTemplate();
 
+  // Verifica si hay masa anexial
+  const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
+  //console.log("La variable hasMassInReports:")
+  //console.log(hasMassInReports)
 
     /* // Función para renderizar las respuestas 
     const renderAnswer = (answer) => {
@@ -381,12 +385,18 @@ const ResponsesProbability = ({ responses, event }) => {
       {/* Iterar sobre los reportes */}
       {reports.map((report, index) => (
         <div key={index} className="report-item">
-          <h4>Masa anexial #{index + 1}</h4>
 
-          {/* Ejemplo: mostrar alguna información del objeto `report` */}
-          <div className="parts">
-            <span className='tlabel'>Probabilidad de malignidad: </span><span className='text' dangerouslySetInnerHTML={{ __html: report.score }} />
-          </div>
+          {/* Mostrar SÓLO si hay masa anexial */}
+          {hasMassInReports && <h4>Masa anexial #{index + 1}</h4>}
+
+          {/* Mostrar SÓLO si hay masa anexial */}
+          {hasMassInReports && (
+            <div className="parts">
+              <span className='tlabel'>Probabilidad de malignidad: </span><span className='text' dangerouslySetInnerHTML={{ __html: report.score }} />
+            </div>
+          )}
+
+          {/* SIEMPRE se muestra */}
           <div className="parts">
             <div className='tlabel'>Informe:</div>
             <div className='text' dangerouslySetInnerHTML={{ __html: report.text }} />

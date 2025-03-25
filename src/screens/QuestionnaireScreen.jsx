@@ -29,7 +29,7 @@ export const generatePeriod = () => {
   const now = new Date(); // Momento actual
   const end = now.toISOString(); // Fin del período (momento actual)
 
-  const start = new Date(now.getTime() - 30 * 60 * 1000).toISOString(); // Inicio: 30 minutos antes
+  const start = new Date(now.getTime() - 15 * 60 * 1000).toISOString(); // Inicio: 15 minutos antes
 
   return { start, end };
 };
@@ -216,7 +216,7 @@ export default function QuestionnaireScreen() {
     <div>
       {questionnaire ? (
         !probability ? (
-          <QuestionnaireForm eventContinue={handleContinue} event={handleSave} questionnaire={questionnaire.resourceData} />
+          <QuestionnaireForm eventContinue={handleContinue} event={handleSave} questionnaire={questionnaire.resourceData}/>
         ) : (
           // <ResponsesSummary event={QBack} responses={responses} />
           <ResponsesProbability responses={questionnaireResponses} event={QBack} />

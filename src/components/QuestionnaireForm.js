@@ -9,6 +9,11 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Verifica si hay masa anexial
+  const hasMass = answers.find(a => a.linkId === "PAT_MA")?.answer?.[0]?.valueCoding.display !== "No";
+  /**console.log("La variable hasMass:")
+  console.log(hasMass)*/
+
   /**
  * Recorre recursivamente el cuestionario (items e hijos) para
  * obtener todos los linkId habilitados dados los 'answers' actuales.
@@ -551,10 +556,12 @@ const renderInput = (item) => {
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h2>Confirmación</h2> 
         <p>{error && <div className="error-message">{error}</div>}</p>
-        <p>Puede <b>continuar</b> con el informe o <b>añadir</b> más masas anexiales.</p>
+        <p>Pulse <b>continuar</b> para elaborar el informe.</p>
         <p><b>Si continúa no podrá volver a este cuestionario.</b></p>
         <button className="save" onClick={() => { if (validate()) { event(answers); setIsModalOpen(false); } }}>Continuar</button>
-        <button className="continue" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); setIsModalOpen(false)} } }>Añadir masa anexial</button>
+        {/* Mostrar solo si hay masa anexial */}
+        {hasMass && (
+        <button className="continue" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); setIsModalOpen(false)} } }>Añadir masa anexial</button>)}
         <button className="cancel" onClick={() => setIsModalOpen(false)}>Cancelar</button>
       </Modal>
     </>
