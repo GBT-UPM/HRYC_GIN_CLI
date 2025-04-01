@@ -357,9 +357,14 @@ const renderInput = (item) => {
             initialValue.valueDecimal ||
             ""
           }
-          onChange={(e) =>
+          onChange={(e) =>{
+            const inputValue = parseFloat(e.target.value);
+            if (minValueDecimal !== undefined && inputValue < minValueDecimal) {
+              // Si el valor es menor que el mínimo, no actualizamos el estado
+              return;
+            }
             handleInputChange(item.text, item.linkId, item.type, e.target.value)
-          }
+          }}
           disabled={isDisabled}
         />
       );
@@ -380,7 +385,7 @@ const renderInput = (item) => {
             }
             onChange={(e) => {
               const inputValue = parseInt(e.target.value, 10);
-              if (minValue !== undefined && inputValue < minValue) {
+              if (minValueInteger !== undefined && inputValue < minValueInteger) {
                 // Si el valor es menor que el mínimo, no actualizamos el estado
                 return;
               }
