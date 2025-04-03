@@ -344,37 +344,56 @@ const renderInput = (item) => {
         />
       );
     case "decimal":
+      const minValueDecimal = item.extension?.find(
+        (ext) => ext.url === "http://hl7.org/fhir/StructureDefinition/minValue"
+      )?.valueInteger;
       return (
         <input
           type="number"
           step="0.1"
+          min={minValueDecimal !== undefined ? minValueDecimal : undefined} // Aplica el valor mínimo si está definido
           value={
             currentAnswer?.answer?.[0]?.valueDecimal ||
             initialValue.valueDecimal ||
             ""
           }
-          onChange={(e) =>
+          onChange={(e) =>{
+            const inputValue = parseFloat(e.target.value);
+            if (minValueDecimal !== undefined && inputValue < minValueDecimal) {
+              // Si el valor es menor que el mínimo, no actualizamos el estado
+              return;
+            }
             handleInputChange(item.text, item.linkId, item.type, e.target.value)
-          }
+          }}
           disabled={isDisabled}
         />
       );
-    case "integer":
-      return (
-        <input
-          type="number"
-          step="1"
-          value={
-            currentAnswer?.answer?.[0]?.valueInteger ||
-            initialValue.valueInteger ||
-            ""
-          }
-          onChange={(e) =>
-            handleInputChange(item.text, item.linkId, item.type, e.target.value)
-          }
-          disabled={isDisabled}
-        />
-      );
+      case "integer":
+        const minValueInteger = item.extension?.find(
+          (ext) => ext.url === "http://hl7.org/fhir/StructureDefinition/minValue"
+        )?.valueInteger;
+      
+        return (
+          <input
+            type="number"
+            step="1"
+            min={minValueInteger !== undefined ? minValueInteger : undefined} // Aplica el valor mínimo si está definido
+            value={
+              currentAnswer?.answer?.[0]?.valueInteger ||
+              initialValue.valueInteger ||
+              ""
+            }
+            onChange={(e) => {
+              const inputValue = parseInt(e.target.value, 10);
+              if (minValueInteger !== undefined && inputValue < minValueInteger) {
+                // Si el valor es menor que el mínimo, no actualizamos el estado
+                return;
+              }
+              handleInputChange(item.text, item.linkId, item.type, e.target.value);
+            }}
+            disabled={isDisabled}
+          />
+        );
     case "string":
       return (
         <input
