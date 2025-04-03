@@ -93,8 +93,6 @@ const WelcomeScreen = () => {
             <Box display="flex" flexDirection="column" gap={2} mt={2}>
               <Button onClick={handleNewPatientClick} variant="contained" color="primary">Iniciar Cuestionario</Button>
               <Button onClick={handleResponsesClick} variant="contained" color="secondary">Revisar Cuestionarios </Button>
-              <Button variant="contained" color="success">Registrar Cita</Button>
-              <Button variant="contained" color="error">Revisar Informes</Button>
             </Box>
           </Paper>
         </Grid2>
