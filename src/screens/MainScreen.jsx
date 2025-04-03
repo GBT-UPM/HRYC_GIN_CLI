@@ -94,7 +94,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
       <Grid2
         container
         spacing={3}
-        alignItems="center"
+        alignItems="flex-start"
         wrap="nowrap"
       >
         {/* Columna: Acciones Rápidas */}
@@ -114,7 +114,8 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
           sm={6}
           sx={{ display: { xs: 'none', sm: 'flex' } }}
           justifyContent="center"
-          alignItems="center"
+          alignItems="flex-start"
+
         >
           <Box
             component="img"
