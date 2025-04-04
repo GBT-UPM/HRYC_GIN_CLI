@@ -326,20 +326,78 @@ const ResponsesProbability = ({ responses, event }) => {
   
     };
 
+    const birthDate = (edad) => {
+      const today = new Date();
+      const birthYear = today.getFullYear() - edad;
+      return `01-01-${birthYear}`; // Devuelve la fecha de nacimiento en formato DD-MM-YYYY
+    };
+
     const handlePrintButtonClick = () => {
-      handleSaveButtonClick();
-      console.log("Se han guardado los datos en la BD.")
+      //handleSaveButtonClick();
+      //console.log("Se han guardado los datos en la BD.")
+      console.log("objeto reports:" +  reports)
+      
       var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NOMBRE".toLowerCase());
       console.log(response)
       const patientName = response?.answer?.[0]?.valueString || '';
+
+      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NHC".toLowerCase());
+      const patientNHC = response?.answer?.[0]?.valueString || '';
+
       response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_EDAD".toLowerCase());
       const patientAge = response?.answer?.[0]?.valueInteger || '';
-      const doc = new jsPDF();
-      doc.addImage(LogoHRYC, "JPEG", 10, 10,90,15);
 
-      doc.text(patientName +" "+patientAge+" años", 10, 50);
-      let yPosition = 60; // Posición inicial en Y para el primer bloque de texto
+      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_FUR".toLowerCase());
+      const patientFUR = response?.answer?.[0]?.valueString || '';
+
+      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_IND".toLowerCase());
+      const indicacion = response?.answer?.[0]?.valueString || '';
+
+      response = reports.find((report) => report.title === "Descripción de la imagen");
+      const descripcion = response?.text || '';
+
+      response = reports.find((report) => report.title === "Conclusión del ecografista");
+      const conclusion = response?.text || '';
+
+      const doc = new jsPDF();  // Crea una nueva instancia de jsPDF
+
+      //Encabezado: logo, hospital y servicio
+      doc.addImage(LogoHRYC, "JPEG", 10, 10, 90, 15);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("Hospital Universitario Ramón y Cajal", 70, 20);
+      doc.setFontSize(12);
+      doc.text("Servicio de Ginecología y Obstetricia", 85, 30);
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+
+      //Datos de la paciente
+      doc.text("Datos del Paciente:", 10, 50);
+      doc.setFont("helvetica", "bold");
+      doc.text("Nombre:", 10, 60);
+      doc.setFont("helvetica", "normal");
+      doc.text(patientName, 60, 60);
+      
+      doc.setFont("helvetica", "bold");
+      doc.text("NHC:", 10, 70);
+      doc.setFont("helvetica", "normal");
+      doc.text(patientNHC, 60, 70);
+      
+      doc.setFont("helvetica", "bold");
+      doc.text("Fecha de nacimiento:", 10, 80);
+      doc.setFont("helvetica", "normal");
+      doc.text(birthDate(patientAge), 60, 80);
+      
+      doc.setFont("helvetica", "bold");
+      doc.text("Fecha de Última Regla:", 10, 90);
+      doc.setFont("helvetica", "normal");
+      doc.text(patientFUR.toString(), 60, 90);
   
+      // let yPosition = 60; // Posición inicial en Y para el primer bloque de texto
+      let yPosition = 100; // Posición inicial en Y para el primer bloque de texto
+
+      //Sección del informe: indicación, descripción y conclusión
       reports.forEach((report, index) => {
         // Reemplaza <br> por saltos de línea
         const htmlConSaltos = report.text.replace(/<br\s*\/?>/gi, "\n");
@@ -364,6 +422,28 @@ const ResponsesProbability = ({ responses, event }) => {
         // Actualiza la posición en Y para el siguiente reporte
         yPosition += textLines.length * 10 + 10;
       });
+
+      const addSection = (title, text) => {
+        doc.setFont("helvetica", "bold");
+        doc.text(title, 10, yPosition);
+        yPosition += 5; // Espacio entre el título y el texto
+        doc.setFont("helvetica", "normal");
+        const textLines = doc.splitTextToSize(text, 180); // Ajusta el ancho según sea necesario  
+        doc.text(textLines, 10, yPosition);
+        yPosition += textLines.length * 7 + 5; // Actualiza la posición en Y para el siguiente bloque de texto
+      };
+
+      addSection("Indicación de la ecografía: ", indicacion);
+      addSection("Descripción de la imagen: ", descripcion);
+      addSection("Conclusiones del ecografista: ", conclusion);
+
+      //Pie de página: nombre del médico y fecha
+      const today = new Date();
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(10);
+      doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 280);
+      doc.text("Fecha: " + today.toLocaleDateString(), 150, 280);
+      doc.text("Ecografista: " + practitionerName, 10, 290);
   
       // Guarda el PDF
       //doc.save("informe.pdf");
@@ -432,7 +512,7 @@ const ResponsesProbability = ({ responses, event }) => {
     </div>
     );
   };
-  
+
   ResponsesProbability.propTypes = {
     responses: PropTypes.arrayOf(
       PropTypes.shape({
@@ -442,8 +522,5 @@ const ResponsesProbability = ({ responses, event }) => {
     ).isRequired,
     event: PropTypes.func.isRequired,
   };
-  
+
   export default ResponsesProbability;
-
-
-
