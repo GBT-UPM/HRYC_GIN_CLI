@@ -7,7 +7,6 @@ const Header = (props) => {
   return (
     <header class="header">
   <div class="logo-section">
-    <img src={LogoGBT} alt="Logo" class="logo"/>
     <img src={LogoHRYC} alt="Logo" class="logo"/>
     <img src={LogoIrycis} alt="Logo" class="logo"/>    
     <span class="app-name">AdnexaTech HRC</span>

@@ -13,6 +13,8 @@ import { useImageStudyTemplate } from "../hooks/useImageStudyTemplate";
 import ApiService from '../services/ApiService';
 import { generateId } from '../screens/QuestionnaireScreen';
 import { generatePeriod } from '../screens/QuestionnaireScreen';
+import { useRiskAssessmentTemplate } from '../hooks/useRiskAssessmentTemplate';
+import { usePatientTemplate } from '../hooks/usePatientTemplate';
 
 
 const ResponsesProbability = ({ responses, event }) => {
@@ -34,30 +36,33 @@ const ResponsesProbability = ({ responses, event }) => {
   const { generateEncounter } = useEncounterTemplate();
   const { generateObservation } = useObservationTemplate();
   const { generateImagingStudy } = useImageStudyTemplate();
+  const { generateRiskAssessment } = useRiskAssessmentTemplate();
+  const { generatePatient } = usePatientTemplate();
+
 
   // Verifica si hay masa anexial
   const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
   //console.log("La variable hasMassInReports:")
   //console.log(hasMassInReports)
 
-    /* // Función para renderizar las respuestas 
-    const renderAnswer = (answer) => {
-      if (answer.valueCoding) {
-        return `${answer.valueCoding.display} (${answer.valueCoding.code})`;
-      }
-      if (answer.valueDecimal !== undefined) {
-        return answer.valueDecimal;
-      }
-      if (answer.valueString) {
-        return answer.valueString;
-      }
-      if (answer.valueDate) {
-        return answer.valueDate;
-      }
-      // Añadir más tipos de respuesta según sea necesario
-      return JSON.stringify(answer);
-    }; */
-    useEffect(() => {
+  /* // Función para renderizar las respuestas 
+  const renderAnswer = (answer) => {
+    if (answer.valueCoding) {
+      return `${answer.valueCoding.display} (${answer.valueCoding.code})`;
+    }
+    if (answer.valueDecimal !== undefined) {
+      return answer.valueDecimal;
+    }
+    if (answer.valueString) {
+      return answer.valueString;
+    }
+    if (answer.valueDate) {
+      return answer.valueDate;
+    }
+    // Añadir más tipos de respuesta según sea necesario
+    return JSON.stringify(answer);
+  }; */
+  useEffect(() => {
     console.log("ENTRA");
     console.log("Respuestas:" + responses);
 
@@ -67,228 +72,238 @@ const ResponsesProbability = ({ responses, event }) => {
     }
 
   }, []);
-    // Función para calcular logit(p)
-    const calcularLogit = (contorno, sombra, vascAreaSolida, vascPapila) =>{
-      let logit = -3.625;
+  // Función para calcular logit(p)
+  const calcularLogit = (contorno, sombra, vascAreaSolida, vascPapila) => {
+    let logit = -3.625;
 
-      //Cálculo coeficientes
-      if (contorno === 'irregular') logit += 1.299;
+    //Cálculo coeficientes
+    if (contorno === 'irregular') logit += 1.299;
 
-      if (sombra === 'no') logit += 1.847;
+    if (sombra === 'no') logit += 1.847;
 
-      if (vascAreaSolida === 'nula (score color 1)' || vascAreaSolida === 'leve (score color 2)') logit += 2.209;
-      else if (vascAreaSolida === 'moderada (score color 3)' || vascAreaSolida === 'abundante (score color 4)') logit += 2.967
+    if (vascAreaSolida === 'nula (score color 1)' || vascAreaSolida === 'leve (score color 2)') logit += 2.209;
+    else if (vascAreaSolida === 'moderada (score color 3)' || vascAreaSolida === 'abundante (score color 4)') logit += 2.967
 
-      if (vascPapila === 'nula (score color 1)' || vascPapila === 'leve (score color 2)') logit += 1.253;
-      else if (vascPapila === 'moderada (score color 3)' || vascPapila === 'abundante (score color 4)') logit +=1.988;
+    if (vascPapila === 'nula (score color 1)' || vascPapila === 'leve (score color 2)') logit += 1.253;
+    else if (vascPapila === 'moderada (score color 3)' || vascPapila === 'abundante (score color 4)') logit += 1.988;
 
-      return logit;
+    return logit;
+  }
+
+  // Función para calcular la probabilidad.
+  const calcularProbabilidad = (logit) => {
+    return 1 / (1 + Math.exp(-logit));
+  };
+
+  // Función para generar el informe médico
+  const generateReport = (res) => {
+
+    const getValue = (id) => {
+      const response = res.item.find((resp) => resp.linkId.toLowerCase() === id.toLowerCase());
+
+      if (response && response.answer.length > 0) {
+
+        const answer = response.answer[0];
+
+        // Determinar el tipo de valor presente en la respuesta
+        if (answer.valueCoding && answer.valueCoding.display) {
+          return answer.valueCoding.display.toLowerCase(); // Campo display de valueCoding
+        } else if (answer.valueString) {
+          return answer.valueString.toLowerCase(); // Campo valueString
+        } else if (answer.valueInteger !== undefined) {
+          return answer.valueInteger.toString(); // Campo valueInteger convertido a string
+        } else if (answer.valueDate) {
+          return answer.valueDate; // Campo valueDate como está (ya es un string)
+        }
+      }
+      return '';  //Si no encuentra nada.
+    };
+
+    const PAT_MA = getValue('PAT_MA');
+    const MA_TIPO = getValue('MA_TIPO');
+    const MA_ESTRUCTURA = getValue('MA_ESTRUCTURA');
+    const MA_LADO = getValue('MA_LADO');
+    const MA_M1 = getValue('MA_M1');
+    const MA_M2 = getValue('MA_M2');
+    const MA_M3 = getValue('MA_M3');
+    const MA_VOL = (parseFloat(MA_M1) * parseFloat(MA_M2) * parseFloat(MA_M3) * 0.52).toFixed(2);
+    const MA_SOL_CONTORNO = getValue('MA_SOL_CONTORNO');
+    const MA_CONTENIDO = getValue('MA_CONTENIDO');
+    const MA_SOL_VASC = getValue('MA_SOL_VASC');
+    const MA_Q_CONTORNO = getValue('MA_Q_CONTORNO');
+    const MA_Q_GROSOR = getValue('MA_Q_GROSOR');
+    const MA_Q_VASC = getValue('MA_Q_VASC');
+    const MA_Q_P = getValue('MA_Q_P');
+    const MA_Q_P_M1 = getValue('MA_Q_P_M1');
+    const MA_Q_P_M2 = getValue('MA_Q_P_M2');
+    const MA_Q_P_CONTORNO = getValue('MA_Q_P_CONTORNO');
+    const MA_Q_P_VASC = getValue('MA_Q_P_VASC');
+    const MA_Q_T = getValue('MA_Q_T');
+    const MA_Q_T_TIPO = getValue('MA_Q_T_TIPO');
+    const MA_Q_T_GROSOR = getValue('MA_Q_T_GROSOR');
+    const MA_Q_T_VASC = getValue('MA_Q_T_VASC');
+    const MA_Q_T_N = getValue('MA_Q_T_N');
+    const MA_Q_AS = getValue('MA_Q_AS');
+    const MA_Q_AS_N = getValue('MA_Q_AS_N');
+    const MA_Q_AS_M1 = getValue('MA_Q_AS_M1');
+    const MA_Q_AS_M2 = getValue('MA_Q_AS_M2');
+    const MA_Q_AS_M3 = getValue('MA_Q_AS_M3');
+    const MA_Q_AS_VASC = getValue('MA_Q_AS_VASC');
+    const MA_SA = getValue('MA_SA');
+    const MA_PS = getValue('MA_PS');
+    const MA_PS_M1 = getValue('MA_PS_M1');
+    const MA_PS_M2 = getValue('MA_PS_M2');
+    const MA_PS_M3 = getValue('MA_PS_M3');
+    const MA_ASC = getValue('MA_ASC');
+    const MA_ASC_TIPO = getValue('MA_ASC_TIPO');
+    const MA_CARC = getValue('MA_CARC');
+    const RES_CONCL = getValue('RES_CONCL');
+
+    //Calcular logit y probabilidad      
+    const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
+    const probabilidad = calcularProbabilidad(logit);
+
+    const RES_SCORE = probabilidad.toFixed(4);    //no sé si esto se mostraría en el informe o solo para información del médico.
+
+    //Construcción del informe
+    let report = '';
+
+
+    if (PAT_MA === 'no') {                  //Si NO hay masa anexial
+      const OD_M1 = getValue('OD_M1');
+      const OD_M2 = getValue('OD_M2');
+      const OD_FOL = getValue('OD_FOL');
+      const OI_M1 = getValue('OI_M1');
+      const OI_M2 = getValue('OI_M2');
+      const OI_FOL = getValue('OI_FOL');
+
+      report += `Anejo derecho de ${OD_M1} x ${OD_M2} mm con ${OD_FOL} folículo/s.<br/> `;
+      report += `Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL} folículo/s.<br/>`;
+
+    } else {    //Si SÍ hay masa anexial
+      if (MA_TIPO === 'sólida') {   //Masa anexial SÓLIDA
+        if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {   //Estructura o lateralidad INDEFINIDAS
+          report += `De dependencia <b>indefinida</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_SOL_CONTORNO}</b>, de contenido <b>${MA_CONTENIDO}</b> y vascularización <b>${MA_SOL_VASC}</b>.<br/>`;
+        } else {
+          report += `Dependiente de <b>${MA_ESTRUCTURA}</b> en lado <b>${MA_LADO}</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_SOL_CONTORNO}</b>, de contenido <b>${MA_CONTENIDO}</b> y vascularización <b>${MA_SOL_VASC}</b>.<br/>`;
+        }
+      } else if (MA_TIPO === 'quística' || MA_TIPO === 'sólido-quística') {   //Masa anexial QUÍSTICA o SÓLIDO-QUÍSTICA
+        if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {     //Estructura o lateralidad INDEFINIDAS
+          report += `De dependencia <b>indefinida</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_Q_CONTORNO}</b> y de contenido <b>${MA_CONTENIDO}</b>.<br/>`;
+        } else {
+          report += `Dependiente de <b>${MA_ESTRUCTURA}</b> en lado <b>${MA_LADO}</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_Q_CONTORNO}</b> y de contenido <b>${MA_CONTENIDO}</b>.<br/>`;
+        }
+
+        report += `La pared mide <b>${MA_Q_GROSOR} mm</b> y su vascularización es <b>${MA_Q_VASC}</b>.<br/>`;
+
+        if (MA_Q_CONTORNO === 'irregular') {    //Contorno irregular.
+          report += `Contiene <b>${MA_Q_P} papila/s</b>, la mayor de ellas de <b>${MA_Q_P_M1} x ${MA_Q_P_M2} mm</b> de morfología <b>${MA_Q_P_CONTORNO}</b>, con vascularización <b>${MA_Q_P_VASC}</b>.<br/>`;
+        }
+
+        if (MA_Q_T === 'sí') {      //Presencia de tabiques.
+          report += `Los tabiques son <b>${MA_Q_T_TIPO}</b>, de grosor <b>${MA_Q_T_GROSOR} mm</b> y vascularización <b>${MA_Q_T_VASC}</b>. La formación tiene <b>${MA_Q_T_N} lóculo/s</b>.<br/>`;
+        }
+
+        if (MA_Q_AS === 'sí') {   //Área sólida.
+          report += `Contiene <b>${MA_Q_AS_N} porción/es sólida/s</b>, la mayor de ellas tiene un tamaño de <b>${MA_Q_AS_M1} x ${MA_Q_AS_M2} x ${MA_Q_AS_M3} mm</b> con vascularización <b>${MA_Q_AS_VASC}</b>.<br/>`;
+        }
+      }
+      //Esto ya no depende del tipo de masa anexial.
+
+      if (MA_SA === 'sí') {   //Sombra acústica posterior.
+        report += `Presenta sombra posterior.<br/>`;
+      }
+
+      if (MA_PS === 'sí') {   //Parénquima ovárico sano.
+        report += `Tiene parénquima ovárico sano, de tamaño <b>${MA_PS_M1} x ${MA_PS_M2} x ${MA_PS_M3} mm</b>.<br/>`;
+      }
+
+      if (MA_ASC === 'sí') {    //Ascitis.
+        report += `Presenta ascitis de tipo <b>${MA_ASC_TIPO}</b>.<br/>`;
+      }
+
+      if (MA_CARC === 'sí') {   //Carcinomatosis.
+        report += 'Hay carcinomatosis.<br/>';
+      }
+
+      //report += `La probabilidad de que la masa anexial sea maligna es de <b>${RES_SCORE}</b>. <br/>`;
     }
 
-    // Función para calcular la probabilidad.
-    const calcularProbabilidad = (logit) => {
-      return 1 / (1 + Math.exp(-logit));
+    return {
+      text: report,
+      score: RES_SCORE
     };
-
-    // Función para generar el informe médico
-    const generateReport = (res) => {
-
-      const getValue = (id) => {
-        const response = res.item.find((resp) => resp.linkId.toLowerCase() === id.toLowerCase());
- 
-        if (response && response.answer.length > 0) {
-
-          const answer = response.answer[0];
-
-          // Determinar el tipo de valor presente en la respuesta
-          if (answer.valueCoding && answer.valueCoding.display) {
-            return answer.valueCoding.display.toLowerCase(); // Campo display de valueCoding
-          } else if (answer.valueString) {
-            return answer.valueString.toLowerCase(); // Campo valueString
-          } else if (answer.valueInteger !== undefined) {
-            return answer.valueInteger.toString(); // Campo valueInteger convertido a string
-          } else if (answer.valueDate) {
-            return answer.valueDate; // Campo valueDate como está (ya es un string)
-            }
-        }
-        return '';  //Si no encuentra nada.
-      };
-
-      const PAT_MA = getValue('PAT_MA');
-      const MA_TIPO = getValue('MA_TIPO');
-      const MA_ESTRUCTURA = getValue('MA_ESTRUCTURA');
-      const MA_LADO = getValue('MA_LADO');
-      const MA_M1 = getValue('MA_M1');
-      const MA_M2 = getValue('MA_M2');
-      const MA_M3 = getValue('MA_M3');
-      const MA_VOL = (parseFloat(MA_M1) * parseFloat(MA_M2) * parseFloat(MA_M3) * 0.52).toFixed(2);
-      const MA_SOL_CONTORNO = getValue('MA_SOL_CONTORNO');
-      const MA_CONTENIDO = getValue('MA_CONTENIDO');
-      const MA_SOL_VASC = getValue('MA_SOL_VASC');
-      const MA_Q_CONTORNO = getValue('MA_Q_CONTORNO');
-      const MA_Q_GROSOR = getValue('MA_Q_GROSOR');
-      const MA_Q_VASC = getValue('MA_Q_VASC');
-      const MA_Q_P = getValue('MA_Q_P');
-      const MA_Q_P_M1 = getValue('MA_Q_P_M1');
-      const MA_Q_P_M2 = getValue('MA_Q_P_M2');
-      const MA_Q_P_CONTORNO = getValue('MA_Q_P_CONTORNO');
-      const MA_Q_P_VASC = getValue('MA_Q_P_VASC');
-      const MA_Q_T = getValue('MA_Q_T');
-      const MA_Q_T_TIPO = getValue('MA_Q_T_TIPO');
-      const MA_Q_T_GROSOR = getValue('MA_Q_T_GROSOR');
-      const MA_Q_T_VASC = getValue('MA_Q_T_VASC');
-      const MA_Q_T_N = getValue('MA_Q_T_N');
-      const MA_Q_AS = getValue('MA_Q_AS');
-      const MA_Q_AS_N = getValue('MA_Q_AS_N');
-      const MA_Q_AS_M1 = getValue('MA_Q_AS_M1');
-      const MA_Q_AS_M2 = getValue('MA_Q_AS_M2');
-      const MA_Q_AS_M3 = getValue('MA_Q_AS_M3');
-      const MA_Q_AS_VASC = getValue('MA_Q_AS_VASC');
-      const MA_SA = getValue('MA_SA');
-      const MA_PS = getValue('MA_PS');
-      const MA_PS_M1 = getValue('MA_PS_M1');
-      const MA_PS_M2 = getValue('MA_PS_M2');
-      const MA_PS_M3 = getValue('MA_PS_M3');
-      const MA_ASC = getValue('MA_ASC');
-      const MA_ASC_TIPO = getValue('MA_ASC_TIPO');
-      const MA_CARC = getValue('MA_CARC');
-      const RES_CONCL = getValue('RES_CONCL');
-
-      //Calcular logit y probabilidad      
-      const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
-      const probabilidad = calcularProbabilidad(logit);
-      
-      const RES_SCORE = probabilidad.toFixed(4);    //no sé si esto se mostraría en el informe o solo para información del médico.
-    
-      //Construcción del informe
-      let report = '';
-
-
-      if (PAT_MA === 'no') {                  //Si NO hay masa anexial
-        const OD_M1 = getValue('OD_M1');
-        const OD_M2 = getValue('OD_M2');
-        const OD_FOL = getValue('OD_FOL');
-        const OI_M1 = getValue('OI_M1');
-        const OI_M2 = getValue('OI_M2');
-        const OI_FOL = getValue('OI_FOL');
-
-        report += `Anejo derecho de ${OD_M1} x ${OD_M2} mm con ${OD_FOL} folículo/s.<br/> `;
-        report += `Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL} folículo/s.<br/>`;
-      
-      } else {    //Si SÍ hay masa anexial
-          if (MA_TIPO === 'sólida') {   //Masa anexial SÓLIDA
-            if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {   //Estructura o lateralidad INDEFINIDAS
-              report += `De dependencia <b>indefinida</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_SOL_CONTORNO}</b>, de contenido <b>${MA_CONTENIDO}</b> y vascularización <b>${MA_SOL_VASC}</b>.<br/>`; 
-            } else {    
-              report += `Dependiente de <b>${MA_ESTRUCTURA}</b> en lado <b>${MA_LADO}</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_SOL_CONTORNO}</b>, de contenido <b>${MA_CONTENIDO}</b> y vascularización <b>${MA_SOL_VASC}</b>.<br/>`;
-            }
-          } else if (MA_TIPO === 'quística' || MA_TIPO === 'sólido-quística') {   //Masa anexial QUÍSTICA o SÓLIDO-QUÍSTICA
-            if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {     //Estructura o lateralidad INDEFINIDAS
-              report += `De dependencia <b>indefinida</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_Q_CONTORNO}</b> y de contenido <b>${MA_CONTENIDO}</b>.<br/>`;
-            } else {
-              report += `Dependiente de <b>${MA_ESTRUCTURA}</b> en lado <b>${MA_LADO}</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_Q_CONTORNO}</b> y de contenido <b>${MA_CONTENIDO}</b>.<br/>`;
-            }
-            
-            report += `La pared mide <b>${MA_Q_GROSOR} mm</b> y su vascularización es <b>${MA_Q_VASC}</b>.<br/>`;
-
-            if (MA_Q_CONTORNO === 'irregular') {    //Contorno irregular.
-              report += `Contiene <b>${MA_Q_P} papila/s</b>, la mayor de ellas de <b>${MA_Q_P_M1} x ${MA_Q_P_M2} mm</b> de morfología <b>${MA_Q_P_CONTORNO}</b>, con vascularización <b>${MA_Q_P_VASC}</b>.<br/>`;
-            }
-            
-            if (MA_Q_T === 'sí') {      //Presencia de tabiques.
-              report += `Los tabiques son <b>${MA_Q_T_TIPO}</b>, de grosor <b>${MA_Q_T_GROSOR} mm</b> y vascularización <b>${MA_Q_T_VASC}</b>. La formación tiene <b>${MA_Q_T_N} lóculo/s</b>.<br/>`;
-            }
-
-            if (MA_Q_AS === 'sí') {   //Área sólida.
-              report += `Contiene <b>${MA_Q_AS_N} porción/es sólida/s</b>, la mayor de ellas tiene un tamaño de <b>${MA_Q_AS_M1} x ${MA_Q_AS_M2} x ${MA_Q_AS_M3} mm</b> con vascularización <b>${MA_Q_AS_VASC}</b>.<br/>`;
-            }
-          }
-          //Esto ya no depende del tipo de masa anexial.
-
-          if (MA_SA === 'sí') {   //Sombra acústica posterior.
-            report += `Presenta sombra posterior.<br/>`;
-          }
-
-          if (MA_PS === 'sí') {   //Parénquima ovárico sano.
-            report += `Tiene parénquima ovárico sano, de tamaño <b>${MA_PS_M1} x ${MA_PS_M2} x ${MA_PS_M3} mm</b>.<br/>`;      
-          }
-
-          if (MA_ASC === 'sí') {    //Ascitis.
-            report += `Presenta ascitis de tipo <b>${MA_ASC_TIPO}</b>.<br/>`;
-          }
-
-          if (MA_CARC === 'sí') {   //Carcinomatosis.
-            report += 'Hay carcinomatosis.<br/>';
-          }
-
-          //report += `La probabilidad de que la masa anexial sea maligna es de <b>${RES_SCORE}</b>. <br/>`;
-        }
-
-        return {
-          text: report,
-          score: RES_SCORE
-        };
-    };
+  };
   /**
    * Maneja el cambio de texto en la observación del reporte de índice `index`.
    */
-    const handleObservationChange = (index, newValue) => {
-      setObservations((prev) => {
-        const updated = [...prev];
-        updated[index] = newValue;
-        return updated;
-      });
-      console.log("Conclusión: " + observations);
-    };
-    function MyComponent({ reportHtml }) {
-      const sanitizedHtml = DOMPurify.sanitize(reportHtml);
-      
-      return <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />;
-    }
-    /**
-     * Ejemplo de función que maneje el click del botón en cada reporte.
-     * Podrías hacer lo que necesites (guardar, eliminar, etc.)
-     */
-    const handleSaveButtonClick = async (index) => {
-      console.log(`Botón de guardado clicado`);
+  const handleObservationChange = (index, newValue) => {
+    setObservations((prev) => {
+      const updated = [...prev];
+      updated[index] = newValue;
+      return updated;
+    });
+    console.log("Conclusión: " + observations);
+  };
+  function MyComponent({ reportHtml }) {
+    const sanitizedHtml = DOMPurify.sanitize(reportHtml);
 
+    return <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />;
+  }
+  /**
+   * Ejemplo de función que maneje el click del botón en cada reporte.
+   * Podrías hacer lo que necesites (guardar, eliminar, etc.)
+   */
+  const handleSaveButtonClick = async (index) => {
+    console.log(`Botón de guardado clicado`);
+    try {
       console.log("Index: " + index);
 
       setProbality(true);
-  
+
       //const firstResponse = responses[index];
-     /* var specificAnswer = responses.item.find(answer => answer.linkId === "PAT_NHC");
-      const patientId = specificAnswer?.answer?.[0]?.valueString || '';
-      console.log("NHC paciente: " + patientId);
-      specificAnswer = responses.item.find(answer => answer.linkId === "PAT_IND");
-      const observation = specificAnswer?.answer?.[0]?.valueString || '';*/
+      /* var specificAnswer = responses.item.find(answer => answer.linkId === "PAT_NHC");
+       const patientId = specificAnswer?.answer?.[0]?.valueString || '';
+       console.log("NHC paciente: " + patientId);
+       specificAnswer = responses.item.find(answer => answer.linkId === "PAT_IND");
+       const observation = specificAnswer?.answer?.[0]?.valueString || '';*/
       var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NHC".toLowerCase());
+      const nhc = response?.answer?.[0]?.valueString || '';
       console.log(response)
-      const patientId = response?.answer?.[0]?.valueString || '';
-     // response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_IND".toLowerCase());
-     // const observationImagen = response?.answer?.[0]?.valueString || '';
-  
-      const encId = generateId();
-      const obsId = generateId();
-      const imgStuId = generateId();
-      const serieId = generateId();
-      setEncounterId(encId);
-      const Encounter = generateEncounter(encId, patientId, practitioner, practitionerName, generatePeriod());
-      //const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observationImagen);
-      const ImageStudy = generateImagingStudy(imgStuId, encId, patientId, serieId);
-  
-      const successfulResponses = [];
-      try {
+      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NOMBRE".toLowerCase());
+      const given = response?.answer?.[0]?.valueString || '';
+      const family = "" //de momento no se pregunta
+      let patientId = generateId();
+      const Patient = generatePatient(patientId, nhc, family, given)
+      // response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_IND".toLowerCase());
+      // const observationImagen = response?.answer?.[0]?.valueString || '';
+      const patient = await ApiService(keycloak.token, 'POST', `/fhir/Patient/check-or-create`, Patient);
+      if (patient.ok) {
+        const pat = await patient.json();
+        patientId = pat.id;
+        console.log("ID paciente: " + patientId);
+        const encId = generateId();
+
+        const imgStuId = generateId();
+        const serieId = generateId();
+        setEncounterId(encId);
+        const Encounter = generateEncounter(encId, patientId, practitioner, practitionerName, generatePeriod());
+        //const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observationImagen);
+        const ImageStudy = generateImagingStudy(imgStuId, encId, patientId, serieId);
+
+        const successfulResponses = [];
+
+
         const encounter = await ApiService(keycloak.token, 'POST', `/fhir/Encounter`, Encounter);
         if (encounter.status === 200) {
-  
+
           //const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
           //console.log("observation: " + observation.status)
           const imageStudy = await ApiService(keycloak.token, 'POST', `/fhir/ImagingStudy`, ImageStudy);
           console.log("imageStudy: " + imageStudy.status)
-  
-         
-          let index=0
+
+
+          let index = 0
           for (const qResponse of responses) {
             // Aquí puedes procesar cada respuesta
             console.log("Response --------------")
@@ -300,31 +315,48 @@ const ResponsesProbability = ({ responses, event }) => {
                 }
               ];
               const response = await ApiService(keycloak.token, 'POST', `/fhir/QuestionnaireResponse`, qResponse);
-              if (response.status === 200) {
-                console.log(response)
+              let resId = 0
+              if (response.ok) {
+                const result = await response.json();
+                console.log("Nuevo ID:", result.id);
+                resId = result.id;
+                const obsId = generateId();
+                const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
+                const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
+                const riskId = generateId();
+                const RiskAssessment = generateRiskAssessment(riskId, encId, patientId, practitioner, reports[index].score, "", qResponse.id)
+                const risk = await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
+                index++;
                 successfulResponses.push(qResponse);
               } else {
                 throw new Error(`Error en la respuesta: ${response.status}`);
               }
-              const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
-              const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
-              console.log("observation: " + observation.status)
-              index++;
+
             } catch (error) {
               console.error("Error al guardar la respuesta:", error);
               setError("Error al guardar la respuesta.");
             }
           }
-        event();
+          index = 0
+          // for (const report of reports) {
+          //   const riskId = generateId();
+          //   const RiskAssessment= generateRiskAssessment(riskId, encId, patientId, practitioner, report.score, "",observations[index])
+          //   const risk = await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
+          //     console.log("risk: " + risk.status)
+          //     index++;
+          // }
+
+          event();
         } else {
           throw new Error(`Error en el encounter: ${encounter.status}`);
         }
-      } catch (error) {
-        console.error("Error al guardar el encounter:", error);
-        setError("Error al guardar el encounter.");
+
       }
-  
-    };
+
+    } catch (error) {
+      console.error("Error al guardar el encounter:", error);
+      setError("Error al guardar el encounter.");
+    }
 
     const birthDate = (edad) => {
       const today = new Date();
@@ -333,133 +365,132 @@ const ResponsesProbability = ({ responses, event }) => {
     };
 
     const handlePrintButtonClick = () => {
-      //handleSaveButtonClick();
-      //console.log("Se han guardado los datos en la BD.")
-      console.log("objeto reports:" +  reports)
-      
-      var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NOMBRE".toLowerCase());
-      console.log(response)
-      const patientName = response?.answer?.[0]?.valueString || '';
+      try {
+        //handleSaveButtonClick();
+        //console.log("Se han guardado los datos en la BD.")
+        console.log("objeto reports:" +  reports)
+        
+        var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NOMBRE".toLowerCase());
+        console.log(response)
+        const patientName = response?.answer?.[0]?.valueString || '';
 
-      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NHC".toLowerCase());
-      const patientNHC = response?.answer?.[0]?.valueString || '';
+        response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NHC".toLowerCase());
+        const patientNHC = response?.answer?.[0]?.valueString || '';
 
-      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_EDAD".toLowerCase());
-      const patientAge = response?.answer?.[0]?.valueInteger || '';
+        response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_EDAD".toLowerCase());
+        const patientAge = response?.answer?.[0]?.valueInteger || '';
 
-      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_FUR".toLowerCase());
-      const patientFUR = response?.answer?.[0]?.valueString || '';
+        response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_FUR".toLowerCase());
+        const patientFUR = response?.answer?.[0]?.valueString || '';
 
-      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_IND".toLowerCase());
-      const indicacion = response?.answer?.[0]?.valueString || '';
+        response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_IND".toLowerCase());
+        const indicacion = response?.answer?.[0]?.valueString || '';
 
-      response = reports.find((report) => report.title === "Descripción de la imagen");
-      const descripcion = response?.text || '';
+        response = reports.find((report) => report.title === "Descripción de la imagen");
+        const descripcion = response?.text || '';
 
-      response = reports.find((report) => report.title === "Conclusión del ecografista");
-      const conclusion = response?.text || '';
+        response = reports.find((report) => report.title === "Conclusión del ecografista");
+        const conclusion = response?.text || '';
 
-      const doc = new jsPDF();  // Crea una nueva instancia de jsPDF
+        const doc = new jsPDF();  // Crea una nueva instancia de jsPDF
 
-      //Encabezado: logo, hospital y servicio
-      doc.addImage(LogoHRYC, "JPEG", 10, 10, 90, 15);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.text("Hospital Universitario Ramón y Cajal", 70, 20);
-      doc.setFontSize(12);
-      doc.text("Servicio de Ginecología y Obstetricia", 85, 30);
-
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "normal");
-
-      //Datos de la paciente
-      doc.text("Datos del Paciente:", 10, 50);
-      doc.setFont("helvetica", "bold");
-      doc.text("Nombre:", 10, 60);
-      doc.setFont("helvetica", "normal");
-      doc.text(patientName, 60, 60);
-      
-      doc.setFont("helvetica", "bold");
-      doc.text("NHC:", 10, 70);
-      doc.setFont("helvetica", "normal");
-      doc.text(patientNHC, 60, 70);
-      
-      doc.setFont("helvetica", "bold");
-      doc.text("Fecha de nacimiento:", 10, 80);
-      doc.setFont("helvetica", "normal");
-      doc.text(birthDate(patientAge), 60, 80);
-      
-      doc.setFont("helvetica", "bold");
-      doc.text("Fecha de Última Regla:", 10, 90);
-      doc.setFont("helvetica", "normal");
-      doc.text(patientFUR.toString(), 60, 90);
-  
-      // let yPosition = 60; // Posición inicial en Y para el primer bloque de texto
-      let yPosition = 100; // Posición inicial en Y para el primer bloque de texto
-
-      //Sección del informe: indicación, descripción y conclusión
-      reports.forEach((report, index) => {
-        // Reemplaza <br> por saltos de línea
-        const htmlConSaltos = report.text.replace(/<br\s*\/?>/gi, "\n");
-  
-        // Crea un elemento temporal para interpretar el HTML
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = htmlConSaltos;
-  
-        // Extrae el texto plano (ahora con saltos de línea donde estaban los <br>)
-        let plainText = tempDiv.innerText;
-  
-        // Opcional: normaliza el texto (por ejemplo, eliminando múltiples saltos de línea consecutivos)
-        const normalizedText = plainText.replace(/\n+/g, "\n").trim();
-  
-        // Usa splitTextToSize para dividir el texto en líneas según el ancho máximo
-        const maxWidth = 180; // Ancho máximo en el PDF (ajusta según tus necesidades)
-        const textLines = doc.splitTextToSize(normalizedText, maxWidth);
-        doc.setFontSize(13);
-        // Agrega el bloque de texto al PDF
-        doc.text(textLines, 10, yPosition);
-  
-        // Actualiza la posición en Y para el siguiente reporte
-        yPosition += textLines.length * 10 + 10;
-      });
-
-      const addSection = (title, text) => {
+        //Encabezado: logo, hospital y servicio
+        doc.addImage(LogoHRYC, "JPEG", 10, 10, 90, 15);
         doc.setFont("helvetica", "bold");
-        doc.text(title, 10, yPosition);
-        yPosition += 5; // Espacio entre el título y el texto
+        doc.setFontSize(16);
+        doc.text("Hospital Universitario Ramón y Cajal", 70, 20);
+        doc.setFontSize(12);
+        doc.text("Servicio de Ginecología y Obstetricia", 85, 30);
+
+        doc.setFontSize(11);
         doc.setFont("helvetica", "normal");
-        const textLines = doc.splitTextToSize(text, 180); // Ajusta el ancho según sea necesario  
-        doc.text(textLines, 10, yPosition);
-        yPosition += textLines.length * 7 + 5; // Actualiza la posición en Y para el siguiente bloque de texto
-      };
 
-      addSection("Indicación de la ecografía: ", indicacion);
-      addSection("Descripción de la imagen: ", descripcion);
-      addSection("Conclusiones del ecografista: ", conclusion);
+        //Datos de la paciente
+        doc.text("Datos del Paciente:", 10, 50);
+        doc.setFont("helvetica", "bold");
+        doc.text("Nombre:", 10, 60);
+        doc.setFont("helvetica", "normal");
+        doc.text(patientName, 60, 60);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("NHC:", 10, 70);
+        doc.setFont("helvetica", "normal");
+        doc.text(patientNHC, 60, 70);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("Fecha de nacimiento:", 10, 80);
+        doc.setFont("helvetica", "normal");
+        doc.text(birthDate(patientAge), 60, 80);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("Fecha de Última Regla:", 10, 90);
+        doc.setFont("helvetica", "normal");
+        doc.text(patientFUR.toString(), 60, 90);
 
-      //Pie de página: nombre del médico y fecha
-      const today = new Date();
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(10);
-      doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 280);
-      doc.text("Fecha: " + today.toLocaleDateString(), 150, 280);
-      doc.text("Ecografista: " + practitionerName, 10, 290);
-  
-      // Guarda el PDF
-      //doc.save("informe.pdf");
-        // Configura el PDF para que se imprima automáticamente
-      doc.autoPrint();
+        // let yPosition = 60; // Posición inicial en Y para el primer bloque de texto
+        let yPosition = 100; // Posición inicial en Y para el primer bloque de texto
 
-      // Abre el PDF en una nueva ventana o pestaña para que se muestre el diálogo de impresión
-      // Opción 1: Usando un URL de tipo blob
-      window.open(doc.output('bloburl'), '_blank');
+        //Sección del informe: indicación, descripción y conclusión
+        reports.forEach((report, index) => {
+          // Reemplaza <br> por saltos de línea
+          const htmlConSaltos = report.text.replace(/<br\s*\/?>/gi, "\n");
 
-      // Opción 2: Usando dataURL (descomenta la siguiente línea y comenta la opción 1 si prefieres esta)
-      // window.open(doc.output('dataurlnewwindow'), '_blank');
-      };
-    
-    return (
-      <div className="responses-summary">
+          // Crea un elemento temporal para interpretar el HTML
+          const tempDiv = document.createElement("div");
+          tempDiv.innerHTML = htmlConSaltos;
+
+          // Extrae el texto plano (ahora con saltos de línea donde estaban los <br>)
+          let plainText = tempDiv.innerText;
+
+          // Opcional: normaliza el texto (por ejemplo, eliminando múltiples saltos de línea consecutivos)
+          const normalizedText = plainText.replace(/\n+/g, "\n").trim();
+
+          // Usa splitTextToSize para dividir el texto en líneas según el ancho máximo
+          const maxWidth = 180; // Ancho máximo en el PDF (ajusta según tus necesidades)
+          const textLines = doc.splitTextToSize(normalizedText, maxWidth);
+          doc.setFontSize(13);
+          // Agrega el bloque de texto al PDF
+          doc.text(textLines, 10, yPosition);
+
+          // Actualiza la posición en Y para el siguiente reporte
+          yPosition += textLines.length * 10 + 10;
+        });
+
+        const addSection = (title, text) => {
+          doc.setFont("helvetica", "bold");
+          doc.text(title, 10, yPosition);
+          yPosition += 5; // Espacio entre el título y el texto
+          doc.setFont("helvetica", "normal");
+          const textLines = doc.splitTextToSize(text, 180); // Ajusta el ancho según sea necesario  
+          doc.text(textLines, 10, yPosition);
+          yPosition += textLines.length * 7 + 5; // Actualiza la posición en Y para el siguiente bloque de texto
+        };
+
+        addSection("Indicación de la ecografía: ", indicacion);
+        addSection("Descripción de la imagen: ", descripcion);
+        addSection("Conclusiones del ecografista: ", conclusion);
+
+        //Pie de página: nombre del médico y fecha
+        const today = new Date();
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(10);
+        doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 280);
+        doc.text("Fecha: " + today.toLocaleDateString(), 150, 280);
+        doc.text("Ecografista: " + practitionerName, 10, 290);
+
+        // Guarda el PDF
+        //doc.save("informe.pdf");
+          // Configura el PDF para que se imprima automáticamente
+        doc.autoPrint();
+
+    } catch (error) {
+      console.error("Error al guardar el encounter:", error);
+      setError("Error al guardar el encounter.");
+    }
+  };
+
+  return (
+    <div className="responses-summary">
       <h3>Informe Médico</h3>
 
       {/* Iterar sobre los reportes */}
@@ -510,17 +541,18 @@ const ResponsesProbability = ({ responses, event }) => {
         Guardar e Imprimir
       </button>
     </div>
-    );
-  };
+  );
+};
 
-  ResponsesProbability.propTypes = {
-    responses: PropTypes.arrayOf(
-      PropTypes.shape({
-        linkId: PropTypes.string.isRequired,
-        answer: PropTypes.arrayOf(PropTypes.object).isRequired,
-      })
-    ).isRequired,
-    event: PropTypes.func.isRequired,
-  };
+ResponsesProbability.propTypes = {
+  responses: PropTypes.arrayOf(
+    PropTypes.shape({
+      linkId: PropTypes.string.isRequired,
+      answer: PropTypes.arrayOf(PropTypes.object).isRequired,
+    })
+  ).isRequired,
+  event: PropTypes.func.isRequired,
+};
+}
 
-  export default ResponsesProbability;
+export default ResponsesProbability;

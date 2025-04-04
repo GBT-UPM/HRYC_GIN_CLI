@@ -1,5 +1,5 @@
 .sidebar {
-    width: 200px;
+    width: 40% !important;
 
     background-color: #ffffff;
     padding: 15px;
@@ -106,9 +106,10 @@
   .sidebar ul li a {
 
     text-decoration: none;
-    color: #8f9397;
-    font-size: small;
-    font-weight: bold;
+    /* color: #8f9397; */
+    color: #000;
+    font-size: medium;
+    /* font-weight: bold; */
     }
   
   

@@ -188,15 +188,15 @@ const ResponsesScreen = () => {
                                     ID del Paciente
                                 </TableSortLabel>
                             </TableCell>
-                            {/* <TableCell>
+                             <TableCell>
                                 <TableSortLabel
-                                    active={orderBy === 'questionnaireResponse'}
+                                    active={orderBy === 'risk'}
                                     direction={orderDirection}
-                                    onClick={() => handleSortRequest('questionnaireResponse')}
+                                    onClick={() => handleSortRequest('risk')}
                                 >
-                                    Estatus
+                                    Riesgo
                                 </TableSortLabel>
-                            </TableCell> */}
+                            </TableCell> 
                             <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'questionnaireResponse'}
@@ -243,7 +243,7 @@ const ResponsesScreen = () => {
                                     style={{ cursor: 'pointer' }}
                                 >
                                     <TableCell>{item.patientId}</TableCell>
-                                    {/* <TableCell>{questionnaireResponse.status}</TableCell> */}
+                                   <TableCell>{item.risk}</TableCell> 
                                     <TableCell>{
                                        observation !==null ? observation.valueCodeableConcept.text : "Pendiente"
                                     }</TableCell> 
