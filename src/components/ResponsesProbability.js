@@ -370,8 +370,8 @@ const ResponsesProbability = ({ responses, event }) => {
   
   const handlePrintButtonClick = () => {
     try {
-      //handleSaveButtonClick();  comentado para evitar que se guarde el encounter al imprimir
-      //console.log("Se han guardado los datos en la BD.")
+      handleSaveButtonClick();
+      console.log("Se han guardado los datos en la BD.")
       
       const getResponse = (key) => {
         const answer = responses[0].item.find(
@@ -389,7 +389,6 @@ const ResponsesProbability = ({ responses, event }) => {
 
       //const getReport = (title) => reports.find((report) => report.title === title)?.text || '';
       console.log("nombre médico: " + practitionerName);
-
 
       const patientName = getResponse("PAT_NOMBRE");
       const patientNHC = getResponse("PAT_NHC");
@@ -441,26 +440,35 @@ const ResponsesProbability = ({ responses, event }) => {
       doc.setFont("helvetica", "normal");
       doc.text(formatDate(patientFUR), 65, 90);
 
-      let yPosition = 110; // Posición inicial en Y para el primer bloque de texto
+      let yPosition = 100; // Posición inicial en Y para el primer bloque de texto
 
       //Sección del informe: indicación, descripción y conclusión
-      const addSection = (title, text) => {
+      const addSection = (title, text, massIndex = null) => {
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.text(title, 10, yPosition);
         yPosition += 10; // Espacio entre el título y el texto
+        
+        //Si hay más de una masa anexial, se añade el título de la masa
+        if (massIndex !== null) {
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "bold");
+          doc.text("Conclusión de la Masa Anexial " + (massIndex + 1), 15, yPosition);
+          yPosition += 10;
+        }
+
         doc.setFontSize(11);
         doc.setFont("helvetica", "normal");
         const textLines = doc.splitTextToSize(text, 180); // Ajusta el ancho según sea necesario  
         doc.text(textLines, 10, yPosition);
-        yPosition += textLines.length + 10; // Actualiza la posición en Y para el siguiente bloque de texto
+        yPosition += textLines.length * 4 + 10; // Actualiza la posición en Y para el siguiente bloque de texto
       };
 
       addSection("Indicación de la ecografía: ", indicacion);
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.text("Descripción de la imagen: ", 10, yPosition);
-      yPosition += 10; 
+      yPosition += 10;
 
       doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
@@ -468,9 +476,11 @@ const ResponsesProbability = ({ responses, event }) => {
         if (hasMassInReports) {
           doc.setFontSize(11);
           doc.setFont("helvetica", "bold");
-          doc.text("Masa anexial" + (index + 1), 10, yPosition);
+          doc.text("Masa anexial " + (index + 1), 15, yPosition);
           yPosition += 10;
         }
+        doc.setFont("helvetica", "normal");
+
         // Reemplaza <br> por saltos de línea
         const htmlConSaltos = report.text.replace(/<br\s*\/?>/gi, "\n");
 
@@ -490,24 +500,45 @@ const ResponsesProbability = ({ responses, event }) => {
         doc.setFontSize(11);
         // Agrega el bloque de texto al PDF
         doc.text(textLines, 10, yPosition, { align: "left" });
-
+        
         // Actualiza la posición en Y para el siguiente reporte
-        yPosition += textLines.length * 8 + 4;
+        yPosition += textLines.length * 4 + 10;
       });
 
-      addSection("Conclusiones del ecografista: ", observations.join("\n"));
+      // Espacio para las conclusiones
+      const validObservations = observations.filter((observation) => observation.trim().length > 0); // Filtra las observaciones vacías o nulas
+      if (validObservations.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Conclusiones del ecografista: ", 10, yPosition);
+        yPosition += 10;
+
+        validObservations.forEach((observation, index) => {
+          if (validObservations.length > 1) {
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "bold");
+            doc.text("Conclusión de la Masa Anexial " + (index + 1), 15, yPosition);
+            yPosition += 10;
+          }
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "normal");
+        const textLines = doc.splitTextToSize(observation, 180); // Ajusta el ancho según sea necesario
+        doc.text(textLines, 10, yPosition);        
+        yPosition += textLines.length + 10; // Actualiza la posición en Y para el siguiente bloque de texto
+      });
+    }
 
       //Pie de página: nombre del médico y fecha
       const today = new Date();
       doc.setFontSize(10);
       doc.setFont("helvetica", "italic");
-      doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 250);
-      doc.text("Fecha: " + today.toLocaleDateString(), 150, 250);
-      doc.text("Ecografista: " + practitionerName, 10, 260);
+      doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
+      doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
+      doc.text("Ecografista: " + practitioner, 10, 270);
 
       // Guarda el PDF
       //doc.save("informe.pdf");
-        // Configura el PDF para que se imprima automáticamente
+      // Configura el PDF para que se imprima automáticamente
       doc.autoPrint();
       window.open(doc.output("bloburl"), "_blank");  // Abre el PDF en una nueva pestaña
 
@@ -543,8 +574,7 @@ const ResponsesProbability = ({ responses, event }) => {
           {/* Campo de texto para observación */}
           <label className='tlabel'>
             Conclusión del ecografista:
-            <input
-              type="text"
+            <textarea
               value={observations[index] || ""}
               onChange={(e) => handleObservationChange(index, e.target.value)}
             />

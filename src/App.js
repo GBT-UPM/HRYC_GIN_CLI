@@ -69,7 +69,8 @@ function App() {
             />
           } />
           <Route path="/questionnaire" element={<QuestionnaireScreen />} />
-          <Route path="/responses" element={<ResponsesScreen />} />
+          <Route path="/responses" element={
+            <ResponsesScreen/>} />
    
         </Route>
 

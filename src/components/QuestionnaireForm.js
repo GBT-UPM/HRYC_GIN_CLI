@@ -5,12 +5,12 @@ import Modal from "./Modal";
 
 const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
   const [answers, setAnswers] = useState([]);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState("");
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Verifica si hay masa anexial
-  const hasMass = answers.find(a => a.linkId === "PAT_MA")?.answer?.[0]?.valueCoding.display !== "No";
+  const hasMass = answers.find(a => a.linkId === "PAT_MA")?.answer?.[0]?.valueCoding.display == "Sí" || false;
   /**console.log("La variable hasMass:")
   console.log(hasMass)*/
 
@@ -458,7 +458,10 @@ const renderInput = (item) => {
     });
 
     if (missingAnswers.length > 0) {
-      setError("Hay campos requeridos sin rellenar. ¿Continuar de todos modos?");
+      const missingLabels = missingAnswers.map((item) => `- ${item.text || item.linkId}`);
+      const message = `Los siguientes campos están sin rellenar:\n\n${missingLabels.join('\n')}`;
+      console.log(message);    
+      setError(message);
       return false;
     } else {
       setError(null);
@@ -573,15 +576,28 @@ const renderInput = (item) => {
       <button className="save-btn" onClick={() => { validate(); setIsModalOpen(true) } }>Siguiente</button>
       {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <h2>Confirmación</h2> 
-        <p>{error && <div className="error-message">{error}</div>}</p>
-        <p>Pulse <b>continuar</b> para elaborar el informe.</p>
-        <p><b>Si continúa no podrá volver a este cuestionario.</b></p>
-        <button className="save" onClick={() => { if (validate()) { event(answers); setIsModalOpen(false); } }}>Continuar</button>
-        {/* Mostrar solo si hay masa anexial */}
-        {hasMass && (
-        <button className="continue" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); setIsModalOpen(false)} } }>Añadir masa anexial</button>)}
-        <button className="cancel" onClick={() => setIsModalOpen(false)}>Cancelar</button>
+        <h2>Confirmación</h2>
+        {error && (
+          <div className="error-message">
+            {error.split('\n').map((line, index) => (
+              <p key={index}>{line}</p>
+            ))}
+          </div>
+        )}
+        {/*<p>{error && <div className="error-message">{error}</div>}</p>*/}
+
+        {/* Mostrar solo si todos los campos están completos*/}
+        {!error && (
+          <>
+            <p>Pulse <b>continuar</b> para elaborar el informe.</p>
+            <p><b>Si continúa no podrá volver a este cuestionario.</b></p>
+            <button className="save" onClick={() => { if (validate()) { event(answers); setIsModalOpen(false); } }}>Continuar</button>
+            {/* Mostrar solo si hay masa anexial */}
+            {hasMass && (
+              <button className="continue" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); setIsModalOpen(false)} } }>Añadir masa anexial</button>)}
+              <button className="cancel" onClick={() => setIsModalOpen(false)}>Cancelar</button>
+          </>
+        )}
       </Modal>
     </>
   );

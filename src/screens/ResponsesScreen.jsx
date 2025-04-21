@@ -31,7 +31,7 @@ const ResponsesScreen = () => {
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [orderBy, setOrderBy] = useState('encounterPeriodStart');
-    const [orderDirection, setOrderDirection] = useState('asc');
+    const [orderDirection, setOrderDirection] = useState('desc');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(5);
     const [selectedQuestionnaire, setSelectedQuestionnaire] = useState(null);
@@ -80,8 +80,8 @@ const ResponsesScreen = () => {
 
     // Función para ordenar la tabla
     const handleSortRequest = (property) => {
-        const isAsc = orderBy === property && orderDirection === 'asc';
-        setOrderDirection(isAsc ? 'desc' : 'asc');
+        const isAsc = orderBy === property && orderDirection === 'desc';
+        setOrderDirection(isAsc ? 'asc' : 'desc');
         setOrderBy(property);
     };
 
@@ -234,6 +234,15 @@ const ResponsesScreen = () => {
                             const observation = item.observation && item.observation !== "" 
                                                 ? JSON.parse(item.observation) 
                                                 : null;
+
+                        //Función para obtener el valor de la respuesta de acuerdo al linkId
+                        const getAnswerByLinkId = (responses, linkId) => {
+                            const qItem = responses?.item.find(i => i.linkId === linkId);
+                            if (!qItem || !qItem.answer || qItem.answer.lenght === 0) return null;
+                            return getAnswerValue(qItem.answer[0]);
+                        };
+                        const hasMass = getAnswerByLinkId(questionnaireResponse, "PAT_MA") === "Sí";
+ 
                             return (
                                 <TableRow
                                     className="table-row"
@@ -243,9 +252,9 @@ const ResponsesScreen = () => {
                                     style={{ cursor: 'pointer' }}
                                 >
                                     <TableCell>{item.patientId}</TableCell>
-                                   <TableCell>{item.risk}</TableCell> 
+                                    <TableCell>{item.risk}</TableCell> 
                                     <TableCell>{
-                                       observation !==null ? observation.valueCodeableConcept.text : "Pendiente"
+                                       !hasMass ? "No disponible" : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
                                     }</TableCell> 
                                     <TableCell>{item.encounterText}</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
@@ -258,7 +267,8 @@ const ResponsesScreen = () => {
                                               <VisibilityIcon />
                                             </IconButton>
                                         </Tooltip>
-                                        <Tooltip title="Editar">
+                                        {hasMass && (
+                                            <Tooltip title="Editar">
                                             <IconButton 
                                                 color="secondary" 
                                                 onClick={() => handleEdit(item)}
@@ -266,6 +276,7 @@ const ResponsesScreen = () => {
                                                 <EditIcon></EditIcon>
                                             </IconButton>
                                         </Tooltip>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             );
