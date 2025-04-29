@@ -1,5 +1,6 @@
 import { faBars, faTimes, faChevronDown, faChevronUp } from "@fortawesome/free-solid-svg-icons";
 import LogoETSIT from "../assets/images/LOGO_ESCUELA.png";
+import LogoGBT from "../assets/images/GBT_SIMPLE.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import '../assets/css/Sidebar.css';
 import React, { useState } from 'react';
@@ -24,6 +25,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
                 <FontAwesomeIcon icon={sidebarOpen ? faTimes : faBars} />
             </button>
             <img src={LogoETSIT} alt="LogoEscuela" class="logoEscuela" />
+            <img src={LogoGBT} alt="LogoGbt" class="logoEscuela"/>
             <div className="sections">
                 <div className="sidebar-section">
                     <ul>
@@ -31,6 +33,11 @@ const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
                     </ul>
                 </div>
                 <div className="sidebar-section">
+                    <ul>
+                    <li><a href="#link3" onClick={download}>Descargar</a></li>
+                    </ul>
+                </div>
+                {/* <div className="sidebar-section">
                     <button className="section-toggle-btn" onClick={() => toggleSection('historico')}>
                         Histórico <FontAwesomeIcon icon={sections.historico ? faChevronUp : faChevronDown} />
                     </button>
@@ -61,7 +68,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
                             <li><a href="#link6">Enlace 6</a></li>
                         </ul>
                     )}
-                </div>
+                </div> */}
             </div>
         </div>
     );

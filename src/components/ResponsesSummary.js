@@ -105,7 +105,7 @@ const ResponsesSummary = ({ responses, event }) => {
       const MA_ASC = getValue('MA_ASC');
       const MA_ASC_TIPO = getValue('MA_ASC_TIPO');
       const MA_CARC = getValue('MA_CARC');
-      const RES_CONCL = getValue('RES_CONCL');
+      //const RES_CONCL = getValue('RES_CONCL');
 
       //Calcular logit y probabilidad      
       const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
@@ -116,7 +116,7 @@ const ResponsesSummary = ({ responses, event }) => {
       //Construcción del informe
       let report = '';
 
-      if (PAT_MA === 'no') {                  //Si NO hay masa anexial
+      if (PAT_MA === '0') {                  //Si NO hay masa anexial
         const OD_M1 = getValue('OD_M1');
         const OD_M2 = getValue('OD_M2');
         const OD_FOL = getValue('OD_FOL');
@@ -124,21 +124,21 @@ const ResponsesSummary = ({ responses, event }) => {
         const OI_M2 = getValue('OI_M2');
         const OI_FOL = getValue('OI_FOL');
 
-        report += `Anejo derecho de ${OD_M1} x ${OD_M2} mm con ${OD_FOL}.\n `;
-        report += `Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL}.\n`;
+        report += `Anejo derecho de ${OD_M1} x ${OD_M2} mm con ${OD_FOL} folículo/s.\n `;
+        report += `Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL} folículo/s.\n`;
       
       } else {    //Si SÍ hay masa anexial
           if (MA_TIPO === 'sólida') {   //Masa anexial SÓLIDA
             if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {   //Estructura o lateralidad INDEFINIDAS
               report += `De dependencia indefinida, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO}, de contenido ${MA_CONTENIDO} y vascularización ${MA_SOL_VASC}.\n`; 
             } else {    
-              report += `Dependiente de ${MA_ESTRUCTURA} ${MA_LADO}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO}, de contenido ${MA_CONTENIDO} y vascularización ${MA_SOL_VASC}.\n`;
+              report += `Dependiente de ${MA_ESTRUCTURA} en lado ${MA_LADO}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO}, de contenido ${MA_CONTENIDO} y vascularización ${MA_SOL_VASC}.\n`;
             }
           } else if (MA_TIPO === 'quística' || MA_TIPO === 'sólido_quística') {   //Masa anexial QUÍSTICA o SÓLIDO-QUÍSTICA
             if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {     //Estructura o lateralidad INDEFINIDAS
               report += `De dependencia indefinida, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_Q_CONTORNO} y de contenido ${MA_CONTENIDO}.\n`;
             } else {
-              report += `Dependiente de ${MA_ESTRUCTURA} ${MA_LADO}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO} y de contenido ${MA_CONTENIDO}.\n`;
+              report += `Dependiente de ${MA_ESTRUCTURA} en lado ${MA_LADO}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO} y de contenido ${MA_CONTENIDO}.\n`;
             }
             
             report += `La pared mide ${MA_Q_GROSOR} y su vascularización es ${MA_Q_VASC}.\n`;
@@ -173,7 +173,7 @@ const ResponsesSummary = ({ responses, event }) => {
             report += 'Hay carcinomatosis.\n';
           }
 
-          report += `La probabilidad de que la masa anexial sea maligna es de ${RES_SCORE}. \n ${RES_CONCL}`;
+          report += `La probabilidad de que la masa anexial sea maligna es de ${RES_SCORE}. \n`;
         }
 
         return report;

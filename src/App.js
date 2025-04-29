@@ -61,7 +61,13 @@ function App() {
         <Route path="/" element={<Layout sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} handleDownload={handleDownload} closeSession={closeSession} preferred_username={practitionerName} isAdmin={isAdmin} />}>
 
           {/* Rutas hijas dentro de Layout */}
-          <Route index element={<HomeScreen />} />
+          <Route index element={
+            <HomeScreen
+              keycloak={keycloak}
+              practitionerName={practitionerName}
+              isAdmin={isAdmin}
+            />
+          } />
           <Route path="/questionnaire" element={<QuestionnaireScreen />} />
           <Route path="/responses" element={<ResponsesScreen />} />
    
