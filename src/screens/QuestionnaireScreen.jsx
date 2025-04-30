@@ -1,23 +1,17 @@
 
 
-import { useTranslation } from "react-i18next";
+
 import { CategoryScale } from "chart.js";
 import Chart from "chart.js/auto";
-import { Col, Container, Row } from "react-bootstrap";
+
 import { useEffect, useState } from "react";
 import { useKeycloak } from '@react-keycloak/web';
 import ApiService from "../services/ApiService";
-import Header from "../components/Header";
-import QuestionPanel from "../components/QuestionPanel";
-import Panel from "../components/Panel";
+
 import QuestionnaireForm from "../components/QuestionnaireForm";
-import Sidebar from "../components/Sidebar";
-import ResponsesSummary from "../components/ResponsesSummary";
-import Footer from "../components/Footer";
+
 import { v4 as uuidv4 } from "uuid";
-import { useEncounterTemplate } from "../hooks/useEncounterTemplate";
-import { useObservationTemplate } from "../hooks/useObservationTemplate";
-import { useImageStudyTemplate } from "../hooks/useImageStudyTemplate";
+
 import ResponsesProbability from "../components/ResponsesProbability";
 import { useNavigate } from "react-router-dom";
 Chart.register(CategoryScale);
@@ -37,18 +31,12 @@ export const generatePeriod = () => {
 export default function QuestionnaireScreen() {
   const { keycloak, initialized } = useKeycloak();
   const [questionnaire, setQuestionnaire] = useState(null);
-  const [error, setError] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [answers, setAnswers] = useState([]);
-  const [responses, setResponses] = useState([]);
+  const [setError] = useState(null);
+
+  const [ setResponses] = useState([]);
   const [questionnaireResponses, setQuestionnaireResponses] = useState([]);
-  const [practitioner, setPractitioner] = useState("");
-  const [practitionerName, setPractitionerName] = useState("");
-  const [encounterId, setEncounterId] = useState("");
-  const { generateEncounter } = useEncounterTemplate();
-  const { generateObservation } = useObservationTemplate();
-  const { generateImagingStudy } = useImageStudyTemplate();
+
+
   //const {probability,setProbality}=useState(false);
   const [probability, setProbality] = useState(false);
   const navigate = useNavigate();

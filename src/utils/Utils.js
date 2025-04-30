@@ -1,4 +1,4 @@
-const base64 = require('base-64');
+
 
 export function CreateParams(token,method,body) {
     if (method==='POST'){
@@ -123,7 +123,7 @@ export function addFilter(filter,type,value) {
 
 
   let filter_no_column= filter.filter(item => item.column !== type);
-  if(value !='todos' && value !== null){
+  if(value !=='todos' && value !== null){
     filter_no_column.push({ column: type, optionValue: value});
   }
   return filter_no_column;

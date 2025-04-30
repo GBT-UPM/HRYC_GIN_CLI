@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import '../assets/css/ResponsesSummary.css';
-import DOMPurify from 'dompurify';
+
 import '../assets/css/ResponsesProbability.css';
 import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
@@ -61,15 +61,15 @@ const ResponsesProbability = ({ responses, event }) => {
     return JSON.stringify(answer);
   }; */
   useEffect(() => {
+    if (!responses || responses.length === 0) return;
+  
     console.log("ENTRA");
-    console.log("Respuestas:" + responses);
-
-    for (const response of responses) {
-      const repo = generateReport(response)
-      setReports((prev) => [...prev, repo]);
-    }
-
-  }, []);
+    console.log("Respuestas:", responses);
+  
+    const generated = responses.map((r) => generateReport(r));
+    setReports(generated);
+  
+  }, [responses, generateReport]);
   // Función para calcular logit(p)
   const calcularLogit = (contorno, sombra, vascAreaSolida, vascPapila) => {
     let logit = -3.625;
@@ -155,7 +155,7 @@ const ResponsesProbability = ({ responses, event }) => {
     const MA_ASC = getValue('MA_ASC');
     const MA_ASC_TIPO = getValue('MA_ASC_TIPO');
     const MA_CARC = getValue('MA_CARC');
-    const RES_CONCL = getValue('RES_CONCL');
+  
 
     //Calcular logit y probabilidad      
     const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
@@ -246,11 +246,6 @@ const ResponsesProbability = ({ responses, event }) => {
     });
     console.log("Conclusión: " + observations);
   };
-  function MyComponent({ reportHtml }) {
-    const sanitizedHtml = DOMPurify.sanitize(reportHtml);
-
-    return <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />;
-  }
   /**
    * Ejemplo de función que maneje el click del botón en cada reporte.
    * Podrías hacer lo que necesites (guardar, eliminar, etc.)
@@ -323,10 +318,10 @@ const ResponsesProbability = ({ responses, event }) => {
                 resId = result.id;
                 const obsId = generateId();
                 const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
-                const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
+                await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
                 const riskId = generateId();
                 const RiskAssessment = generateRiskAssessment(riskId, encId, patientId, practitioner, reports[index].score, "", qResponse.id)
-                const risk = await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
+                await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
                 index++;
                 successfulResponses.push(qResponse);
               } else {
