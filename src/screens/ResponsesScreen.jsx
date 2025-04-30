@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Container, Typography, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, Paper, TablePagination, TableSortLabel,
@@ -51,28 +51,29 @@ const ResponsesScreen = () => {
         "Maligno": { code: "363346000", display: "Maligno" },
         "Desconocido / Incierto": { code: "70852002", display: "Desconocido / Incierto" }
     };
-    const fetchQuestionnaire = async () => {
+    const fetchQuestionnaire = useCallback(async () => {
         try {
-            const response = await ApiService(keycloak.token, 'GET', `/app/QuestionnaireResponse`, {});
-            if (response.status === 200) {
-                const data = await response.json();
-                console.log(data)
-                if (data && data.length > 0) {
-                    setData(data);
-                }
-            } else {
-                throw new Error(`Error en la respuesta: ${response.status}`);
+          const response = await ApiService(keycloak.token, 'GET', `/app/QuestionnaireResponse`, {});
+          if (response.status === 200) {
+            const data = await response.json();
+            console.log(data);
+            if (data && data.length > 0) {
+              setData(data);
             }
+          } else {
+            throw new Error(`Error en la respuesta: ${response.status}`);
+          }
         } catch (error) {
-            console.error("Error al obtener los datos del paciente:", error);
-            setError("Error al obtener los datos del paciente.");
+          console.error("Error al obtener los datos del paciente:", error);
+          setError("Error al obtener los datos del paciente.");
         }
-    };
+      }, [keycloak.token, setData, setError]);
     // Simula la carga de datos desde una API (reemplazar con fetch/axios en entorno real)
     useEffect(() => {
-        fetchQuestionnaire();
-
-    }, [initialized]); // Ejecutar el efecto solo cuando Keycloak esté inicializado
+        if (initialized) {
+          fetchQuestionnaire();
+        }
+      }, [initialized, fetchQuestionnaire]);
 
 
     // Función para ordenar la tabla

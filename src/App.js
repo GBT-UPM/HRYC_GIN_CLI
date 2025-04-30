@@ -31,22 +31,19 @@ function App() {
   useEffect(() => {
     console.log(keycloak)
     if (initialized && keycloak.authenticated) {
-
       const realmRoles = keycloak.tokenParsed?.realm_access?.roles || [];
       const clientRoles = keycloak.tokenParsed?.resource_access?.['my-api-client']?.roles || [];
+  
       if (realmRoles.includes('practitioner') || clientRoles.includes('practitioner')) {
         setIsAdmin(true);
-
         setPractitioner(keycloak.tokenParsed.preferred_username);
         const fullName = `${keycloak.tokenParsed.given_name} ${keycloak.tokenParsed.family_name}`;
         setPractitionerName(fullName);
       } else if (realmRoles.includes('patient') || clientRoles.includes('patient')) {
-        // Si el usuario es paciente, hacer llamada para obtener los datos del paciente
-
-        //fetchPatientData();
+        // fetchPatientData();
       }
     }
-  }, [initialized, keycloak]); // Ejecutar el efecto solo cuando Keycloak esté inicializado
+  }, [initialized, keycloak, setIsAdmin, setPractitioner, setPractitionerName]);
 
   return (
     <>{/*<Notification />*/}

@@ -4,7 +4,7 @@
 import { CategoryScale } from "chart.js";
 import Chart from "chart.js/auto";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useKeycloak } from '@react-keycloak/web';
 import ApiService from "../services/ApiService";
 
@@ -40,12 +40,18 @@ export default function QuestionnaireScreen() {
   //const {probability,setProbality}=useState(false);
   const [probability, setProbality] = useState(false);
   const navigate = useNavigate();
-  const fetchQuestionnaire = async () => {
+  const fetchQuestionnaire = useCallback(async () => {
     try {
-      const response = await ApiService(keycloak.token, 'GET', `/fhir/Questionnaire?name=registro_ginecologico`, {});
+      const response = await ApiService(
+        keycloak.token,
+        'GET',
+        `/fhir/Questionnaire?name=registro_ginecologico`,
+        {}
+      );
+  
       if (response.status === 200) {
         const data = await response.json();
-        console.log(data)
+        console.log(data);
         if (data && data.length > 0) {
           setQuestionnaire(data[0]);
         }
@@ -56,7 +62,7 @@ export default function QuestionnaireScreen() {
       console.error("Error al obtener los datos del paciente:", error);
       setError("Error al obtener los datos del paciente.");
     }
-  };
+  }, [keycloak.token, setQuestionnaire, setError]);
   const handleSave = async (anwers) => {
     // const confirmSave = window.confirm("¿Está seguro de que desea guardar las respuestas?");
     // if (!confirmSave) return;
@@ -110,17 +116,15 @@ export default function QuestionnaireScreen() {
   }
 
   useEffect(() => {
-    console.log(keycloak)
-
+    console.log(keycloak);
+  
     setQuestionnaireResponses([]);
     setResponses([]);
     // checkUserRoles();
-
+  
     fetchQuestionnaire();
-
-
-
-  }, [initialized]); // Ejecutar el efecto solo cuando Keycloak esté inicializado
+  
+  }, [initialized, keycloak, setResponses, setQuestionnaireResponses, fetchQuestionnaire]);
   return (
     <div>
       {questionnaire ? (
