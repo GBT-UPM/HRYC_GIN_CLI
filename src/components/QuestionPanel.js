@@ -1,10 +1,10 @@
-import { Box, Slider, ThemeProvider, createTheme} from "@mui/material";
+import { Slider, ThemeProvider, createTheme} from "@mui/material";
 import { purple } from "@mui/material/colors";
 import { useState } from "react";
-import { Form } from "react-bootstrap";
+
 import ReactDatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { Unstable_NumberInput as NumberInput } from '@mui/base/Unstable_NumberInput';
+
 
 export default function QuestionPanel({
   id,
@@ -34,7 +34,6 @@ export default function QuestionPanel({
   });
  
   const [ startDate, setStartDate] = useState();
-  const [value, setValue] = useState();
   const checkChoiceResponse = (code) => {
     let index = responses.findIndex(item => (item.linkId === linkId && item.code === code));
     return index !== -1;

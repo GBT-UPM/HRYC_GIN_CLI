@@ -13,7 +13,7 @@ import {
     Select,
     MenuItem
 } from '@mui/material';
-import InfoIcon from '@mui/icons-material/Info';
+
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import '../assets/css/ResponsesScreen.css';
@@ -28,7 +28,7 @@ import { v4 as uuidv4 } from "uuid";
 const ResponsesScreen = () => {
     const { keycloak, initialized } = useKeycloak();
     const [data, setData] = useState([]);
-    const [error, setError] = useState(null);
+    const [setError] = useState(null);
     const [search, setSearch] = useState('');
     const [orderBy, setOrderBy] = useState('encounterPeriodStart');
     const [orderDirection, setOrderDirection] = useState('asc');
@@ -73,10 +73,7 @@ const ResponsesScreen = () => {
         fetchQuestionnaire();
 
     }, [initialized]); // Ejecutar el efecto solo cuando Keycloak esté inicializado
-    // Función para manejar la búsqueda
-    const handleSearch = (event) => {
-        setSearch(event.target.value);
-    };
+
 
     // Función para ordenar la tabla
     const handleSortRequest = (property) => {
@@ -229,7 +226,7 @@ const ResponsesScreen = () => {
                     </TableHead>
                     <TableBody>
                         {paginatedData.map((item, index) => {
-                            const questionnaireResponse = JSON.parse(item.questionnaireResponse);
+                            //const questionnaireResponse = JSON.parse(item.questionnaireResponse);
                             console.log(item.observation)
                             const observation = item.observation && item.observation !== "" 
                                                 ? JSON.parse(item.observation) 

@@ -22,18 +22,15 @@ const ResponsesProbability = ({ responses, event }) => {
   const [reports, setReports] = useState([]);
   const [observations, setObservations] = useState([]);
   //nuevo
-  const [questionnaireResponses, setQuestionnaireResponses] = useState([]);
-  const [probability, setProbality] = useState(false);
-  const [encounterId, setEncounterId] = useState("");
-  const [error, setError] = useState(null);
-  const [allResponses, setAllResponses] = useState([]);
-  const { keycloak, initialized } = useKeycloak();
-  const [questionnaire, setQuestionnaire] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [answers, setAnswers] = useState([]);
-  const [practitioner, setPractitioner] = useState("");
-  const [practitionerName, setPractitionerName] = useState("");
+
+  const [ setProbality] = useState(false);
+  const [ setEncounterId] = useState("");
+ 
+
+  const { keycloak } = useKeycloak();
+  const [setError] = useState(null);
+  const [practitioner] = useState("");
+  const [practitionerName] = useState("");
   const { generateEncounter } = useEncounterTemplate();
   const { generateObservation } = useObservationTemplate();
   const { generateImagingStudy } = useImageStudyTemplate();

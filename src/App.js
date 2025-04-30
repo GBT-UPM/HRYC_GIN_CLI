@@ -1,11 +1,8 @@
-import { Routes, Route, Router } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css"
 import './App.css';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
-
-
-import i18n from "./i18n"
 
 import HomeScreen from "./screens/MainScreen";
 import QuestionnaireScreen from "./screens/QuestionnaireScreen";
@@ -19,7 +16,7 @@ import ResponsesScreen from "./screens/ResponsesScreen";
 function App() {
   const { keycloak, initialized } = useKeycloak();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [practitioner, setPractitioner] = useState("");
+  const [setPractitioner] = useState("");
   const [practitionerName, setPractitionerName] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const toggleSidebar = () => {
@@ -45,7 +42,7 @@ function App() {
         setPractitionerName(fullName);
       } else if (realmRoles.includes('patient') || clientRoles.includes('patient')) {
         // Si el usuario es paciente, hacer llamada para obtener los datos del paciente
-        const username = keycloak.tokenParsed.preferred_username;
+
         //fetchPatientData();
       }
     }
