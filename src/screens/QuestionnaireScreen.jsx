@@ -31,9 +31,10 @@ export const generatePeriod = () => {
 export default function QuestionnaireScreen() {
   const { keycloak, initialized } = useKeycloak();
   const [questionnaire, setQuestionnaire] = useState(null);
-  const [setError] = useState(null);
-
-  const [ setResponses] = useState([]);
+  // eslint-disable-next-line no-unused-vars
+  const [error, setError] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [responses, setResponses] = useState([]);
   const [questionnaireResponses, setQuestionnaireResponses] = useState([]);
 
 

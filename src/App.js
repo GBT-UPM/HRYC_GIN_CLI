@@ -16,7 +16,8 @@ import ResponsesScreen from "./screens/ResponsesScreen";
 function App() {
   const { keycloak, initialized } = useKeycloak();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [setPractitioner] = useState("");
+  // eslint-disable-next-line no-unused-vars
+  const [practitioner, setPractitioner] = useState("");
   const [practitionerName, setPractitionerName] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const toggleSidebar = () => {

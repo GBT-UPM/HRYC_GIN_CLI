@@ -28,7 +28,8 @@ import { v4 as uuidv4 } from "uuid";
 const ResponsesScreen = () => {
     const { keycloak, initialized } = useKeycloak();
     const [data, setData] = useState([]);
-    const [setError] = useState(null);
+    // eslint-disable-next-line no-unused-vars
+    const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [orderBy, setOrderBy] = useState('encounterPeriodStart');
     const [orderDirection, setOrderDirection] = useState('asc');

@@ -22,13 +22,15 @@ const ResponsesProbability = ({ responses, event }) => {
   const [reports, setReports] = useState([]);
   const [observations, setObservations] = useState([]);
   //nuevo
-
-  const [ setProbality] = useState(false);
-  const [ setEncounterId] = useState("");
+// eslint-disable-next-line no-unused-vars
+  const [probality, setProbality] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [encounterId, setEncounterId] = useState("");
  
 
   const { keycloak } = useKeycloak();
-  const [setError] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [error, setError] = useState(null);
   const [practitioner] = useState("");
   const [practitionerName] = useState("");
   const { generateEncounter } = useEncounterTemplate();
