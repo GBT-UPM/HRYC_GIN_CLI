@@ -13,6 +13,8 @@ import Layout from "./layout/Layout";
 import { useEffect, useState } from "react";
 import { useKeycloak } from "@react-keycloak/web";
 import ResponsesScreen from "./screens/ResponsesScreen";
+import ApiService from "./services/ApiService";
+import DownloadScreen from "./screens/DownloadScreen";
 
 
 
@@ -26,7 +28,66 @@ function App() {
     setSidebarOpen(!sidebarOpen);
   };
   const handleDownload = async () => {
+    try {
+      const response = await ApiService(keycloak.token, 'GET', `/downloadcsv`, {});
+      if (response.status === 200) {
 
+        const contentDisposition = response.headers.get("Content-Disposition");
+          const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/);
+          const filename = filenameMatch ? filenameMatch[1] : "questionnaire.csv";
+      
+          const blob = await response.blob();
+    
+           // Crear un enlace temporal para descargar
+          const url = window.URL.createObjectURL(blob);
+           const link = document.createElement("a");
+          link.href = url;
+           link.download = filename;
+           document.body.appendChild(link);
+           link.click();
+           link.remove();
+          window.URL.revokeObjectURL(url);
+
+
+
+      } else {
+        throw new Error(`Error en la respuesta: ${response.status}`);
+      }
+    } catch (error) {
+      console.error("Error al obtener los datos del paciente:", error);
+
+    }
+    // try {
+    //   const response = await fetch("http://localhost:8080/downloadcsv", { 
+    //     method: "GET",
+    //     headers: {
+    //       Authorization: `Bearer ${keycloak.token}` // si usas Keycloak
+    //     }
+    //   });
+  
+    //   if (!response.ok) {
+    //     throw new Error(`Error al descargar: ${response.statusText}`);
+    //   }
+  
+    //   // Extraer el nombre del archivo del header si está disponible
+    //   const contentDisposition = response.headers.get("Content-Disposition");
+    //   const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/);
+    //   const filename = filenameMatch ? filenameMatch[1] : "questionnaire.csv";
+  
+    //   const blob = await response.blob();
+  
+    //   // Crear un enlace temporal para descargar
+    //   const url = window.URL.createObjectURL(blob);
+    //   const link = document.createElement("a");
+    //   link.href = url;
+    //   link.download = filename;
+    //   document.body.appendChild(link);
+    //   link.click();
+    //   link.remove();
+    //   window.URL.revokeObjectURL(url);
+    // } catch (error) {
+    //   console.error("Error al descargar el CSV:", error);
+    // }
   };
   const closeSession = async () => {
     keycloak.logout();
@@ -70,6 +131,7 @@ function App() {
           } />
           <Route path="/questionnaire" element={<QuestionnaireScreen />} />
           <Route path="/responses" element={<ResponsesScreen />} />
+          <Route path="/download" element={<DownloadScreen />} />
    
         </Route>
 

@@ -284,7 +284,7 @@ const ResponsesProbability = ({ responses, event }) => {
       const patient = await ApiService(keycloak.token, 'POST', `/fhir/Patient/check-or-create`, Patient);
       if (patient.ok) {
         const pat = await patient.json();
-        patientId = pat.id;
+        //patientId = pat.id;
         console.log("ID paciente: " + patientId);
         const encId = generateId();
 

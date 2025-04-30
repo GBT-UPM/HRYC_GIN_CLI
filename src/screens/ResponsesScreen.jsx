@@ -159,15 +159,16 @@ const ResponsesScreen = () => {
     };
     return (
         <Container className="container">
-            <Typography variant="h4" className="title">
-                📋 Lista de Cuestionarios Médicos
+  
+            <Typography variant="h4" gutterBottom>
+            📋 Lista de Cuestionarios Médicos
             </Typography>
-
             {/* Campo de búsqueda */}
             <TextField
                 label="Buscar por paciente o tipo de encuentro"
                 variant="outlined"
                 fullWidth
+                sx={{ mt: 5 }}
                 className="search-box"
                 InputProps={{
                     startAdornment: <SearchIcon color="primary" sx={{ marginRight: 1 }} />
@@ -181,11 +182,20 @@ const ResponsesScreen = () => {
                         <TableRow className="table-header">
                             <TableCell>
                                 <TableSortLabel
-                                    active={orderBy === 'patientId'}
+                                    active={orderBy === 'patientIdentifier'}
                                     direction={orderDirection}
-                                    onClick={() => handleSortRequest('patientId')}
+                                    onClick={() => handleSortRequest('patientIdentifier')}
                                 >
-                                    ID del Paciente
+                                    NHC
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'patientName'}
+                                    direction={orderDirection}
+                                    onClick={() => handleSortRequest('patientName')}
+                                >
+                                    Nombre
                                 </TableSortLabel>
                             </TableCell>
                              <TableCell>
@@ -212,7 +222,7 @@ const ResponsesScreen = () => {
                                     direction={orderDirection}
                                     onClick={() => handleSortRequest('encounterText')}
                                 >
-                                    Tipo de Encuentro
+                                    Tipo de Cita
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell>
@@ -221,7 +231,7 @@ const ResponsesScreen = () => {
                                     direction={orderDirection}
                                     onClick={() => handleSortRequest('encounterPeriodStart')}
                                 >
-                                    Fecha del Encuentro
+                                    Fecha de la cita
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell><span>Acciones</span></TableCell>
@@ -242,7 +252,8 @@ const ResponsesScreen = () => {
                                     
                                     style={{ cursor: 'pointer' }}
                                 >
-                                    <TableCell>{item.patientId}</TableCell>
+                                    <TableCell>{item.patientIdentifier}</TableCell>
+                                    <TableCell>{item.patientName}</TableCell>
                                    <TableCell>{item.risk}</TableCell> 
                                     <TableCell>{
                                        observation !==null ? observation.valueCodeableConcept.text : "Pendiente"
