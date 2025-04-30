@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Box, Typography, Tooltip, Grid2 } from '@mui/material';
 import '../assets/css/ResponsesScreen.css';
 import { useKeycloak } from '@react-keycloak/web';
-import { useObservationHistologyTemplate } from '../hooks/useObservationHistologyTemplate';
+
 import dq from "../assets/images/downloadQuestionnaires.png";
 import du from "../assets/images/downloadUsers.png";
 import ApiService from '../services/ApiService';
 
 
 const DownloadScreen = () => {
-    const { keycloak, initialized } = useKeycloak();
+    const { keycloak} = useKeycloak();
     const handleDownload = async (recurso) => {
         try {
             var response = null;
