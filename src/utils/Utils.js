@@ -123,7 +123,7 @@ export function addFilter(filter,type,value) {
 
 
   let filter_no_column= filter.filter(item => item.column !== type);
-  if(value !='todos' && value != null){
+  if(value !='todos' && value !== null){
     filter_no_column.push({ column: type, optionValue: value});
   }
   return filter_no_column;
@@ -159,7 +159,7 @@ export function parseDate(objectDate) {
 export function getUser(email,hospital) {
 
   let email_array = email.split('@')
-  if(email_array.length==2){
+  if(email_array.length===2){
     let username = email.split('@')[0];
     let organization = email.split('@')[1];
      if(organization===hospital){
