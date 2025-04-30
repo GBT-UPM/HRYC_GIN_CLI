@@ -1,4 +1,4 @@
-import { Assessment, People, CalendarMonth,MedicalInformation,LocalHospital     } from "@mui/icons-material";
+import { People, CalendarMonth,MedicalInformation,LocalHospital     } from "@mui/icons-material";
 import { Box, Button, Grid2, Paper, Typography } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -32,11 +32,8 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
     };
 
     fetchCounts();
-  }, [keycloak?.token]);
-  const handleStart = () => {
-    // Lógica para comenzar o navegar a otra pantalla
-    alert("Bienvenido, comenzamos la revisión ginecológica!");
-  };
+  }, [keycloak]);
+
 
   const navigate = useNavigate();
 

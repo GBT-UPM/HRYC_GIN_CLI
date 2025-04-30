@@ -1,11 +1,8 @@
-import { Routes, Route, Router } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css"
 import './App.css';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
-
-
-import i18n from "./i18n"
 
 import HomeScreen from "./screens/MainScreen";
 import QuestionnaireScreen from "./screens/QuestionnaireScreen";
@@ -21,6 +18,7 @@ import DownloadScreen from "./screens/DownloadScreen";
 function App() {
   const { keycloak, initialized } = useKeycloak();
   const [isAdmin, setIsAdmin] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [practitioner, setPractitioner] = useState("");
   const [practitionerName, setPractitionerName] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -95,22 +93,19 @@ function App() {
   useEffect(() => {
     console.log(keycloak)
     if (initialized && keycloak.authenticated) {
-
       const realmRoles = keycloak.tokenParsed?.realm_access?.roles || [];
       const clientRoles = keycloak.tokenParsed?.resource_access?.['my-api-client']?.roles || [];
+  
       if (realmRoles.includes('practitioner') || clientRoles.includes('practitioner')) {
         setIsAdmin(true);
-
         setPractitioner(keycloak.tokenParsed.preferred_username);
         const fullName = `${keycloak.tokenParsed.given_name} ${keycloak.tokenParsed.family_name}`;
         setPractitionerName(fullName);
       } else if (realmRoles.includes('patient') || clientRoles.includes('patient')) {
-        // Si el usuario es paciente, hacer llamada para obtener los datos del paciente
-        const username = keycloak.tokenParsed.preferred_username;
-        //fetchPatientData();
+        // fetchPatientData();
       }
     }
-  }, [initialized, keycloak]); // Ejecutar el efecto solo cuando Keycloak esté inicializado
+  }, [initialized, keycloak, setIsAdmin, setPractitioner, setPractitionerName]);
 
   return (
     <>{/*<Notification />*/}
