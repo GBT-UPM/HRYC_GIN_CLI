@@ -10,7 +10,7 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Verifica si hay masa anexial
-  const hasMass = answers.find(a => a.linkId === "PAT_MA")?.answer?.[0]?.valueCoding.display == "Sí" || false;
+  const hasMass = answers.find(a => a.linkId === "PAT_MA")?.answer?.[0]?.valueCoding.display === "Sí" || false;
   /**console.log("La variable hasMass:")
   console.log(hasMass)*/
 

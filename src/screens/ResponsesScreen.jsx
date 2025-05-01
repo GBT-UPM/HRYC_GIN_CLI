@@ -250,7 +250,7 @@ const ResponsesScreen = () => {
                             if (!qItem || !qItem.answer || qItem.answer.lenght === 0) return null;
                             return getAnswerValue(qItem.answer[0]);
                         };
-                        const hasMass = getAnswerByLinkId(questionnaireResponse, "PAT_MA") === "Sí";
+                        const hasMass = getAnswerByLinkId(item.questionnaireResponse, "PAT_MA") === "Sí";
  
                             return (
                                 <TableRow
@@ -260,8 +260,7 @@ const ResponsesScreen = () => {
                                     
                                     style={{ cursor: 'pointer' }}
                                 >
-                                    <TableCell>{item.patientIdentifier}</TableCell>
-                                    <TableCell>{item.patientName}</TableCell>
+                                    <TableCell>{item.patientId}</TableCell>
                                    <TableCell>{item.risk}</TableCell> 
                                     <TableCell>{
                                        !hasMass ? "No disponible" : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
