@@ -566,13 +566,17 @@ const ResponsesProbability = ({ responses, event }) => {
             <div className='text' dangerouslySetInnerHTML={{ __html: report.text }} />
           </div>
           {/* Campo de texto para observación */}
-          <label className='tlabel'>
-            Conclusión del ecografista:
-            <textarea
-              value={observations[index] || ""}
-              onChange={(e) => handleObservationChange(index, e.target.value)}
-            />
-          </label>
+
+          <div className="parts">
+            <div className='tlabel'>Conclusión del ecografista:</div>
+            <div className='text'>
+              <textarea rows="7" cols="75"
+                value={observations[index] || ""}
+                onChange={(e) => handleObservationChange(index, e.target.value)}
+              />
+            </div>
+          </div>
+     
 
           {/* Botón para este reporte 
           <button onClick={() => handleReportButtonClick(index)}>
