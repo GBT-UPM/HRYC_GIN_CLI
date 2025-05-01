@@ -42,11 +42,11 @@ const ResponsesScreen = () => {
     const [histology, setHistology] = useState('');
     const [selectedRow, setSelectedRow] = useState(null);
     const { generateObservation } = useObservationHistologyTemplate();
-/*    const histologyOptions = {
-        "Benigno": { code: "37310001", display: "Benign neoplasm (disorder)" },
-        "Maligno": { code: "363346000", display: "Malignant neoplastic disease (disorder)" },
-        "Desconocido / Incierto": { code: "70852002", display: "Neoplasm of uncertain or unknown behaviour (disorder)" }
-    }; */
+    /*    const histologyOptions = {
+            "Benigno": { code: "37310001", display: "Benign neoplasm (disorder)" },
+            "Maligno": { code: "363346000", display: "Malignant neoplastic disease (disorder)" },
+            "Desconocido / Incierto": { code: "70852002", display: "Neoplasm of uncertain or unknown behaviour (disorder)" }
+        }; */
     const histologyOptions = {
         "Benigno": { code: "37310001", display: "Benigno" },
         "Maligno": { code: "363346000", display: "Maligno" },
@@ -54,27 +54,27 @@ const ResponsesScreen = () => {
     };
     const fetchQuestionnaire = useCallback(async () => {
         try {
-          const response = await ApiService(keycloak.token, 'GET', `/app/QuestionnaireResponse`, {});
-          if (response.status === 200) {
-            const data = await response.json();
-            console.log(data);
-            if (data && data.length > 0) {
-              setData(data);
+            const response = await ApiService(keycloak.token, 'GET', `/app/QuestionnaireResponse`, {});
+            if (response.status === 200) {
+                const data = await response.json();
+                console.log(data);
+                if (data && data.length > 0) {
+                    setData(data);
+                }
+            } else {
+                throw new Error(`Error en la respuesta: ${response.status}`);
             }
-          } else {
-            throw new Error(`Error en la respuesta: ${response.status}`);
-          }
         } catch (error) {
-          console.error("Error al obtener los datos del paciente:", error);
-          setError("Error al obtener los datos del paciente.");
+            console.error("Error al obtener los datos del paciente:", error);
+            setError("Error al obtener los datos del paciente.");
         }
-      }, [keycloak.token, setData, setError]);
+    }, [keycloak.token, setData, setError]);
     // Simula la carga de datos desde una API (reemplazar con fetch/axios en entorno real)
     useEffect(() => {
         if (initialized) {
-          fetchQuestionnaire();
+            fetchQuestionnaire();
         }
-      }, [initialized, fetchQuestionnaire]);
+    }, [initialized, fetchQuestionnaire]);
 
 
     // Función para ordenar la tabla
@@ -123,7 +123,7 @@ const ResponsesScreen = () => {
     const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
     const generateId = () => {
         return uuidv4(); // Genera un UUID único
-      };
+    };
     // Guardar cambios y cerrar modal
     const handleSaveChanges = async () => {
         console.log(histology)
@@ -135,21 +135,21 @@ const ResponsesScreen = () => {
         const histologyData = histologyOptions[histology];
         const code = histologyData.code;
         const display = histologyData.display;
-        const obsId=generateId();
-        const encId=selectedRow.encounterId;
-        const quesRId=JSON.parse(selectedRow.questionnaireResponse).id;
-        const patientId=selectedRow.patientId;
-        const text=histology;
-        const note=pathologyReport;
-        const Observation= generateObservation(obsId, encId, quesRId, patientId, code, display, text, note);
-    //    const Observation= generateObservation(generateId(), selectedRow.encounterId, selectedRow.questionnaireResponse.id,selectedRow.patientId, code, display, histology, pathologyReport)
+        const obsId = generateId();
+        const encId = selectedRow.encounterId;
+        const quesRId = JSON.parse(selectedRow.questionnaireResponse).id;
+        const patientId = selectedRow.patientId;
+        const text = histology;
+        const note = pathologyReport;
+        const Observation = generateObservation(obsId, encId, quesRId, patientId, code, display, text, note);
+        //    const Observation= generateObservation(generateId(), selectedRow.encounterId, selectedRow.questionnaireResponse.id,selectedRow.patientId, code, display, histology, pathologyReport)
         try {
             const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, Observation);
-            console.log("observation: "+ observation.status)
+            console.log("observation: " + observation.status)
 
             if (observation.status === 200) {
                 await fetchQuestionnaire();
-        }
+            }
             // console.log(updatedData);
             setOpenHistoModal(false);
         } catch (error) {
@@ -158,9 +158,9 @@ const ResponsesScreen = () => {
     };
     return (
         <Container className="container">
-  
+
             <Typography variant="h4" gutterBottom>
-            📋 Lista de Cuestionarios Médicos
+                📋 Lista de Cuestionarios Médicos
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
@@ -197,7 +197,7 @@ const ResponsesScreen = () => {
                                     Nombre
                                 </TableSortLabel>
                             </TableCell>
-                             <TableCell>
+                            <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'risk'}
                                     direction={orderDirection}
@@ -205,7 +205,7 @@ const ResponsesScreen = () => {
                                 >
                                     Riesgo
                                 </TableSortLabel>
-                            </TableCell> 
+                            </TableCell>
                             <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'questionnaireResponse'}
@@ -240,11 +240,11 @@ const ResponsesScreen = () => {
                         {paginatedData.map((item, index) => {
                             //const questionnaireResponse = JSON.parse(item.questionnaireResponse);
                             console.log(item.observation)
-                            const observation = item.observation && item.observation !== "" 
-                                                ? JSON.parse(item.observation) 
-                                                : null;
+                            const observation = item.observation && item.observation !== ""
+                                ? JSON.parse(item.observation)
+                                : null;
 
-                        //Función para obtener el valor de la respuesta de acuerdo al linkId
+                            //Función para obtener el valor de la respuesta de acuerdo al linkId
                             const getAnswerByLinkId = (questionnaireResponse, linkId) => {
                                 const responses = JSON.parse(questionnaireResponse)
                                 if (!responses || !Array.isArray(responses.item)) return null;
@@ -252,43 +252,41 @@ const ResponsesScreen = () => {
                                 if (!qItem || !Array.isArray(qItem.answer) || qItem.answer.length === 0) return null;
                                 return getAnswerValue(qItem.answer[0]);
                             };
-                        console.log("----------------",getAnswerByLinkId(item.questionnaireResponse, "PAT_MA") )
-                        const hasMass = getAnswerByLinkId(item.questionnaireResponse, "PAT_MA") === "1";
-                        console.log("hasMass: " + hasMass)
+                            const hasMass = getAnswerByLinkId(item.questionnaireResponse, "PAT_MA") === "1";
                             return (
                                 <TableRow
                                     className="table-row"
                                     key={index}
                                     hover
-                                    
+
                                     style={{ cursor: 'pointer' }}
                                 >
                                     <TableCell>{item.patientIdentifier}</TableCell>
                                     <TableCell>{item.patientName}</TableCell>
-                                   <TableCell>{item.risk}</TableCell> 
+                                    <TableCell>{item.risk}</TableCell>
                                     <TableCell>{
-                                       !hasMass ? "No disponible" : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
-                                    }</TableCell> 
+                                        !hasMass ? "No disponible" : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
+                                    }</TableCell>
                                     <TableCell>{item.encounterText}</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
                                     <TableCell style={{ textAlign: 'center' }}>
                                         <Tooltip title="Ver Detalles">
-                                            <IconButton 
-                                                color="primary" 
+                                            <IconButton
+                                                color="primary"
                                                 onClick={() => handleRowClick(item.questionnaireResponse)}
                                             >
-                                              <VisibilityIcon />
+                                                <VisibilityIcon />
                                             </IconButton>
                                         </Tooltip>
-                                        {hasMass && (
+                                        {hasMass && observation === null && (
                                             <Tooltip title="Editar">
-                                            <IconButton 
-                                                color="secondary" 
-                                                onClick={() => handleEdit(item)}
-                                            >
-                                                <EditIcon></EditIcon>
-                                            </IconButton>
-                                        </Tooltip>
+                                                <IconButton
+                                                    color="secondary"
+                                                    onClick={() => handleEdit(item)}
+                                                >
+                                                    <EditIcon></EditIcon>
+                                                </IconButton>
+                                            </Tooltip>
                                         )}
                                     </TableCell>
                                 </TableRow>
@@ -351,8 +349,8 @@ const ResponsesScreen = () => {
                     </Button>
                 </Box>
             </Modal>
-              {/* Modal para editar la histología */}
-              <Modal open={openModalHisto} onClose={() => setOpenHistoModal(false)}>
+            {/* Modal para editar la histología */}
+            <Modal open={openModalHisto} onClose={() => setOpenHistoModal(false)}>
                 <Box className="modal-box">
                     <Typography variant="h6" gutterBottom>
                         Editar Histología
@@ -379,17 +377,17 @@ const ResponsesScreen = () => {
                         value={pathologyReport}
                         onChange={(e) => setPathologyReport(e.target.value)}
                     />
-                    <Button 
-                        variant="contained" 
-                        sx={{ mt: 2 }} 
+                    <Button
+                        variant="contained"
+                        sx={{ mt: 2 }}
                         color="primary"
                         onClick={handleSaveChanges}
                     >
                         Guardar Cambios
                     </Button>
-                    <Button 
-                        variant="outlined" 
-                        sx={{ mt: 2, ml: 2 }} 
+                    <Button
+                        variant="outlined"
+                        sx={{ mt: 2, ml: 2 }}
                         onClick={() => setOpenHistoModal(false)}
                     >
                         Cancelar
