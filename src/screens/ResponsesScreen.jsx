@@ -246,8 +246,11 @@ const ResponsesScreen = () => {
 
                         //Función para obtener el valor de la respuesta de acuerdo al linkId
                         const getAnswerByLinkId = (responses, linkId) => {
-                            const qItem = responses?.item.find(i => i.linkId === linkId);
-                            if (!qItem || !qItem.answer || qItem.answer.lenght === 0) return null;
+                            if (!responses || !Array.isArray(responses.item)) return null;
+                        
+                            const qItem = responses.item.find(i => i.linkId === linkId);
+                            if (!qItem || !Array.isArray(qItem.answer) || qItem.answer.length === 0) return null;
+                        
                             return getAnswerValue(qItem.answer[0]);
                         };
                         const hasMass = getAnswerByLinkId(item.questionnaireResponse, "PAT_MA") === "Sí";
@@ -260,7 +263,8 @@ const ResponsesScreen = () => {
                                     
                                     style={{ cursor: 'pointer' }}
                                 >
-                                    <TableCell>{item.patientId}</TableCell>
+                                    <TableCell>{item.patientIdentifier}</TableCell>
+                                    <TableCell>{item.patientName}</TableCell>
                                    <TableCell>{item.risk}</TableCell> 
                                     <TableCell>{
                                        !hasMass ? "No disponible" : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
