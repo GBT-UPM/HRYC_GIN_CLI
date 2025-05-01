@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import '../assets/css/ResponsesSummary.css';
-import DOMPurify from 'dompurify';
+
 import '../assets/css/ResponsesProbability.css';
 import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
@@ -22,18 +22,17 @@ const ResponsesProbability = ({ responses, event }) => {
   const [reports, setReports] = useState([]);
   const [observations, setObservations] = useState([]);
   //nuevo
-  const [questionnaireResponses, setQuestionnaireResponses] = useState([]);
-  const [probability, setProbality] = useState(false);
+// eslint-disable-next-line no-unused-vars
+  const [probality, setProbality] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [encounterId, setEncounterId] = useState("");
+ 
+
+  const { keycloak } = useKeycloak();
+  // eslint-disable-next-line no-unused-vars
   const [error, setError] = useState(null);
-  const [allResponses, setAllResponses] = useState([]);
-  const { keycloak, initialized } = useKeycloak();
-  const [questionnaire, setQuestionnaire] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [answers, setAnswers] = useState([]);
-  const [practitioner, setPractitioner] = useState("");
-  const [practitionerName, setPractitionerName] = useState("");
+  const [practitioner] = useState("");
+  const [practitionerName] = useState("");
   const { generateEncounter } = useEncounterTemplate();
   const { generateObservation } = useObservationTemplate();
   const { generateImagingStudy } = useImageStudyTemplate();
@@ -63,41 +62,7 @@ const ResponsesProbability = ({ responses, event }) => {
     // Añadir más tipos de respuesta según sea necesario
     return JSON.stringify(answer);
   }; */
-  useEffect(() => {
-    console.log("ENTRA");
-    console.log("Respuestas:" + responses);
-
-    for (const response of responses) {
-      const repo = generateReport(response)
-      setReports((prev) => [...prev, repo]);
-    }
-
-  }, []);
-  // Función para calcular logit(p)
-  const calcularLogit = (contorno, sombra, vascAreaSolida, vascPapila) => {
-    let logit = -3.625;
-
-    //Cálculo coeficientes
-    if (contorno === 'irregular') logit += 1.299;
-
-    if (sombra === 'no') logit += 1.847;
-
-    if (vascAreaSolida === 'nula (score color 1)' || vascAreaSolida === 'leve (score color 2)') logit += 2.209;
-    else if (vascAreaSolida === 'moderada (score color 3)' || vascAreaSolida === 'abundante (score color 4)') logit += 2.967
-
-    if (vascPapila === 'nula (score color 1)' || vascPapila === 'leve (score color 2)') logit += 1.253;
-    else if (vascPapila === 'moderada (score color 3)' || vascPapila === 'abundante (score color 4)') logit += 1.988;
-
-    return logit;
-  }
-
-  // Función para calcular la probabilidad.
-  const calcularProbabilidad = (logit) => {
-    return 1 / (1 + Math.exp(-logit));
-  };
-
-  // Función para generar el informe médico
-  const generateReport = (res) => {
+  const generateReport = useCallback((res) => {
 
     const getValue = (id) => {
       const response = res.item.find((resp) => resp.linkId.toLowerCase() === id.toLowerCase());
@@ -158,7 +123,7 @@ const ResponsesProbability = ({ responses, event }) => {
     const MA_ASC = getValue('MA_ASC');
     const MA_ASC_TIPO = getValue('MA_ASC_TIPO');
     const MA_CARC = getValue('MA_CARC');
-    const RES_CONCL = getValue('RES_CONCL');
+  
 
     //Calcular logit y probabilidad      
     const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
@@ -237,7 +202,41 @@ const ResponsesProbability = ({ responses, event }) => {
       text: report,
       score: RES_SCORE
     };
+  }, []);
+  useEffect(() => {
+    if (!responses || responses.length === 0) return;
+  
+    console.log("ENTRA");
+    console.log("Respuestas:", responses);
+  
+    const generated = responses.map((r) => generateReport(r));
+    setReports(generated);
+  }, [responses, generateReport]);
+  // Función para calcular logit(p)
+  const calcularLogit = (contorno, sombra, vascAreaSolida, vascPapila) => {
+    let logit = -3.625;
+
+    //Cálculo coeficientes
+    if (contorno === 'irregular') logit += 1.299;
+
+    if (sombra === 'no') logit += 1.847;
+
+    if (vascAreaSolida === 'nula (score color 1)' || vascAreaSolida === 'leve (score color 2)') logit += 2.209;
+    else if (vascAreaSolida === 'moderada (score color 3)' || vascAreaSolida === 'abundante (score color 4)') logit += 2.967
+
+    if (vascPapila === 'nula (score color 1)' || vascPapila === 'leve (score color 2)') logit += 1.253;
+    else if (vascPapila === 'moderada (score color 3)' || vascPapila === 'abundante (score color 4)') logit += 1.988;
+
+    return logit;
+  }
+
+  // Función para calcular la probabilidad.
+  const calcularProbabilidad = (logit) => {
+    return 1 / (1 + Math.exp(-logit));
   };
+
+  // Función para generar el informe médico
+
   /**
    * Maneja el cambio de texto en la observación del reporte de índice `index`.
    */
@@ -249,11 +248,6 @@ const ResponsesProbability = ({ responses, event }) => {
     });
     console.log("Conclusión: " + observations);
   };
-  function MyComponent({ reportHtml }) {
-    const sanitizedHtml = DOMPurify.sanitize(reportHtml);
-
-    return <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />;
-  }
   /**
    * Ejemplo de función que maneje el click del botón en cada reporte.
    * Podrías hacer lo que necesites (guardar, eliminar, etc.)
@@ -283,8 +277,8 @@ const ResponsesProbability = ({ responses, event }) => {
       // const observationImagen = response?.answer?.[0]?.valueString || '';
       const patient = await ApiService(keycloak.token, 'POST', `/fhir/Patient/check-or-create`, Patient);
       if (patient.ok) {
-        const pat = await patient.json();
-        patientId = pat.id;
+     
+        //patientId = pat.id;
         console.log("ID paciente: " + patientId);
         const encId = generateId();
 
@@ -319,17 +313,17 @@ const ResponsesProbability = ({ responses, event }) => {
                 }
               ];
               const response = await ApiService(keycloak.token, 'POST', `/fhir/QuestionnaireResponse`, qResponse);
-              let resId = 0
+              //let resId = 0
               if (response.ok) {
                 const result = await response.json();
                 console.log("Nuevo ID:", result.id);
-                resId = result.id;
+               // resId = result.id;
                 const obsId = generateId();
                 const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
-                const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
+                await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
                 const riskId = generateId();
                 const RiskAssessment = generateRiskAssessment(riskId, encId, patientId, practitioner, reports[index].score, "", qResponse.id)
-                const risk = await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
+                await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
                 index++;
                 successfulResponses.push(qResponse);
               } else {

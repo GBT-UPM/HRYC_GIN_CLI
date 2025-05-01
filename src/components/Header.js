@@ -1,7 +1,6 @@
 import React from 'react';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
 import LogoUser from "../assets/images/user.png";
-import LogoGBT from "../assets/images/GBT_SIMPLE.png";
 import LogoIrycis from "../assets/images/logo-irycis.png";
 const Header = (props) => {
   return (

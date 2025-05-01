@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Container, Typography, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, Paper, TablePagination, TableSortLabel,
@@ -13,7 +13,7 @@ import {
     Select,
     MenuItem
 } from '@mui/material';
-import InfoIcon from '@mui/icons-material/Info';
+
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import '../assets/css/ResponsesScreen.css';
@@ -28,6 +28,7 @@ import { v4 as uuidv4 } from "uuid";
 const ResponsesScreen = () => {
     const { keycloak, initialized } = useKeycloak();
     const [data, setData] = useState([]);
+    // eslint-disable-next-line no-unused-vars
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
     const [orderBy, setOrderBy] = useState('encounterPeriodStart');
@@ -51,32 +52,30 @@ const ResponsesScreen = () => {
         "Maligno": { code: "363346000", display: "Maligno" },
         "Desconocido / Incierto": { code: "70852002", display: "Desconocido / Incierto" }
     };
-    const fetchQuestionnaire = async () => {
+    const fetchQuestionnaire = useCallback(async () => {
         try {
-            const response = await ApiService(keycloak.token, 'GET', `/app/QuestionnaireResponse`, {});
-            if (response.status === 200) {
-                const data = await response.json();
-                console.log(data)
-                if (data && data.length > 0) {
-                    setData(data);
-                }
-            } else {
-                throw new Error(`Error en la respuesta: ${response.status}`);
+          const response = await ApiService(keycloak.token, 'GET', `/app/QuestionnaireResponse`, {});
+          if (response.status === 200) {
+            const data = await response.json();
+            console.log(data);
+            if (data && data.length > 0) {
+              setData(data);
             }
+          } else {
+            throw new Error(`Error en la respuesta: ${response.status}`);
+          }
         } catch (error) {
-            console.error("Error al obtener los datos del paciente:", error);
-            setError("Error al obtener los datos del paciente.");
+          console.error("Error al obtener los datos del paciente:", error);
+          setError("Error al obtener los datos del paciente.");
         }
-    };
+      }, [keycloak.token, setData, setError]);
     // Simula la carga de datos desde una API (reemplazar con fetch/axios en entorno real)
     useEffect(() => {
-        fetchQuestionnaire();
+        if (initialized) {
+          fetchQuestionnaire();
+        }
+      }, [initialized, fetchQuestionnaire]);
 
-    }, [initialized]); // Ejecutar el efecto solo cuando Keycloak esté inicializado
-    // Función para manejar la búsqueda
-    const handleSearch = (event) => {
-        setSearch(event.target.value);
-    };
 
     // Función para ordenar la tabla
     const handleSortRequest = (property) => {
@@ -159,15 +158,16 @@ const ResponsesScreen = () => {
     };
     return (
         <Container className="container">
-            <Typography variant="h4" className="title">
-                📋 Lista de Cuestionarios Médicos
+  
+            <Typography variant="h4" gutterBottom>
+            📋 Lista de Cuestionarios Médicos
             </Typography>
-
             {/* Campo de búsqueda */}
             <TextField
                 label="Buscar por paciente o tipo de encuentro"
                 variant="outlined"
                 fullWidth
+                sx={{ mt: 5 }}
                 className="search-box"
                 InputProps={{
                     startAdornment: <SearchIcon color="primary" sx={{ marginRight: 1 }} />
@@ -181,11 +181,20 @@ const ResponsesScreen = () => {
                         <TableRow className="table-header">
                             <TableCell>
                                 <TableSortLabel
-                                    active={orderBy === 'patientId'}
+                                    active={orderBy === 'patientIdentifier'}
                                     direction={orderDirection}
-                                    onClick={() => handleSortRequest('patientId')}
+                                    onClick={() => handleSortRequest('patientIdentifier')}
                                 >
-                                    ID del Paciente
+                                    NHC
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'patientName'}
+                                    direction={orderDirection}
+                                    onClick={() => handleSortRequest('patientName')}
+                                >
+                                    Nombre
                                 </TableSortLabel>
                             </TableCell>
                              <TableCell>
@@ -212,7 +221,7 @@ const ResponsesScreen = () => {
                                     direction={orderDirection}
                                     onClick={() => handleSortRequest('encounterText')}
                                 >
-                                    Tipo de Encuentro
+                                    Tipo de Cita
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell>
@@ -221,7 +230,7 @@ const ResponsesScreen = () => {
                                     direction={orderDirection}
                                     onClick={() => handleSortRequest('encounterPeriodStart')}
                                 >
-                                    Fecha del Encuentro
+                                    Fecha de la cita
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell><span>Acciones</span></TableCell>
@@ -229,7 +238,7 @@ const ResponsesScreen = () => {
                     </TableHead>
                     <TableBody>
                         {paginatedData.map((item, index) => {
-                            const questionnaireResponse = JSON.parse(item.questionnaireResponse);
+                            //const questionnaireResponse = JSON.parse(item.questionnaireResponse);
                             console.log(item.observation)
                             const observation = item.observation && item.observation !== "" 
                                                 ? JSON.parse(item.observation) 
@@ -251,8 +260,9 @@ const ResponsesScreen = () => {
                                     
                                     style={{ cursor: 'pointer' }}
                                 >
-                                    <TableCell>{item.patientId}</TableCell>
-                                    <TableCell>{item.risk}</TableCell> 
+                                    <TableCell>{item.patientIdentifier}</TableCell>
+                                    <TableCell>{item.patientName}</TableCell>
+                                   <TableCell>{item.risk}</TableCell> 
                                     <TableCell>{
                                        !hasMass ? "No disponible" : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
                                     }</TableCell> 

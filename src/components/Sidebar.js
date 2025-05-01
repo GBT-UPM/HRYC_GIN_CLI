@@ -1,24 +1,12 @@
-import { faBars, faTimes, faChevronDown, faChevronUp } from "@fortawesome/free-solid-svg-icons";
+import { faBars, faTimes} from "@fortawesome/free-solid-svg-icons";
 import LogoETSIT from "../assets/images/LOGO_ESCUELA.png";
 import LogoGBT from "../assets/images/GBT_SIMPLE.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import '../assets/css/Sidebar.css';
-import React, { useState } from 'react';
-import { Home } from "@mui/icons-material";
-const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
-    const [sections, setSections] = useState({
-        Home:true,
-        historico: false,
-        datos: false,
-        enlaces: false,
-    });
+import React from 'react';
 
-    const toggleSection = (section) => {
-        setSections((prevSections) => ({
-            ...prevSections,
-            [section]: !prevSections[section],
-        }));
-    };
+const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
+
     return (
         <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
             <button className="close-sidebar-btn" onClick={toggleSidebar}>
@@ -34,7 +22,8 @@ const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
                 </div>
                 <div className="sidebar-section">
                     <ul>
-                    <li><a href="#link3" onClick={download}>Descargar</a></li>
+                    {/* <li><a href="#link3" onClick={download}>Descargar</a></li> */}
+                    <li><a href="/download">Descargas</a></li>
                     </ul>
                 </div>
                 {/* <div className="sidebar-section">

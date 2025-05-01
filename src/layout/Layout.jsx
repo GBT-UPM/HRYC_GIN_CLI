@@ -33,12 +33,14 @@ const Layout = ({ children, sidebarOpen,toggleSidebar,handleDownload,closeSessio
           {/* Mostrar diferentes secciones basadas en el rol del usuario */}
           {isAdmin ? (
                  <Outlet />
-          ) : (
-            <div>
-              <h2>Sección de Usuario</h2>
-              <p>Esta es una sección visible para usuarios regulares.</p>
-            </div>
-          )}
+          ) : //(
+          //   <div>
+          //     <h2>Sección de Usuario</h2>
+          //     <p>Esta es una sección visible para usuarios regulares.</p>
+          //   </div>
+          // )
+              null
+          }
           {/* <Footer/> */}
         </div>
       </Container>
