@@ -150,7 +150,10 @@
     margin-left: auto; /* Alinear el botón de cerrar sesión a la derecha */
   }
 }
-
+.report div{
+  margin-bottom: 10px;
+  text-align: justify;
+}
 .App {
   display: flex;
 }
