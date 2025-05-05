@@ -126,8 +126,8 @@ const ResponsesScreen = () => {
       
         //Construcción del informe
         let report = '';
-  
-        if (PAT_MA === '0') {                  //Si NO hay masa anexial
+        console.log("PAT_MA: " + PAT_MA);   
+        if (PAT_MA === 'no') {                  //Si NO hay masa anexial
           const OD_M1 = getValue('OD_M1');
           const OD_M2 = getValue('OD_M2');
           const OD_FOL = getValue('OD_FOL');
@@ -416,22 +416,17 @@ const ResponsesScreen = () => {
                                 >
                                     <TableCell>{item.patientIdentifier}</TableCell>
                                     <TableCell>{item.patientName}</TableCell>
-                                    <TableCell>{item.risk}</TableCell>
+                                    <TableCell>{!isNaN(parseFloat(item.risk))
+                                                ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
+                                                : '—'}
+                                    </TableCell>
                                     <TableCell>{
-                                        !hasMass ? "No disponible" : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
+                                        !hasMass ? '—' : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
                                     }</TableCell>
                                     <TableCell>{item.encounterText}</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
-                                    <TableCell style={{ textAlign: 'center' }}>
-                                        <Tooltip title="Ver Detalles">
-                                            <IconButton
-                                                color="primary"
-                                                onClick={() => handleRowClick(item.questionnaireResponse)}
-                                            >
-                                                <VisibilityIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                        {hasMass && observation === null && (
+                                    <TableCell style={{ textAlign: 'right' }}>
+                                    {hasMass && observation === null && (
                                             <Tooltip title="Editar">
                                                 <IconButton
                                                     color="secondary"
@@ -441,6 +436,15 @@ const ResponsesScreen = () => {
                                                 </IconButton>
                                             </Tooltip>
                                         )}
+                                        <Tooltip title="Ver Detalles">
+                                            <IconButton
+                                                color="primary"
+                                                onClick={() => handleRowClick(item.questionnaireResponse)}
+                                            >
+                                                <VisibilityIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                       
                                     </TableCell>
                                 </TableRow>
                             );

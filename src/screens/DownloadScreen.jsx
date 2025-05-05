@@ -73,16 +73,16 @@ const DownloadScreen = () => {
                     alignItems="center"
                     sx={{ px: 4, py: 2 }}
                 >
-                    <Tooltip title="Descargar cuestionarios completados en formato csv">
+                    <Tooltip title="Descargar respuestas completados en formato csv">
                         <Box
                             component="img"
                             src={dq}
-                            alt="Descargar cuestionarios"
+                            alt="Descargar respuestas"
                             sx={{ maxWidth: '180px', height: 'auto', objectFit: 'contain', cursor: 'pointer' }}
                         />
                     </Tooltip>
                     <Typography variant="subtitle1" sx={{ mt: 2, textTransform: 'uppercase' }}>
-                        Descargar cuestionarios
+                        Descargar respuestas
                     </Typography>
                 </Grid2>
 

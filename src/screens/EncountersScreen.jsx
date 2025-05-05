@@ -636,16 +636,8 @@ const EncountersScreen = () => {
                                     </TableCell>
                                     <TableCell>{item.encounterText}</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
-                                    <TableCell style={{ textAlign: 'center' }}>
-                                        <Tooltip title="Ver Detalles">
-                                            <IconButton
-                                                color="primary"
-                                                onClick={() => handleRowClick(item.questionnaireResponse, item.observation)}
-                                            >
-                                                <LocalPrintshopIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                        {hasMass && observation === null && (
+                                    <TableCell style={{ textAlign: 'right' }}>
+                                    {hasMass && observation === null && (
                                             <Tooltip title="Editar">
                                                 <IconButton
                                                     color="secondary"
@@ -655,6 +647,15 @@ const EncountersScreen = () => {
                                                 </IconButton>
                                             </Tooltip>
                                         )}
+                                        <Tooltip title="Ver Detalles">
+                                            <IconButton
+                                                color="primary"
+                                                onClick={() => handleRowClick(item.questionnaireResponse, item.observation)}
+                                            >
+                                                <LocalPrintshopIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                       
                                     </TableCell>
                                 </TableRow>
                             );

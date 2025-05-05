@@ -571,6 +571,7 @@ const ResponsesProbability = ({ responses, event }) => {
             <div className='tlabel'>Conclusión del ecografista:</div>
             <div className='text'>
               <textarea rows="7" cols="75"
+                style={{ padding: '8px' }}
                 value={observations[index] || ""}
                 onChange={(e) => handleObservationChange(index, e.target.value)}
               />
