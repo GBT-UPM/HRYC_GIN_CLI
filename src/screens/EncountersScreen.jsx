@@ -19,7 +19,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import '../assets/css/ResponsesScreen.css';
 import { useKeycloak } from '@react-keycloak/web';
 import ApiService from '../services/ApiService';
-import VisibilityIcon from '@mui/icons-material/Visibility';
+
+import LocalPrintshopIcon from '@mui/icons-material/LocalPrintshop';
 import { useObservationHistologyTemplate } from '../hooks/useObservationHistologyTemplate';
 import { v4 as uuidv4 } from "uuid";
 import jsPDF from 'jspdf';
@@ -59,15 +60,15 @@ const EncountersScreen = () => {
         const date = new Date(dateStr);
         return isNaN(date) ? '' : date.toLocaleDateString('es-ES');
     };
-    const handlePrintButtonClick = (responses,observations) => {
+    const handlePrintButtonClick = (responses, observations) => {
         try {
             console.log("pasa")
-      
+
             console.log(responses)
             const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
-console.log("hasMassInReports", hasMassInReports)
+            console.log("hasMassInReports", hasMassInReports)
             const generated = responses.map((r) => generateReport(r));
-    
+
             console.log(generated)
 
             const getResponse = (key) => {
@@ -205,30 +206,30 @@ console.log("hasMassInReports", hasMassInReports)
             // Espacio para las conclusiones
             console.log("observations", observations)
             const validObservations = observations
-              //const validObservations = observations.filter((observation) => observation.trim().length > 0); // Filtra las observaciones vacías o nulas
-                if (validObservations.length > 0) {
-                    doc.setFontSize(12);
-                    doc.setFont("helvetica", "bold");
-                    doc.text("Conclusiones del ecografista: ", 10, yPosition);
-                    yPosition += 10;
+            //const validObservations = observations.filter((observation) => observation.trim().length > 0); // Filtra las observaciones vacías o nulas
+            if (validObservations.length > 0) {
+                doc.setFontSize(12);
+                doc.setFont("helvetica", "bold");
+                doc.text("Conclusiones del ecografista: ", 10, yPosition);
+                yPosition += 10;
 
-                    validObservations.forEach((observation, index) => {
-                        if (validObservations.length > 1) {
-                            doc.setFontSize(11);
-                            doc.setFont("helvetica", "bold");
-                            doc.text("Conclusión de la Masa Anexial " + (index + 1), 15, yPosition);
-                            yPosition += 10;
-                        }
+                validObservations.forEach((observation, index) => {
+                    if (validObservations.length > 1) {
                         doc.setFontSize(11);
-                        doc.setFont("helvetica", "normal");
-                       
-                        const text = observation.text || observation.valueString || "";
-                        const textLines = doc.splitTextToSize(text, 180);
-                        //const textLines = doc.splitTextToSize(observation, 180); // Ajusta el ancho según sea necesario
-                        doc.text(textLines, 10, yPosition);
-                        yPosition += textLines.length + 10; // Actualiza la posición en Y para el siguiente bloque de texto
-                    });
-                }
+                        doc.setFont("helvetica", "bold");
+                        doc.text("Conclusión de la Masa Anexial " + (index + 1), 15, yPosition);
+                        yPosition += 10;
+                    }
+                    doc.setFontSize(11);
+                    doc.setFont("helvetica", "normal");
+
+                    const text = observation.text || observation.valueString || "";
+                    const textLines = doc.splitTextToSize(text, 180);
+                    //const textLines = doc.splitTextToSize(observation, 180); // Ajusta el ancho según sea necesario
+                    doc.text(textLines, 10, yPosition);
+                    yPosition += textLines.length + 10; // Actualiza la posición en Y para el siguiente bloque de texto
+                });
+            }
 
             //Pie de página: nombre del médico y fecha
             const today = new Date();
@@ -461,8 +462,8 @@ console.log("hasMassInReports", hasMassInReports)
     const handleRowClick = (questionnaireResponse, observations) => {
         console.log("questionnaireResponse", JSON.parse(questionnaireResponse))
         setSelectedQuestionnaire(JSON.parse(questionnaireResponse));
-        handlePrintButtonClick(JSON.parse(questionnaireResponse),JSON.parse(observations));
-      //  setOpenModal(true);
+        handlePrintButtonClick(JSON.parse(questionnaireResponse), JSON.parse(observations));
+        //  setOpenModal(true);
     };
     // Abrir modal de edición
     const handleEdit = (row) => {
@@ -521,7 +522,7 @@ console.log("hasMassInReports", hasMassInReports)
         <Container className="container">
 
             <Typography variant="h4" gutterBottom>
-                📋 Lista de Cuestionarios Médicos
+                📋 Lista de Citas cursadas
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
@@ -539,7 +540,7 @@ console.log("hasMassInReports", hasMassInReports)
             <TableContainer className="table-container" component={Paper} sx={{ marginTop: 3 }}>
                 <Table>
                     <TableHead>
-                        <TableRow className="table-header">
+                        <TableRow className="table-header2">
                             <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'patientIdentifier'}
@@ -567,15 +568,7 @@ console.log("hasMassInReports", hasMassInReports)
                                     Riesgo
                                 </TableSortLabel>
                             </TableCell>
-                            <TableCell>
-                                <TableSortLabel
-                                    active={orderBy === 'questionnaireResponse'}
-                                    direction={orderDirection}
-                                    onClick={() => handleSortRequest('questionnaireResponse')}
-                                >
-                                    Histologia
-                                </TableSortLabel>
-                            </TableCell>
+   
                             <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'encounterText'}
@@ -624,19 +617,32 @@ console.log("hasMassInReports", hasMassInReports)
                                 >
                                     <TableCell>{item.patientIdentifier}</TableCell>
                                     <TableCell>{item.patientName}</TableCell>
-                                    <TableCell>{item.risk}</TableCell>
-                                    <TableCell>{
-                                        !hasMass ? "No disponible" : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
-                                    }</TableCell>
+                                    <TableCell>
+                                    {(() => {
+                                        let parsed = [];
+                                        try {
+                                        const riskData = typeof item.risk === 'string' ? JSON.parse(item.risk) : item.risk;
+                                        parsed = Array.isArray(riskData) ? riskData : [riskData];
+                                        } catch (e) {
+                                        console.error("Error al parsear item.risk:", e);
+                                        }
+
+                                        return parsed
+                                        .map(r => parseFloat(r?.prediction?.[0]?.probabilityDecimal))
+                                        .filter(p => !isNaN(p))
+                                        .map(p => (p * 100).toFixed(2) + '%')
+                                        .join(' - ');
+                                    })()}
+                                    </TableCell>
                                     <TableCell>{item.encounterText}</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
                                     <TableCell style={{ textAlign: 'center' }}>
                                         <Tooltip title="Ver Detalles">
                                             <IconButton
                                                 color="primary"
-                                                 onClick={() => handleRowClick(item.questionnaireResponse,item.observation)}
+                                                onClick={() => handleRowClick(item.questionnaireResponse, item.observation)}
                                             >
-                                                <VisibilityIcon />
+                                                <LocalPrintshopIcon />
                                             </IconButton>
                                         </Tooltip>
                                         {hasMass && observation === null && (
@@ -686,7 +692,7 @@ console.log("hasMassInReports", hasMassInReports)
                     <Typography variant="h6" gutterBottom>
                         Detalle del Cuestionario
                     </Typography>
-                 
+
                     <Button variant="contained" sx={{ mt: 2 }} onClick={() => setOpenModal(false)}>
                         Cerrar
                     </Button>

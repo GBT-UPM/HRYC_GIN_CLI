@@ -284,11 +284,6 @@ const ResponsesScreen = () => {
     };
     // Guardar cambios y cerrar modal
     const handleSaveChanges = async () => {
-        console.log(histology)
-        console.log(pathologyReport)
-        console.log(selectedRow.encounterId)
-        console.log(selectedRow.patientId)
-        console.log(JSON.parse(selectedRow.questionnaireResponse).id)
 
         const histologyData = histologyOptions[histology];
         const code = histologyData.code;
@@ -318,7 +313,7 @@ const ResponsesScreen = () => {
         <Container className="container">
 
             <Typography variant="h4" gutterBottom>
-                📋 Lista de Cuestionarios Médicos
+                📋 Lista de Respuestas
             </Typography>
             {/* Campo de búsqueda */}
             <TextField

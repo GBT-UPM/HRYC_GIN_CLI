@@ -23,12 +23,6 @@ const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
                 <div className="sidebar-section">
                     <ul>
                     {/* <li><a href="#link3" onClick={download}>Descargar</a></li> */}
-                    <li><a href="/encounters">Citas</a></li>
-                    </ul>
-                </div>
-                <div className="sidebar-section">
-                    <ul>
-                    {/* <li><a href="#link3" onClick={download}>Descargar</a></li> */}
                     <li><a href="/download">Descargas</a></li>
                     </ul>
                 </div>

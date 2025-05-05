@@ -24,11 +24,20 @@
 }
 
 .table-header {
-    background-color: #0d6081;
+    background-color: #bd5806;
+    color: white !important;
+    font-weight: bold;
+}
+.table-header2 {
+    background-color: #2e7d32;
+    ;
     color: white !important;
     font-weight: bold;
 }
 .table-header  span{
+    color: white !important;
+}
+.table-header2citas  span{
     color: white !important;
 }
 /* Efecto de hover en filas */
