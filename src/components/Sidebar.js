@@ -1,11 +1,12 @@
-import { faBars, faTimes} from "@fortawesome/free-solid-svg-icons";
+import { faBars, faTimes } from "@fortawesome/free-solid-svg-icons";
 import LogoETSIT from "../assets/images/LOGO_ESCUELA.png";
 import LogoGBT from "../assets/images/GBT_SIMPLE.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import '../assets/css/Sidebar.css';
 import React from 'react';
-
-const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
+import HomeIcon from '@mui/icons-material/Home';
+import DownloadIcon from '@mui/icons-material/Download';
+const Sidebar = ({ sidebarOpen, toggleSidebar, download }) => {
 
     return (
         <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
@@ -13,17 +14,27 @@ const Sidebar = ({ sidebarOpen, toggleSidebar,download }) => {
                 <FontAwesomeIcon icon={sidebarOpen ? faTimes : faBars} />
             </button>
             <img src={LogoETSIT} alt="LogoEscuela" class="logoEscuela" />
-            <img src={LogoGBT} alt="LogoGbt" class="logoEscuela"/>
+            <img src={LogoGBT} alt="LogoGbt" class="logoEscuela" />
             <div className="sections">
                 <div className="sidebar-section">
                     <ul>
-                     <li> <a href="/">Inicio</a></li>
+                        <li>
+                            <a href="/">
+                                <HomeIcon sx={{ fontSize: 18, verticalAlign: 'middle', marginRight: 1 }} />
+                                Inicio
+                            </a>
+                        </li>
                     </ul>
                 </div>
+
                 <div className="sidebar-section">
                     <ul>
-                    {/* <li><a href="#link3" onClick={download}>Descargar</a></li> */}
-                    <li><a href="/download">Descargas</a></li>
+                        <li>
+                            <a href="/download">
+                                <DownloadIcon sx={{ fontSize: 18, verticalAlign: 'middle', marginRight: 1 }} />
+                                Descargas
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 {/* <div className="sidebar-section">
