@@ -237,7 +237,8 @@ const EncountersScreen = () => {
             doc.setFont("helvetica", "italic");
             doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
             doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
-            //  doc.text("Ecografista: " + practitioner, 10, 270);
+            const practitionerName = sessionStorage.getItem('practitionerName');
+            doc.text("Ecografista: " + practitionerName, 10, 270);
 
             // Guarda el PDF
             //doc.save("informe.pdf");
@@ -575,7 +576,7 @@ const EncountersScreen = () => {
                                     direction={orderDirection}
                                     onClick={() => handleSortRequest('encounterText')}
                                 >
-                                    Tipo de Cita
+                                    Ecografista
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell>
@@ -634,7 +635,7 @@ const EncountersScreen = () => {
                                         .join(' - ');
                                     })()}
                                     </TableCell>
-                                    <TableCell>{item.encounterText}</TableCell>
+                                    <TableCell>{item.practitionerName || '—'}</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
                                     <TableCell style={{ textAlign: 'right' }}>
                                     {hasMass && observation === null && (

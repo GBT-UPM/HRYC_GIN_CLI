@@ -31,8 +31,7 @@ const ResponsesProbability = ({ responses, event }) => {
   const { keycloak } = useKeycloak();
   // eslint-disable-next-line no-unused-vars
   const [error, setError] = useState(null);
-  const [practitioner] = useState("");
-  const [practitionerName] = useState("");
+
   const { generateEncounter } = useEncounterTemplate();
   const { generateObservation } = useObservationTemplate();
   const { generateImagingStudy } = useImageStudyTemplate();
@@ -205,7 +204,8 @@ const ResponsesProbability = ({ responses, event }) => {
   }, []);
   useEffect(() => {
     if (!responses || responses.length === 0) return;
-  
+
+
     console.log("ENTRA");
     console.log("Respuestas:", responses);
   
@@ -285,6 +285,8 @@ const ResponsesProbability = ({ responses, event }) => {
         const imgStuId = generateId();
         const serieId = generateId();
         setEncounterId(encId);
+        const practitioner = sessionStorage.getItem('practitioner');
+        const practitionerName = sessionStorage.getItem('practitionerName');
         const Encounter = generateEncounter(encId, patientId, practitioner, practitionerName, generatePeriod());
         //const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observationImagen);
         const ImageStudy = generateImagingStudy(imgStuId, encId, patientId, serieId);
@@ -382,8 +384,6 @@ const ResponsesProbability = ({ responses, event }) => {
     };
 
       //const getReport = (title) => reports.find((report) => report.title === title)?.text || '';
-      console.log("nombre médico: " + practitionerName);
-
       const patientName = getResponse("PAT_NOMBRE");
       const patientNHC = getResponse("PAT_NHC");
       //const patientAge = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_EDAD".toLowerCase())?.answer?.[0]?.valueInteger || '';
@@ -528,7 +528,8 @@ const ResponsesProbability = ({ responses, event }) => {
       doc.setFont("helvetica", "italic");
       doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
       doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
-      doc.text("Ecografista: " + practitioner, 10, 270);
+      const practitionerName = sessionStorage.getItem('practitionerName');
+      doc.text("Ecografista: " + practitionerName, 10, 270);
 
       // Guarda el PDF
       //doc.save("informe.pdf");

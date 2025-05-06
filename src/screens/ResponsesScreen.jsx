@@ -374,7 +374,7 @@ const ResponsesScreen = () => {
                                     direction={orderDirection}
                                     onClick={() => handleSortRequest('encounterText')}
                                 >
-                                    Tipo de Cita
+                                    Ecografista
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell>
@@ -423,7 +423,7 @@ const ResponsesScreen = () => {
                                     <TableCell>{
                                         !hasMass ? '—' : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
                                     }</TableCell>
-                                    <TableCell>{item.encounterText}</TableCell>
+                                    <TableCell>{item.practitionerName || '—' }</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
                                     <TableCell style={{ textAlign: 'right' }}>
                                     {hasMass && observation === null && (
