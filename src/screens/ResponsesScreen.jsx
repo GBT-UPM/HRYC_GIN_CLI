@@ -100,7 +100,8 @@ const ResponsesScreen = () => {
     });
     // Función para abrir el modal con el detalle del cuestionario
     const handleRowClick = (questionnaireResponse) => {
-        setSelectedQuestionnaire(JSON.parse(questionnaireResponse));
+        //setSelectedQuestionnaire(JSON.parse(questionnaireResponse));
+        setSelectedQuestionnaire(questionnaireResponse);
         setOpenModal(true);
     };
     // Abrir modal de edición
@@ -135,7 +136,10 @@ const ResponsesScreen = () => {
         const histologyData = histologyOptions[histology];
         const code = histologyData.code;
         const display = histologyData.display;
-        const obsId=generateId();
+        //const obsId=generateId();
+        const obsId = selectedRow.observation //si ya existe, se usa el id de la observación existente
+            ? JSON.parse(selectedRow.observation).id 
+            : generateId();
         const encId=selectedRow.encounterId;
         const quesRId=JSON.parse(selectedRow.questionnaireResponse).id;
         const patientId=selectedRow.patientId;
@@ -145,6 +149,8 @@ const ResponsesScreen = () => {
     //    const Observation= generateObservation(generateId(), selectedRow.encounterId, selectedRow.questionnaireResponse.id,selectedRow.patientId, code, display, histology, pathologyReport)
         try {
             const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, Observation);
+            // con PUT se actualiza la observación existente o se crea una nueva si no existe
+            //const observation = await ApiService(keycloak.token, 'PUT', `/fhir/Observation/${Observation.id}`, Observation);
             console.log("observation: "+ observation.status)
 
             if (observation.status === 200) {
@@ -164,7 +170,7 @@ const ResponsesScreen = () => {
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
-                label="Buscar por paciente o tipo de encuentro"
+                label="Buscar por NHC o tipo de encuentro"
                 variant="outlined"
                 fullWidth
                 sx={{ mt: 5 }}
@@ -238,19 +244,22 @@ const ResponsesScreen = () => {
                     </TableHead>
                     <TableBody>
                         {paginatedData.map((item, index) => {
-                            //const questionnaireResponse = JSON.parse(item.questionnaireResponse);
+                            const questionnaireResponse = JSON.parse(item.questionnaireResponse);
                             console.log(item.observation)
                             const observation = item.observation && item.observation !== "" 
                                                 ? JSON.parse(item.observation) 
                                                 : null;
 
-                        //Función para obtener el valor de la respuesta de acuerdo al linkId
+                        //Función para obtener el valor de la respuesta de acuerdo al linkId - mostrar o no el botón de editar histología
                         const getAnswerByLinkId = (responses, linkId) => {
                             const qItem = responses?.item.find(i => i.linkId === linkId);
-                            if (!qItem || !qItem.answer || qItem.answer.lenght === 0) return null;
+                            if (!qItem || !qItem.answer || qItem.answer.length === 0) return null;
+                            // const value = getAnswerValue(qItem.answer[0]);
+                            // console.log("Valor encontrado para", linkId, ":", value);
                             return getAnswerValue(qItem.answer[0]);
                         };
-                        const hasMass = getAnswerByLinkId(item.questionnaireResponse, "PAT_MA") === "Sí";
+                        const hasMass = getAnswerByLinkId(questionnaireResponse, "PAT_MA") === "1";
+                        // console.log("Paciente:", item.patientId, "Masa:", hasMass)
  
                             return (
                                 <TableRow
@@ -261,9 +270,15 @@ const ResponsesScreen = () => {
                                     style={{ cursor: 'pointer' }}
                                 >
                                     <TableCell>{item.patientId}</TableCell>
-                                   <TableCell>{item.risk}</TableCell> 
+                                    <TableCell>{getAnswerByLinkId(questionnaireResponse, "PAT_NOMBRE") || "No disponible"}</TableCell>
+                                    <TableCell>{item.risk}</TableCell> 
                                     <TableCell>{
-                                       !hasMass ? "No disponible" : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
+                                        !hasMass ? "No disponible" : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
+                                        // !hasMass
+                                        //     ? "No disponible"
+                                        //     : observation
+                                        //         ? (observation.valueCodeableConcept?.text || observation.valueString || "Pendiente")
+                                        //         : "Pendiente"
                                     }</TableCell> 
                                     <TableCell>{item.encounterText}</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
@@ -271,7 +286,7 @@ const ResponsesScreen = () => {
                                         <Tooltip title="Ver Detalles">
                                             <IconButton 
                                                 color="primary" 
-                                                onClick={() => handleRowClick(item.questionnaireResponse)}
+                                                onClick={() => handleRowClick(questionnaireResponse)}
                                             >
                                               <VisibilityIcon />
                                             </IconButton>
