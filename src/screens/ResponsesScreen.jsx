@@ -421,7 +421,7 @@ const ResponsesScreen = () => {
                                     <TableCell>{item.patientName}</TableCell>
                                     <TableCell>{!isNaN(parseFloat(item.risk))
                                                 ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
-                                                : '—'}
+                                                : 'No procede'}
                                     </TableCell>
                                     <TableCell>{
                                         !hasMass ? '—' : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"

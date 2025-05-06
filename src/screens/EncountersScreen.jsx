@@ -62,165 +62,165 @@ const EncountersScreen = () => {
     };
     const handlePrintButtonClick = (responses, observations) => {
         try {
-     
-          const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
-          console.log("hasMassInReports", hasMassInReports);
-      
-          const generated = responses.map((r) => generateReport(r));
-      
-          const getResponse = (key) => {
-            const answer = responses[0].item.find(
-              (resp) => resp.linkId.toLowerCase() === key.toLowerCase()
-            )?.answer?.[0];
-      
-            return (
-              answer?.valueString ||
-              answer?.valueInteger ||
-              answer?.valueDate ||
-              answer?.valueCoding?.display ||
-              ''
-            );
-          };
-      
-          const checkAndAddPage = (doc, nextBlockHeight) => {
-            const pageHeight = doc.internal.pageSize.getHeight();
-            if (yPosition + nextBlockHeight > pageHeight - 30) {
-              doc.addPage();
-              yPosition = 20;
-            }
-          };
-      
-          const doc = new jsPDF();
-      
-          doc.addImage(LogoHRYC, "JPEG", 10, 10, 90, 15);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(12);
-          doc.text("Servicio de Ginecología y Obstetricia", 120, 20);
-      
-          const patientName = getResponse("PAT_NOMBRE");
-          const patientNHC = getResponse("PAT_NHC");
-          const patientAge = getResponse("PAT_EDAD");
-          const patientFUR = getResponse("PAT_FUR");
-          const indicacion = getResponse("PAT_IND");
-      
-          let yPosition = 50;
-          doc.setFontSize(12);
-          doc.setFont("helvetica", "bold");
-          checkAndAddPage(doc, 10);
-          doc.text("Datos de la paciente:", 10, yPosition);
-          yPosition += 10;
-      
-          const addField = (label, value) => {
-            checkAndAddPage(doc, 10);
-            doc.setFontSize(11);
+
+            const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
+            console.log("hasMassInReports", hasMassInReports);
+
+            const generated = responses.map((r) => generateReport(r));
+
+            const getResponse = (key) => {
+                const answer = responses[0].item.find(
+                    (resp) => resp.linkId.toLowerCase() === key.toLowerCase()
+                )?.answer?.[0];
+
+                return (
+                    answer?.valueString ||
+                    answer?.valueInteger ||
+                    answer?.valueDate ||
+                    answer?.valueCoding?.display ||
+                    ''
+                );
+            };
+
+            const checkAndAddPage = (doc, nextBlockHeight) => {
+                const pageHeight = doc.internal.pageSize.getHeight();
+                if (yPosition + nextBlockHeight > pageHeight - 30) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+            };
+
+            const doc = new jsPDF();
+
+            doc.addImage(LogoHRYC, "JPEG", 10, 10, 90, 15);
             doc.setFont("helvetica", "bold");
-            doc.text(label, 15, yPosition);
-            doc.setFont("helvetica", "normal");
-            doc.text(value, 65, yPosition);
-            yPosition += 10;
-          };
-      
-          addField("Nombre:", patientName);
-          addField("NHC:", patientNHC);
-          addField("Edad:", patientAge.toString());
-          addField("FUR:", formatDate(patientFUR));
-      
-          const addSectionWithAutoBreak = (title, text) => {
-            const textLines = text.trim() !== "" ? doc.splitTextToSize(text, 180) : [];
-            const totalHeight = textLines.length * 5 + 10;
-          
-            // Añade salto de página solo si se va a imprimir algo más que el título
-            checkAndAddPage(doc, totalHeight);
-          
-            // Imprime el título siempre
+            doc.setFontSize(12);
+            doc.text("Servicio de Ginecología y Obstetricia", 120, 20);
+
+            const patientName = getResponse("PAT_NOMBRE");
+            const patientNHC = getResponse("PAT_NHC");
+            const patientAge = getResponse("PAT_EDAD");
+            const patientFUR = getResponse("PAT_FUR");
+            const indicacion = getResponse("PAT_IND");
+
+            let yPosition = 50;
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
-            doc.text(title, 10, yPosition);
+            checkAndAddPage(doc, 10);
+            doc.text("Datos de la paciente:", 10, yPosition);
             yPosition += 10;
-          
-            if (textLines.length > 0) {
-              doc.setFontSize(11);
-              doc.setFont("helvetica", "normal");
-              doc.text(textLines, 10, yPosition);
-              yPosition += textLines.length * 5 + 10;
-            }
-          };
-      
-          addSectionWithAutoBreak("Indicación de la ecografía:", indicacion);
-          doc.setFontSize(12);
-          doc.setFont("helvetica", "bold");
-          checkAndAddPage(doc, 10);
-          doc.text("Descripción de la imagen:", 10, yPosition);
-          yPosition += 10;
-      
-          doc.setFontSize(11);
-          doc.setFont("helvetica", "normal");
-          generated.forEach((report, index) => {
-            if (hasMassInReports) {
-              checkAndAddPage(doc, 10);
-              doc.setFont("helvetica", "bold");
-              doc.text("Masa anexial " + (index + 1), 15, yPosition);
-              yPosition += 10;
-            }
-      
-            doc.setFont("helvetica", "normal");
-            const htmlConSaltos = report.text.replace(/<br\s*\/?>/gi, "\n");
-            const tempDiv = document.createElement("div");
-            tempDiv.innerHTML = htmlConSaltos;
-            const plainText = tempDiv.innerText;
-            const normalizedText = plainText.replace(/\n+/g, "\n").trim();
-      
-            const textLines = doc.splitTextToSize(normalizedText, 180);
-            textLines.forEach((line) => {
-              checkAndAddPage(doc, 6);
-              doc.text(line, 10, yPosition);
-              yPosition += 6;
-            });
-      
-            yPosition += 4;
-          });
-      
-          const validObservations = observations;
-          if (validObservations.length > 0) {
-            addSectionWithAutoBreak("Conclusiones del ecografista:", "");
-      
-            validObservations.forEach((observation, index) => {
-              if (validObservations.length > 1) {
+
+            const addField = (label, value) => {
                 checkAndAddPage(doc, 10);
                 doc.setFontSize(11);
                 doc.setFont("helvetica", "bold");
-                doc.text("Conclusión de la Masa Anexial " + (index + 1), 15, yPosition);
+                doc.text(label, 15, yPosition);
+                doc.setFont("helvetica", "normal");
+                doc.text(value, 65, yPosition);
                 yPosition += 10;
-              }
-      
-              doc.setFontSize(11);
-              doc.setFont("helvetica", "normal");
-              const text = observation.text || observation.valueString || "";
-              const textLines = doc.splitTextToSize(text, 180);
-              textLines.forEach((line) => {
-                checkAndAddPage(doc, 6);
-                doc.text(line, 10, yPosition);
-                yPosition += 6;
-              });
-              yPosition += 4;
+            };
+
+            addField("Nombre:", patientName);
+            addField("NHC:", patientNHC);
+            addField("Edad:", patientAge.toString());
+            addField("FUR:", formatDate(patientFUR));
+
+            const addSectionWithAutoBreak = (title, text) => {
+                const textLines = text.trim() !== "" ? doc.splitTextToSize(text, 180) : [];
+                const totalHeight = textLines.length * 5 + 10;
+
+                // Añade salto de página solo si se va a imprimir algo más que el título
+                checkAndAddPage(doc, totalHeight);
+
+                // Imprime el título siempre
+                doc.setFontSize(12);
+                doc.setFont("helvetica", "bold");
+                doc.text(title, 10, yPosition);
+                yPosition += 10;
+
+                if (textLines.length > 0) {
+                    doc.setFontSize(11);
+                    doc.setFont("helvetica", "normal");
+                    doc.text(textLines, 10, yPosition);
+                    yPosition += textLines.length * 5 + 10;
+                }
+            };
+
+            addSectionWithAutoBreak("Indicación de la ecografía:", indicacion);
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            checkAndAddPage(doc, 10);
+            doc.text("Descripción de la imagen:", 10, yPosition);
+            yPosition += 10;
+
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "normal");
+            generated.forEach((report, index) => {
+                if (hasMassInReports) {
+                    checkAndAddPage(doc, 10);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("Masa anexial " + (index + 1), 15, yPosition);
+                    yPosition += 10;
+                }
+
+                doc.setFont("helvetica", "normal");
+                const htmlConSaltos = report.text.replace(/<br\s*\/?>/gi, "\n");
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = htmlConSaltos;
+                const plainText = tempDiv.innerText;
+                const normalizedText = plainText.replace(/\n+/g, "\n").trim();
+
+                const textLines = doc.splitTextToSize(normalizedText, 180);
+                textLines.forEach((line) => {
+                    checkAndAddPage(doc, 6);
+                    doc.text(line, 10, yPosition);
+                    yPosition += 6;
+                });
+
+                yPosition += 4;
             });
-          }
-      
-          const today = new Date();
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "italic");
-          doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
-          doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
-          const practitionerName = sessionStorage.getItem('practitionerName');
-          doc.text("Ecografista: " + practitionerName, 10, 270);
-      
-          doc.autoPrint();
-          window.open(doc.output("bloburl"), "_blank");
+
+            const validObservations = observations;
+            if (validObservations.length > 0) {
+                addSectionWithAutoBreak("Conclusiones del ecografista:", "");
+
+                validObservations.forEach((observation, index) => {
+                    if (validObservations.length > 1) {
+                        checkAndAddPage(doc, 10);
+                        doc.setFontSize(11);
+                        doc.setFont("helvetica", "bold");
+                        doc.text("Conclusión de la Masa Anexial " + (index + 1), 15, yPosition);
+                        yPosition += 10;
+                    }
+
+                    doc.setFontSize(11);
+                    doc.setFont("helvetica", "normal");
+                    const text = observation.text || observation.valueString || "";
+                    const textLines = doc.splitTextToSize(text, 180);
+                    textLines.forEach((line) => {
+                        checkAndAddPage(doc, 6);
+                        doc.text(line, 10, yPosition);
+                        yPosition += 6;
+                    });
+                    yPosition += 4;
+                });
+            }
+
+            const today = new Date();
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "italic");
+            doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
+            doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
+            const practitionerName = sessionStorage.getItem('practitionerName');
+            doc.text("Ecografista: " + practitionerName, 10, 270);
+
+            doc.autoPrint();
+            window.open(doc.output("bloburl"), "_blank");
         } catch (error) {
-          console.error("Error al guardar el encounter:", error);
-          setError("Error al guardar el encounter.");
+            console.error("Error al guardar el encounter:", error);
+            setError("Error al guardar el encounter.");
         }
-      };
+    };
     const generateReport = useCallback((res) => {
 
         const getValue = (id) => {
@@ -421,7 +421,7 @@ const EncountersScreen = () => {
         item.patientIdentifier.toLowerCase().includes(search.toLowerCase()) ||
         item.patientName.toLowerCase().includes(search.toLowerCase()) ||
         item.risk.toLowerCase().includes(search.toLowerCase()) ||
-        new Date(item.encounterPeriodStart).toLocaleString().includes(search.toLowerCase()) 
+        new Date(item.encounterPeriodStart).toLocaleString().includes(search.toLowerCase())
     );
 
     // Ordenación de datos
@@ -542,7 +542,7 @@ const EncountersScreen = () => {
                                     Riesgo
                                 </TableSortLabel>
                             </TableCell>
-   
+
                             <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'encounterText'}
@@ -592,26 +592,33 @@ const EncountersScreen = () => {
                                     <TableCell>{item.patientIdentifier}</TableCell>
                                     <TableCell>{item.patientName}</TableCell>
                                     <TableCell>
-                                    {(() => {
-                                        let parsed = [];
-                                        try {
-                                        const riskData = typeof item.risk === 'string' ? JSON.parse(item.risk) : item.risk;
-                                        parsed = Array.isArray(riskData) ? riskData : [riskData];
-                                        } catch (e) {
-                                        console.error("Error al parsear item.risk:", e);
-                                        }
+                                        {(() => {
+                                            let parsed = [];
+                                            try {
+                                                if (!item.risk || item.risk === "" || item.risk === "{}") {
+                                                    return "No procede";
+                                                }
 
-                                        return parsed
-                                        .map(r => parseFloat(r?.prediction?.[0]?.probabilityDecimal))
-                                        .filter(p => !isNaN(p))
-                                        .map(p => (p * 100).toFixed(2) + '%')
-                                        .join(' - ');
-                                    })()}
+                                                const riskData = typeof item.risk === 'string' ? JSON.parse(item.risk) : item.risk;
+                                                parsed = Array.isArray(riskData) ? riskData : [riskData];
+                                            } catch (e) {
+                                                console.error("Error al parsear item.risk:", e);
+                                                return "No procede";
+                                            }
+
+                                            const probabilities = parsed
+                                                .map(r => parseFloat(r?.prediction?.[0]?.probabilityDecimal))
+                                                .filter(p => !isNaN(p));
+
+                                            return probabilities.length > 0
+                                                ? probabilities.map(p => (p * 100).toFixed(2) + '%').join(' - ')
+                                                : "No procede";
+                                        })()}
                                     </TableCell>
                                     <TableCell>{item.practitionerName || '—'}</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
                                     <TableCell style={{ textAlign: 'right' }}>
-                                    {hasMass && observation === null && (
+                                        {hasMass && observation === null && (
                                             <Tooltip title="Editar">
                                                 <IconButton
                                                     color="secondary"
@@ -629,7 +636,7 @@ const EncountersScreen = () => {
                                                 <LocalPrintshopIcon />
                                             </IconButton>
                                         </Tooltip>
-                                       
+
                                     </TableCell>
                                 </TableRow>
                             );
