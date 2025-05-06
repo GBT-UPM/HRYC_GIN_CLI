@@ -12,6 +12,7 @@ import { useKeycloak } from "@react-keycloak/web";
 import ResponsesScreen from "./screens/ResponsesScreen";
 import ApiService from "./services/ApiService";
 import DownloadScreen from "./screens/DownloadScreen";
+import EncountersScreen from "./screens/EncountersScreen";
 
 
 
@@ -127,7 +128,7 @@ function App() {
           <Route path="/questionnaire" element={<QuestionnaireScreen />} />
           <Route path="/responses" element={<ResponsesScreen />} />
           <Route path="/download" element={<DownloadScreen />} />
-   
+          <Route path="/encounters" element={<EncountersScreen />} />
         </Route>
 
         {/* Otras rutas que no usen Layout, si deseas */}

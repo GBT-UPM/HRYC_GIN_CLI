@@ -1,4 +1,4 @@
-import { People, CalendarMonth,MedicalInformation,LocalHospital     } from "@mui/icons-material";
+import { People, CalendarMonth, MedicalInformation, LocalHospital } from "@mui/icons-material";
 import { Box, Button, Grid2, Paper, Typography } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +43,9 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
   const handleResponsesClick = () => {
     navigate('/responses');
   };
+  const handleEncountersClick = () => {
+    navigate('/encounters');
+  };
 
   return (
     <Box sx={{ px: 4, py: 3 }}>
@@ -60,9 +63,9 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
       >
         {[
           { label: 'Pacientes', icon: <People fontSize="large" color="primary" />, count: counts.Patient },
-          { label: 'Citas', icon: <CalendarMonth   fontSize="large" color="success" />, count: counts.Encounter },
-          { label: 'Cuestionarios', icon: <MedicalInformation  fontSize="large" color="warning" />, count: counts.QuestionnaireResponse },
-          { label: 'Masas Anexiales', icon: <LocalHospital  fontSize="large" color="error" />, count: counts.RiskAssessment },
+          { label: 'Citas', icon: <CalendarMonth fontSize="large" color="success" />, count: counts.Encounter },
+          { label: 'Respuestas', icon: <MedicalInformation fontSize="large" color="warning" />, count: counts.QuestionnaireResponse },
+          { label: 'Masas Anexiales', icon: <LocalHospital fontSize="large" color="error" />, count: counts.RiskAssessment },
         ].map(({ label, icon, count }, index) => (
           <Grid2 item xs={12} sm={6} md={4} key={index} sx={{ display: 'flex' }}>
             <Paper
@@ -100,8 +103,22 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
             <Typography variant="h6">Acciones Rápidas</Typography>
             <Box display="flex" flexDirection="column" gap={2} mt={2}>
               <Button onClick={handleNewPatientClick} variant="contained" color="primary">Iniciar Cuestionario</Button>
-              <Button onClick={handleResponsesClick} variant="contained" color="secondary">Revisar Cuestionarios </Button>
+              <Button onClick={handleResponsesClick} variant="contained" sx={{
+                backgroundColor: '#ed6c02', // color personalizado
+                color: '#fff',              // color del texto
+                '&:hover': {
+                  backgroundColor: '#bd5806', // color al pasar el cursor
+                },
+              }}>Revisar Respuestas </Button>
+                <Button onClick={handleEncountersClick} variant="contained" sx={{
+                backgroundColor: '#2e7d32', // color personalizado
+                color: '#fff',              // color del texto
+                '&:hover': {
+                  backgroundColor: '#236026', // color al pasar el cursor
+                },
+              }}>Revisar Citas </Button>
             </Box>
+            
           </Paper>
         </Grid2>
 
