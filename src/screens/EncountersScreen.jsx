@@ -447,8 +447,11 @@ const EncountersScreen = () => {
 
     // Filtrado de datos basado en la búsqueda
     const filteredData = data.filter((item) =>
-        item.encounterText.toLowerCase().includes(search.toLowerCase()) ||
-        item.patientId.toLowerCase().includes(search.toLowerCase())
+        item.practitionerName.toLowerCase().includes(search.toLowerCase()) ||
+        item.patientIdentifier.toLowerCase().includes(search.toLowerCase()) ||
+        item.patientName.toLowerCase().includes(search.toLowerCase()) ||
+        item.risk.toLowerCase().includes(search.toLowerCase()) ||
+        new Date(item.encounterPeriodStart).toLocaleString().includes(search.toLowerCase()) 
     );
 
     // Ordenación de datos

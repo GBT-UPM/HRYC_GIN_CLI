@@ -22,11 +22,11 @@ const ResponsesProbability = ({ responses, event }) => {
   const [reports, setReports] = useState([]);
   const [observations, setObservations] = useState([]);
   //nuevo
-// eslint-disable-next-line no-unused-vars
+  // eslint-disable-next-line no-unused-vars
   const [probality, setProbality] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [encounterId, setEncounterId] = useState("");
- 
+
 
   const { keycloak } = useKeycloak();
   // eslint-disable-next-line no-unused-vars
@@ -122,7 +122,7 @@ const ResponsesProbability = ({ responses, event }) => {
     const MA_ASC = getValue('MA_ASC');
     const MA_ASC_TIPO = getValue('MA_ASC_TIPO');
     const MA_CARC = getValue('MA_CARC');
-  
+
 
     //Calcular logit y probabilidad      
     const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
@@ -144,7 +144,7 @@ const ResponsesProbability = ({ responses, event }) => {
 
       report += `Anejo derecho de ${OD_M1} x ${OD_M2} mm con ${OD_FOL} folículo/s.<br/>`;
       report += `Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL} folículo/s.<br/>`;
-      
+
       return {
         text: report
       };
@@ -208,7 +208,7 @@ const ResponsesProbability = ({ responses, event }) => {
 
     console.log("ENTRA");
     console.log("Respuestas:", responses);
-  
+
     const generated = responses.map((r) => generateReport(r));
     setReports(generated);
   }, [responses, generateReport]);
@@ -271,13 +271,16 @@ const ResponsesProbability = ({ responses, event }) => {
       response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NOMBRE".toLowerCase());
       const given = response?.answer?.[0]?.valueString || '';
       const family = "" //de momento no se pregunta
+      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase());
+      const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
+
       let patientId = generateId();
       const Patient = generatePatient(patientId, nhc, family, given)
       // response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_IND".toLowerCase());
       // const observationImagen = response?.answer?.[0]?.valueString || '';
       const patient = await ApiService(keycloak.token, 'POST', `/fhir/Patient/check-or-create`, Patient);
       if (patient.ok) {
-     
+
         //patientId = pat.id;
         console.log("ID paciente: " + patientId);
         const encId = generateId();
@@ -319,13 +322,15 @@ const ResponsesProbability = ({ responses, event }) => {
               if (response.ok) {
                 const result = await response.json();
                 console.log("Nuevo ID:", result.id);
-               // resId = result.id;
+                // resId = result.id;
                 const obsId = generateId();
                 const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
                 await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
-                const riskId = generateId();
-                const RiskAssessment = generateRiskAssessment(riskId, encId, patientId, practitioner, reports[index].score, "", qResponse.id)
-                await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
+                if (hasMassInReports) {
+                  const riskId = generateId();
+                  const RiskAssessment = generateRiskAssessment(riskId, encId, patientId, practitioner, reports[index].score, "", qResponse.id)
+                  await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
+                }
                 index++;
                 successfulResponses.push(qResponse);
               } else {
@@ -363,12 +368,12 @@ const ResponsesProbability = ({ responses, event }) => {
     const date = new Date(dateStr);
     return isNaN(date) ? '' : date.toLocaleDateString('es-ES');
   };
-  
+
   const handlePrintButtonClick = () => {
     try {
       handleSaveButtonClick();
       console.log("Se han guardado los datos en la BD.")
-      
+
       const getResponse = (key) => {
         const answer = responses[0].item.find(
           (resp) => resp.linkId.toLowerCase() === key.toLowerCase()
@@ -381,7 +386,7 @@ const ResponsesProbability = ({ responses, event }) => {
           answer?.valueCoding?.display ||
           ''
         );
-    };
+      };
 
       //const getReport = (title) => reports.find((report) => report.title === title)?.text || '';
       const patientName = getResponse("PAT_NOMBRE");
@@ -390,7 +395,7 @@ const ResponsesProbability = ({ responses, event }) => {
       const patientAge = getResponse("PAT_EDAD");
       const patientFUR = getResponse("PAT_FUR");
       const indicacion = getResponse("PAT_IND");
-      
+
       const doc = new jsPDF();  // Crea una nueva instancia de jsPDF
 
       //Encabezado: logo, hospital y servicio
@@ -400,7 +405,7 @@ const ResponsesProbability = ({ responses, event }) => {
       //doc.text("Hospital Universitario Ramón y Cajal", 115, 20);
       doc.setFontSize(12);
       doc.text("Servicio de Ginecología y Obstetricia", 120, 20);
-      
+
       /*doc.autoTable({
         startY: 40,
         head: [["Nombre", "NHC", "Fecha de nacimiento", "Fecha de Última Regla"]],
@@ -412,23 +417,23 @@ const ResponsesProbability = ({ responses, event }) => {
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.text("Datos de la paciente:", 10, 50);
-      
+
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       doc.text("Nombre:", 15, 60);
       doc.setFont("helvetica", "normal");
       doc.text(patientName, 65, 60);
-      
+
       doc.setFont("helvetica", "bold");
       doc.text("NHC:", 15, 70);
       doc.setFont("helvetica", "normal");
       doc.text(patientNHC, 65, 70);
-      
+
       doc.setFont("helvetica", "bold");
       doc.text("Edad:", 15, 80);
       doc.setFont("helvetica", "normal");
       doc.text(patientAge.toString(), 65, 80);
-      
+
       doc.setFont("helvetica", "bold");
       doc.text("FUR:", 15, 90);
       doc.setFont("helvetica", "normal");
@@ -442,7 +447,7 @@ const ResponsesProbability = ({ responses, event }) => {
         doc.setFont("helvetica", "bold");
         doc.text(title, 10, yPosition);
         yPosition += 10; // Espacio entre el título y el texto
-        
+
         //Si hay más de una masa anexial, se añade el título de la masa
         if (massIndex !== null) {
           doc.setFontSize(11);
@@ -494,7 +499,7 @@ const ResponsesProbability = ({ responses, event }) => {
         doc.setFontSize(11);
         // Agrega el bloque de texto al PDF
         doc.text(textLines, 10, yPosition, { align: "left" });
-        
+
         // Actualiza la posición en Y para el siguiente reporte
         yPosition += textLines.length * 4 + 10;
       });
@@ -514,13 +519,13 @@ const ResponsesProbability = ({ responses, event }) => {
             doc.text("Conclusión de la Masa Anexial " + (index + 1), 15, yPosition);
             yPosition += 10;
           }
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "normal");
-        const textLines = doc.splitTextToSize(observation, 180); // Ajusta el ancho según sea necesario
-        doc.text(textLines, 10, yPosition);        
-        yPosition += textLines.length + 10; // Actualiza la posición en Y para el siguiente bloque de texto
-      });
-    }
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "normal");
+          const textLines = doc.splitTextToSize(observation, 180); // Ajusta el ancho según sea necesario
+          doc.text(textLines, 10, yPosition);
+          yPosition += textLines.length + 10; // Actualiza la posición en Y para el siguiente bloque de texto
+        });
+      }
 
       //Pie de página: nombre del médico y fecha
       const today = new Date();
@@ -578,7 +583,7 @@ const ResponsesProbability = ({ responses, event }) => {
               />
             </div>
           </div>
-     
+
 
           {/* Botón para este reporte 
           <button onClick={() => handleReportButtonClick(index)}>

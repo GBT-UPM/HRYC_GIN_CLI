@@ -1,5 +1,5 @@
 import { People, CalendarMonth, MedicalInformation, LocalHospital } from "@mui/icons-material";
-import { Box, Button, Grid2, Paper, Typography } from "@mui/material";
+import { Box, Button, Grid2, Paper, Tooltip, Typography } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ApiService from "../services/ApiService";
@@ -62,29 +62,31 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
         sx={{ mb: 4 }}
       >
         {[
-          { label: 'Pacientes', icon: <People fontSize="large" color="primary" />, count: counts.Patient },
-          { label: 'Citas', icon: <CalendarMonth fontSize="large" color="success" />, count: counts.Encounter },
-          { label: 'Respuestas', icon: <MedicalInformation fontSize="large" color="warning" />, count: counts.QuestionnaireResponse },
-          { label: 'Masas Anexiales', icon: <LocalHospital fontSize="large" color="error" />, count: counts.RiskAssessment },
-        ].map(({ label, icon, count }, index) => (
+          { label: 'Pacientes Atendidos', icon: <People fontSize="large" color="primary" />, count: counts.Patient, tooltip: 'Número total de pacientes registrados en el sistema.' },
+          { label: 'Citas Cursadas', icon: <CalendarMonth fontSize="large" color="success" />, count: counts.Encounter, tooltip: 'Total de citas clínicos realizadas.' },
+          { label: 'Informes Registrados', icon: <MedicalInformation fontSize="large" color="warning" />, count: counts.QuestionnaireResponse, tooltip: 'Informes completados durante las visitas.' },
+          { label: 'Masas Anexiales', icon: <LocalHospital fontSize="large" color="error" />, count: counts.RiskAssessment, tooltip: 'Casos en los que se ha evaluado riesgo de masa anexial.' },
+        ].map(({ label, icon, count,tooltip }, index) => (
           <Grid2 item xs={12} sm={6} md={4} key={index} sx={{ display: 'flex' }}>
-            <Paper
-              sx={{
-                flex: 1, // <- ocupa todo el espacio dentro del grid
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-                padding: 3,
-                textAlign: 'center',
-                minWidth: '200px',
-                minHeight: 180, // puedes ajustar esta altura según tu gusto
-              }}
-            >
-              {icon}
-              <Typography variant="h6" sx={{ mt: 1 }}>{label}</Typography>
-              <Typography variant="h4">{count}</Typography>
-            </Paper>
+            <Tooltip title={tooltip} placement="top">
+              <Paper
+                sx={{
+                  flex: 1, // <- ocupa todo el espacio dentro del grid
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: 3,
+                  textAlign: 'center',
+                  minWidth: '200px',
+                  minHeight: 180, // puedes ajustar esta altura según tu gusto
+                }}
+              >
+                {icon}
+                <Typography variant="h6" sx={{ mt: 1 }}>{label}</Typography>
+                <Typography variant="h4">{count}</Typography>
+              </Paper>
+            </Tooltip>
           </Grid2>
         ))}
       </Grid2>
@@ -109,8 +111,8 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
                 '&:hover': {
                   backgroundColor: '#bd5806', // color al pasar el cursor
                 },
-              }}>Revisar Respuestas </Button>
-                <Button onClick={handleEncountersClick} variant="contained" sx={{
+              }}>Revisar Informes </Button>
+              <Button onClick={handleEncountersClick} variant="contained" sx={{
                 backgroundColor: '#2e7d32', // color personalizado
                 color: '#fff',              // color del texto
                 '&:hover': {
@@ -118,7 +120,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
                 },
               }}>Revisar Citas </Button>
             </Box>
-            
+
           </Paper>
         </Grid2>
 
