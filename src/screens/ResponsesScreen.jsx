@@ -34,7 +34,7 @@ const ResponsesScreen = () => {
     const [orderBy, setOrderBy] = useState('encounterPeriodStart');
     const [orderDirection, setOrderDirection] = useState('desc');
     const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(5);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     const [selectedQuestionnaire, setSelectedQuestionnaire] = useState(null);
     
     const [openModal, setOpenModal] = useState(false);
