@@ -102,6 +102,8 @@ function App() {
         setPractitioner(keycloak.tokenParsed.preferred_username);
         const fullName = `${keycloak.tokenParsed.given_name} ${keycloak.tokenParsed.family_name}`;
         setPractitionerName(fullName);
+        sessionStorage.setItem('practitioner', keycloak.tokenParsed.preferred_username);
+        sessionStorage.setItem('practitionerName', fullName);
       } else if (realmRoles.includes('patient') || clientRoles.includes('patient')) {
         // fetchPatientData();
       }

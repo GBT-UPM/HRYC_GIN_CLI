@@ -37,7 +37,7 @@ const EncountersScreen = () => {
     const [orderBy, setOrderBy] = useState('encounterPeriodStart');
     const [orderDirection, setOrderDirection] = useState('desc');
     const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(5);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     // eslint-disable-next-line no-unused-vars
     const [selectedQuestionnaire, setSelectedQuestionnaire] = useState(null);
     const [openModal, setOpenModal] = useState(false);
@@ -62,14 +62,11 @@ const EncountersScreen = () => {
     };
     const handlePrintButtonClick = (responses, observations) => {
         try {
-            console.log("pasa")
 
-            console.log(responses)
             const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
-            console.log("hasMassInReports", hasMassInReports)
-            const generated = responses.map((r) => generateReport(r));
+            console.log("hasMassInReports", hasMassInReports);
 
-            console.log(generated)
+            const generated = responses.map((r) => generateReport(r));
 
             const getResponse = (key) => {
                 const answer = responses[0].item.find(
@@ -85,166 +82,140 @@ const EncountersScreen = () => {
                 );
             };
 
-            //const getReport = (title) => reports.find((report) => report.title === title)?.text || '';
+            const checkAndAddPage = (doc, nextBlockHeight) => {
+                const pageHeight = doc.internal.pageSize.getHeight();
+                if (yPosition + nextBlockHeight > pageHeight - 30) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+            };
 
+            const doc = new jsPDF();
+
+            doc.addImage(LogoHRYC, "JPEG", 10, 10, 90, 15);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(12);
+            doc.text("Servicio de Ginecología y Obstetricia", 120, 20);
 
             const patientName = getResponse("PAT_NOMBRE");
             const patientNHC = getResponse("PAT_NHC");
-            //const patientAge = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_EDAD".toLowerCase())?.answer?.[0]?.valueInteger || '';
             const patientAge = getResponse("PAT_EDAD");
             const patientFUR = getResponse("PAT_FUR");
             const indicacion = getResponse("PAT_IND");
 
-            const doc = new jsPDF();  // Crea una nueva instancia de jsPDF
-
-            //Encabezado: logo, hospital y servicio
-            doc.addImage(LogoHRYC, "JPEG", 10, 10, 90, 15);
-            doc.setFont("helvetica", "bold");
-            //doc.setFontSize(16);
-            //doc.text("Hospital Universitario Ramón y Cajal", 115, 20);
-            doc.setFontSize(12);
-            doc.text("Servicio de Ginecología y Obstetricia", 120, 20);
-
-            /*doc.autoTable({
-              startY: 40,
-              head: [["Nombre", "NHC", "Fecha de nacimiento", "Fecha de Última Regla"]],
-              body: [[patientName, patientNHC, birthDate(patientAge), patientFUR]],
-              theme: 'grid'
-            });*/
-
-            //Datos de la paciente
+            let yPosition = 50;
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
-            doc.text("Datos de la paciente:", 10, 50);
+            checkAndAddPage(doc, 10);
+            doc.text("Datos de la paciente:", 10, yPosition);
+            yPosition += 10;
 
-            doc.setFontSize(11);
-            doc.setFont("helvetica", "bold");
-            doc.text("Nombre:", 15, 60);
-            doc.setFont("helvetica", "normal");
-            doc.text(patientName, 65, 60);
+            const addField = (label, value) => {
+                checkAndAddPage(doc, 10);
+                doc.setFontSize(11);
+                doc.setFont("helvetica", "bold");
+                doc.text(label, 15, yPosition);
+                doc.setFont("helvetica", "normal");
+                doc.text(value, 65, yPosition);
+                yPosition += 10;
+            };
 
-            doc.setFont("helvetica", "bold");
-            doc.text("NHC:", 15, 70);
-            doc.setFont("helvetica", "normal");
-            doc.text(patientNHC, 65, 70);
+            addField("Nombre:", patientName);
+            addField("NHC:", patientNHC);
+            addField("Edad:", patientAge.toString());
+            addField("FUR:", formatDate(patientFUR));
 
-            doc.setFont("helvetica", "bold");
-            doc.text("Edad:", 15, 80);
-            doc.setFont("helvetica", "normal");
-            doc.text(patientAge.toString(), 65, 80);
+            const addSectionWithAutoBreak = (title, text) => {
+                const textLines = text.trim() !== "" ? doc.splitTextToSize(text, 180) : [];
+                const totalHeight = textLines.length * 5 + 10;
 
-            doc.setFont("helvetica", "bold");
-            doc.text("FUR:", 15, 90);
-            doc.setFont("helvetica", "normal");
-            doc.text(formatDate(patientFUR), 65, 90);
+                // Añade salto de página solo si se va a imprimir algo más que el título
+                checkAndAddPage(doc, totalHeight);
 
-            let yPosition = 100; // Posición inicial en Y para el primer bloque de texto
-
-            //Sección del informe: indicación, descripción y conclusión
-            const addSection = (title, text, massIndex = null) => {
+                // Imprime el título siempre
                 doc.setFontSize(12);
                 doc.setFont("helvetica", "bold");
                 doc.text(title, 10, yPosition);
-                yPosition += 10; // Espacio entre el título y el texto
+                yPosition += 10;
 
-                //Si hay más de una masa anexial, se añade el título de la masa
-                if (massIndex !== null) {
+                if (textLines.length > 0) {
                     doc.setFontSize(11);
-                    doc.setFont("helvetica", "bold");
-                    doc.text("Conclusión de la Masa Anexial " + (massIndex + 1), 15, yPosition);
-                    yPosition += 10;
+                    doc.setFont("helvetica", "normal");
+                    doc.text(textLines, 10, yPosition);
+                    yPosition += textLines.length * 5 + 10;
                 }
-
-                doc.setFontSize(11);
-                doc.setFont("helvetica", "normal");
-                const textLines = doc.splitTextToSize(text, 180); // Ajusta el ancho según sea necesario  
-                doc.text(textLines, 10, yPosition);
-                yPosition += textLines.length * 4 + 10; // Actualiza la posición en Y para el siguiente bloque de texto
             };
 
-            addSection("Indicación de la ecografía: ", indicacion);
+            addSectionWithAutoBreak("Indicación de la ecografía:", indicacion);
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
-            doc.text("Descripción de la imagen: ", 10, yPosition);
+            checkAndAddPage(doc, 10);
+            doc.text("Descripción de la imagen:", 10, yPosition);
             yPosition += 10;
 
             doc.setFontSize(11);
             doc.setFont("helvetica", "normal");
             generated.forEach((report, index) => {
                 if (hasMassInReports) {
-                    doc.setFontSize(11);
+                    checkAndAddPage(doc, 10);
                     doc.setFont("helvetica", "bold");
                     doc.text("Masa anexial " + (index + 1), 15, yPosition);
                     yPosition += 10;
                 }
+
                 doc.setFont("helvetica", "normal");
-
-                // Reemplaza <br> por saltos de línea
                 const htmlConSaltos = report.text.replace(/<br\s*\/?>/gi, "\n");
-
-                // Crea un elemento temporal para interpretar el HTML
                 const tempDiv = document.createElement("div");
                 tempDiv.innerHTML = htmlConSaltos;
-
-                // Extrae el texto plano (ahora con saltos de línea donde estaban los <br>)
-                let plainText = tempDiv.innerText;
-
-                // Opcional: normaliza el texto (por ejemplo, eliminando múltiples saltos de línea consecutivos)
+                const plainText = tempDiv.innerText;
                 const normalizedText = plainText.replace(/\n+/g, "\n").trim();
 
-                // Usa splitTextToSize para dividir el texto en líneas según el ancho máximo
-                const maxWidth = 180; // Ancho máximo en el PDF (ajusta según tus necesidades)
-                const textLines = doc.splitTextToSize(normalizedText, maxWidth);
-                doc.setFontSize(11);
-                // Agrega el bloque de texto al PDF
-                doc.text(textLines, 10, yPosition, { align: "left" });
+                const textLines = doc.splitTextToSize(normalizedText, 180);
+                textLines.forEach((line) => {
+                    checkAndAddPage(doc, 6);
+                    doc.text(line, 10, yPosition);
+                    yPosition += 6;
+                });
 
-                // Actualiza la posición en Y para el siguiente reporte
-                yPosition += textLines.length * 4 + 10;
+                yPosition += 4;
             });
 
-            // Espacio para las conclusiones
-            console.log("observations", observations)
-            const validObservations = observations
-            //const validObservations = observations.filter((observation) => observation.trim().length > 0); // Filtra las observaciones vacías o nulas
+            const validObservations = observations;
             if (validObservations.length > 0) {
-                doc.setFontSize(12);
-                doc.setFont("helvetica", "bold");
-                doc.text("Conclusiones del ecografista: ", 10, yPosition);
-                yPosition += 10;
+                addSectionWithAutoBreak("Conclusiones del ecografista:", "");
 
                 validObservations.forEach((observation, index) => {
                     if (validObservations.length > 1) {
+                        checkAndAddPage(doc, 10);
                         doc.setFontSize(11);
                         doc.setFont("helvetica", "bold");
                         doc.text("Conclusión de la Masa Anexial " + (index + 1), 15, yPosition);
                         yPosition += 10;
                     }
+
                     doc.setFontSize(11);
                     doc.setFont("helvetica", "normal");
-
                     const text = observation.text || observation.valueString || "";
                     const textLines = doc.splitTextToSize(text, 180);
-                    //const textLines = doc.splitTextToSize(observation, 180); // Ajusta el ancho según sea necesario
-                    doc.text(textLines, 10, yPosition);
-                    yPosition += textLines.length + 10; // Actualiza la posición en Y para el siguiente bloque de texto
+                    textLines.forEach((line) => {
+                        checkAndAddPage(doc, 6);
+                        doc.text(line, 10, yPosition);
+                        yPosition += 6;
+                    });
+                    yPosition += 4;
                 });
             }
 
-            //Pie de página: nombre del médico y fecha
             const today = new Date();
             doc.setFontSize(10);
             doc.setFont("helvetica", "italic");
             doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
             doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
-            //  doc.text("Ecografista: " + practitioner, 10, 270);
+            const practitionerName = sessionStorage.getItem('practitionerName');
+            doc.text("Ecografista: " + practitionerName, 10, 270);
 
-            // Guarda el PDF
-            //doc.save("informe.pdf");
-            // Configura el PDF para que se imprima automáticamente
             doc.autoPrint();
-            window.open(doc.output("bloburl"), "_blank");  // Abre el PDF en una nueva pestaña
-
+            window.open(doc.output("bloburl"), "_blank");
         } catch (error) {
             console.error("Error al guardar el encounter:", error);
             setError("Error al guardar el encounter.");
@@ -446,8 +417,11 @@ const EncountersScreen = () => {
 
     // Filtrado de datos basado en la búsqueda
     const filteredData = data.filter((item) =>
-        item.encounterText.toLowerCase().includes(search.toLowerCase()) ||
-        item.patientId.toLowerCase().includes(search.toLowerCase())
+        item.practitionerName.toLowerCase().includes(search.toLowerCase()) ||
+        item.patientIdentifier.toLowerCase().includes(search.toLowerCase()) ||
+        item.patientName.toLowerCase().includes(search.toLowerCase()) ||
+        item.risk.toLowerCase().includes(search.toLowerCase()) ||
+        new Date(item.encounterPeriodStart).toLocaleString().includes(search.toLowerCase())
     );
 
     // Ordenación de datos
@@ -568,14 +542,14 @@ const EncountersScreen = () => {
                                     Riesgo
                                 </TableSortLabel>
                             </TableCell>
-   
+
                             <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'encounterText'}
                                     direction={orderDirection}
                                     onClick={() => handleSortRequest('encounterText')}
                                 >
-                                    Tipo de Cita
+                                    Ecografista
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell>
@@ -618,26 +592,33 @@ const EncountersScreen = () => {
                                     <TableCell>{item.patientIdentifier}</TableCell>
                                     <TableCell>{item.patientName}</TableCell>
                                     <TableCell>
-                                    {(() => {
-                                        let parsed = [];
-                                        try {
-                                        const riskData = typeof item.risk === 'string' ? JSON.parse(item.risk) : item.risk;
-                                        parsed = Array.isArray(riskData) ? riskData : [riskData];
-                                        } catch (e) {
-                                        console.error("Error al parsear item.risk:", e);
-                                        }
+                                        {(() => {
+                                            let parsed = [];
+                                            try {
+                                                if (!item.risk || item.risk === "" || item.risk === "{}") {
+                                                    return "No procede";
+                                                }
 
-                                        return parsed
-                                        .map(r => parseFloat(r?.prediction?.[0]?.probabilityDecimal))
-                                        .filter(p => !isNaN(p))
-                                        .map(p => (p * 100).toFixed(2) + '%')
-                                        .join(' - ');
-                                    })()}
+                                                const riskData = typeof item.risk === 'string' ? JSON.parse(item.risk) : item.risk;
+                                                parsed = Array.isArray(riskData) ? riskData : [riskData];
+                                            } catch (e) {
+                                                console.error("Error al parsear item.risk:", e);
+                                                return "No procede";
+                                            }
+
+                                            const probabilities = parsed
+                                                .map(r => parseFloat(r?.prediction?.[0]?.probabilityDecimal))
+                                                .filter(p => !isNaN(p));
+
+                                            return probabilities.length > 0
+                                                ? probabilities.map(p => (p * 100).toFixed(2) + '%').join(' - ')
+                                                : "No procede";
+                                        })()}
                                     </TableCell>
-                                    <TableCell>{item.encounterText}</TableCell>
+                                    <TableCell>{item.practitionerName || '—'}</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
                                     <TableCell style={{ textAlign: 'right' }}>
-                                    {hasMass && observation === null && (
+                                        {hasMass && observation === null && (
                                             <Tooltip title="Editar">
                                                 <IconButton
                                                     color="secondary"
@@ -655,7 +636,7 @@ const EncountersScreen = () => {
                                                 <LocalPrintshopIcon />
                                             </IconButton>
                                         </Tooltip>
-                                       
+
                                     </TableCell>
                                 </TableRow>
                             );

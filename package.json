@@ -1,5 +1,5 @@
 {
-  "name": "client-fhir",
+  "name": "eco-data",
   "version": "0.1.1",
   "private": true,
   "dependencies": {
@@ -9,8 +9,8 @@
     "@fortawesome/free-solid-svg-icons": "^6.4.0",
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@mui/base": "^5.0.0-beta.40",
-    "@mui/icons-material": "^6.4.1",
-    "@mui/material": "^6.4.2",
+    "@mui/icons-material": "^6.4.11",
+    "@mui/material": "^6.4.11",
     "@react-keycloak/web": "^3.4.0",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",

@@ -34,7 +34,7 @@ const ResponsesScreen = () => {
     const [orderBy, setOrderBy] = useState('encounterPeriodStart');
     const [orderDirection, setOrderDirection] = useState('desc');
     const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(5);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     const [selectedQuestionnaire, setSelectedQuestionnaire] = useState(null);
     
     const [openModal, setOpenModal] = useState(false);
@@ -243,8 +243,11 @@ const ResponsesScreen = () => {
 
     // Filtrado de datos basado en la búsqueda
     const filteredData = data.filter((item) =>
-        item.encounterText.toLowerCase().includes(search.toLowerCase()) ||
-        item.patientId.toLowerCase().includes(search.toLowerCase())
+        item.practitionerName.toLowerCase().includes(search.toLowerCase()) ||
+        item.patientIdentifier.toLowerCase().includes(search.toLowerCase()) ||
+        item.patientName.toLowerCase().includes(search.toLowerCase()) ||
+        item.risk.toLowerCase().includes(search.toLowerCase()) ||
+        new Date(item.encounterPeriodStart).toLocaleString().includes(search.toLowerCase()) 
     );
 
     // Ordenación de datos
@@ -313,7 +316,7 @@ const ResponsesScreen = () => {
         <Container className="container">
 
             <Typography variant="h4" gutterBottom>
-                📋 Lista de Respuestas
+                📋 Lista de Informes
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
@@ -374,7 +377,7 @@ const ResponsesScreen = () => {
                                     direction={orderDirection}
                                     onClick={() => handleSortRequest('encounterText')}
                                 >
-                                    Tipo de Cita
+                                    Ecografista
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell>
@@ -418,12 +421,12 @@ const ResponsesScreen = () => {
                                     <TableCell>{item.patientName}</TableCell>
                                     <TableCell>{!isNaN(parseFloat(item.risk))
                                                 ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
-                                                : '—'}
+                                                : 'No procede'}
                                     </TableCell>
                                     <TableCell>{
-                                       !hasMass ? "No disponible" : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
-                                    }</TableCell> 
-                                    <TableCell>{item.encounterText}</TableCell>
+                                        !hasMass ? '—' : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
+                                    }</TableCell>
+                                    <TableCell>{item.practitionerName || '—' }</TableCell>
                                     <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
                                     <TableCell style={{ textAlign: 'right' }}>
                                     {hasMass && observation === null && (
@@ -516,7 +519,7 @@ const ResponsesScreen = () => {
                         Editar Histología
                     </Typography>
                     <FormControl fullWidth sx={{ mb: 3 }}>
-                        <InputLabel>Estado Histológico</InputLabel>
+                        <InputLabel>Resultado Histológico</InputLabel>
                         <Select
                             value={histology}
                             onChange={(e) => setHistology(e.target.value)}
@@ -537,6 +540,13 @@ const ResponsesScreen = () => {
                         value={pathologyReport}
                         onChange={(e) => setPathologyReport(e.target.value)}
                     />
+                    <Typography
+                        variant="body2"
+                        color="error"
+                        sx={{ mt: 1 }}
+                    >
+                        Una vez guardado, no será posible editar este campo.
+                    </Typography>
                     <Button
                         variant="contained"
                         sx={{ mt: 2 }}
