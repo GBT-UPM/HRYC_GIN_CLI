@@ -145,7 +145,7 @@ const ResponsesScreen = () => {
               } else {    
                 report += `<div>Dependiente de ${MA_ESTRUCTURA} en lado ${MA_LADO}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO}, de contenido ${MA_CONTENIDO} y vascularización ${MA_SOL_VASC}.</div>`;
               }
-            } else if (MA_TIPO === 'quística' || MA_TIPO === 'sólido_quística') {   //Masa anexial QUÍSTICA o SÓLIDO-QUÍSTICA
+            } else if (MA_TIPO === 'quística' || MA_TIPO === 'sólido-quística') {   //Masa anexial QUÍSTICA o SÓLIDO-QUÍSTICA
               if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {     //Estructura o lateralidad INDEFINIDAS
                 report += `<div>De dependencia indefinida, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_Q_CONTORNO} y de contenido ${MA_CONTENIDO}.</div>`;
               } else {
