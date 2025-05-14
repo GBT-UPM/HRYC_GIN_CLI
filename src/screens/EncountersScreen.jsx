@@ -500,7 +500,7 @@ const EncountersScreen = () => {
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
-                label="Buscar por paciente o tipo de encuentro"
+                label="Buscar por paciente o ecografista"
                 variant="outlined"
                 fullWidth
                 sx={{ mt: 5 }}

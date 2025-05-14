@@ -6,6 +6,7 @@ import '../assets/css/ResponsesProbability.css';
 import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
 
+import Modal from "./Modal";
 
 import { useKeycloak } from '@react-keycloak/web';
 import { useEncounterTemplate } from "../hooks/useEncounterTemplate";
@@ -26,6 +27,8 @@ const ResponsesProbability = ({ responses, event }) => {
   const [probality, setProbality] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [encounterId, setEncounterId] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [includeProbability, setIncludeProbability] = useState(false);
 
 
   const { keycloak } = useKeycloak();
@@ -132,11 +135,10 @@ const ResponsesProbability = ({ responses, event }) => {
     const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
     const probabilidad = calcularProbabilidad(logit);
 
-    const RES_SCORE = probabilidad.toFixed(4);    //no sé si esto se mostraría en el informe o solo para información del médico.
+    const RES_SCORE = probabilidad.toFixed(4);
 
     //Construcción del informe
     let report = '';
-
 
     if (PAT_MA === 'no') {                  //Si NO hay masa anexial
       const OD_M1 = getValue('OD_M1');
@@ -152,27 +154,7 @@ const ResponsesProbability = ({ responses, event }) => {
       return {
         text: report
       };
-    } else {    //Si SÍ hay masa anexial
-      // if (MA_TIPO === 'sólida') {   //Masa anexial SÓLIDA
-      //   if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {   //Estructura o lateralidad INDEFINIDAS
-      //     report += `De dependencia <b>indefinida</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_SOL_CONTORNO}</b>, de contenido <b>${MA_CONTENIDO}</b> y vascularización <b>${MA_SOL_VASC}</b>.<br/>`;
-      //   } else if (MA_ESTRUCTURA === 'trompa' && MA_LADO === 'derecho') {  //Estructura en femenino
-      //     report += `Dependiente de <b>trompa</b> <b>derecha</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_SOL_CONTORNO}</b>, de contenido <b>${MA_CONTENIDO}</b> y vascularización <b>${MA_SOL_VASC}</b>.<br/>`;
-      //   } else if (MA_ESTRUCTURA === 'trompa' && MA_LADO === 'izquierdo') { //Estructura en femenino
-      //     report += `Dependiente de <b>trompa</b> <b>izquierda</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_SOL_CONTORNO}</b>, de contenido <b>${MA_CONTENIDO}</b> y vascularización <b>${MA_SOL_VASC}</b>.<br/>`;
-      //   } else {
-      //     report += `Dependiente de <b>${MA_ESTRUCTURA}</b> <b>${MA_LADO}</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_SOL_CONTORNO}</b>, de contenido <b>${MA_CONTENIDO}</b> y vascularización <b>${MA_SOL_VASC}</b>.<br/>`;
-      //   }
-      // } else if (MA_TIPO === 'quística' || MA_TIPO === 'sólido-quística') {   //Masa anexial QUÍSTICA o SÓLIDO-QUÍSTICA
-      //   if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {     //Estructura o lateralidad INDEFINIDAS
-      //     report += `De dependencia <b>indefinida</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_Q_CONTORNO}</b> y de contenido <b>${MA_CONTENIDO}</b>.<br/>`;
-      //   } else if (MA_ESTRUCTURA === 'trompa' && MA_LADO === 'derecho') {  //Estructura en femenino 
-      //     report += `Dependiente de <b>trompa</b> <b>derecha</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_Q_CONTORNO}</b> y de contenido <b>${MA_CONTENIDO}</b>.<br/>`;
-      //   } else if (MA_ESTRUCTURA === 'trompa' && MA_LADO === 'izquierdo') { //Estructura en femenino
-      //     report += `Dependiente de <b>trompa</b> <b>izquierda</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_Q_CONTORNO}</b> y de contenido <b>${MA_CONTENIDO}</b>.<br/>`;
-      //   } else {
-      //     report += `Dependiente de <b>${MA_ESTRUCTURA}</b> <b>${MA_LADO}</b>, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm <b>(${MA_VOL} mm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${MA_Q_CONTORNO}</b> y de contenido <b>${MA_CONTENIDO}</b>.<br/>`;
-      //   }
+    } else {  //Si SÍ hay masa anexial
         const estructurasFemeninas = ['trompa'];
         if (['sólida', 'quística', 'sólido-quística'].includes(MA_TIPO)) {
           let dependencia = '';
@@ -193,8 +175,8 @@ const ResponsesProbability = ({ responses, event }) => {
               ? (MA_LADO === 'derecho' ? 'derecha' : MA_LADO === 'izquierdo' ? 'izquierda' : MA_LADO) : MA_LADO;
             dependencia = `Dependiente de <b>${estructura}</b> <b>${lado}</b>`;
           }
-          report += `${dependencia}, se objetiva formación de <b>${MA_M1} x ${MA_M2} x ${MA_M3} mm</b> <b>(${MA_VOL} cm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${contorno}</b> y de contenido <b>${MA_CONTENIDO}</b>.${vascularizacion_MA_SOL}<br/>`;
-        
+          report += `${dependencia}, se objetiva formación de <b>${MA_M1} x ${MA_M2} x ${MA_M3} mm</b> <b>(${MA_VOL} cm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${contorno}</b> y de contenido <b>${MA_CONTENIDO}</b>.${vascularizacion_MA_SOL}.<br/>`;
+          
           // Información adicional para masas quísticas y sólido-quísticas
           let vascularizacion_MA_Q = '';	
           if (MA_TIPO === 'quística' || MA_TIPO === 'sólido-quística') {
@@ -206,7 +188,7 @@ const ResponsesProbability = ({ responses, event }) => {
             let vascularizacion_papila = '';
             vascularizacion_papila = MA_Q_P_VASC === 'ninguno (score color 1)'
               ? '<b>avascular</b>'
-              : `con grado de vascularización <b>${MA_Q_P_VASC}.`;
+              : `con grado de vascularización <b>${MA_Q_P_VASC}</b>.`;
             if (MA_PAPS === 'sí') {    
               report += `Contiene <b>${MA_Q_P} papila/s</b>, la mayor de ellas de <b>${MA_Q_P_M1} x ${MA_Q_P_M2} mm</b> de morfología <b>${MA_Q_P_CONTORNO}</b> y ${vascularizacion_papila}</b>.<br/>`;
             }
@@ -247,7 +229,8 @@ const ResponsesProbability = ({ responses, event }) => {
     }
     return {
       text: report,
-      score: RES_SCORE
+      score: RES_SCORE,
+      text_score: `La probabilidad de que la masa anexial sea maligna es de ${(RES_SCORE ?? 0)* 100}%.`,
     };
   }, []);
   useEffect(() => {
@@ -595,10 +578,9 @@ const ResponsesProbability = ({ responses, event }) => {
   //     setError("Error al guardar el encounter.");
   //   }
   // };
-  const handlePrintButtonClick = () => {
-     try {
-     handleSaveButtonClick();
- 
+  const handlePrintButtonClick = (includeProbability) => {
+    try {
+      handleSaveButtonClick(); 
       const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
 
       const getResponse = (key) => {
@@ -709,6 +691,15 @@ const ResponsesProbability = ({ responses, event }) => {
           doc.text(line, 10, yPosition);
           yPosition += 6;
         });
+
+        if (includeProbability && report.text_score) {
+          const scoreLines = doc.splitTextToSize(report.text_score, 180);
+          scoreLines.forEach((line) => {
+            checkAndAddPage(doc, 6);
+            doc.text(line, 10, yPosition);
+            yPosition += 6;
+          });
+        }
   
         yPosition += 4;
       });
@@ -812,10 +803,35 @@ const ResponsesProbability = ({ responses, event }) => {
       <button className="save-btn" onClick={handleSaveButtonClick}>
         Guardar
       </button>
-      <button className="save-btn" onClick={handlePrintButtonClick}>
+      {/* <button className="save-btn" onClick={handlePrintButtonClick}>
+        Guardar e Imprimir
+      </button> */}
+      <button className="save-btn" onClick={() => {
+        if (calcularScore)  {
+          setIsModalOpen(true);
+        } else {
+          handlePrintButtonClick(false);
+        }
+      }}
+      >
         Guardar e Imprimir
       </button>
-    </div>
+      {/* Modal para dar opción de incluir la probabilidad en el informe */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+      <h2>Confirmación</h2> 
+      <p>¿Desea incluir la probabilidad de malignidad en el informe?</p>
+      <button className="save" onClick={() => {
+          handlePrintButtonClick(true);
+          setIsModalOpen(false);
+      }}>Sí
+      </button>
+      <button className="cancel" onClick={() => {
+        handlePrintButtonClick(false);
+        setIsModalOpen(false);
+      }}>No
+      </button>
+    </Modal>
+  </div>
   );
 }
 

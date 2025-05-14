@@ -73,7 +73,7 @@ const ResponsesScreen = () => {
               return answer.valueInteger.toString(); // Campo valueInteger convertido a string
             } else if (answer.valueDate) {
               return answer.valueDate; // Campo valueDate como está (ya es un string)
-              }
+            }
           }
           return '';  //Si no encuentra nada.
         };
@@ -85,13 +85,15 @@ const ResponsesScreen = () => {
         const MA_M1 = getValue('MA_M1');
         const MA_M2 = getValue('MA_M2');
         const MA_M3 = getValue('MA_M3');
-        const MA_VOL = (parseFloat(MA_M1) * parseFloat(MA_M2) * parseFloat(MA_M3) * 0.52).toFixed(2);
+        const volumen = ((parseFloat(MA_M1) * parseFloat(MA_M2) * parseFloat(MA_M3) * 0.52)/1000);
+        const MA_VOL = volumen < 0.01 ? volumen.toFixed(3) : volumen.toFixed(2); // Volumen en cm³
         const MA_SOL_CONTORNO = getValue('MA_SOL_CONTORNO');
         const MA_CONTENIDO = getValue('MA_CONTENIDO');
         const MA_SOL_VASC = getValue('MA_SOL_VASC');
         const MA_Q_CONTORNO = getValue('MA_Q_CONTORNO');
         const MA_Q_GROSOR = getValue('MA_Q_GROSOR');
         const MA_Q_VASC = getValue('MA_Q_VASC');
+        const MA_PAPS = getValue('MA_PAPS');
         const MA_Q_P = getValue('MA_Q_P');
         const MA_Q_P_M1 = getValue('MA_Q_P_M1');
         const MA_Q_P_M2 = getValue('MA_Q_P_M2');
@@ -116,17 +118,18 @@ const ResponsesScreen = () => {
         const MA_ASC = getValue('MA_ASC');
         const MA_ASC_TIPO = getValue('MA_ASC_TIPO');
         const MA_CARC = getValue('MA_CARC');
-        //const RES_CONCL = getValue('RES_CONCL');
+    
   
         //Calcular logit y probabilidad      
         const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
         const probabilidad = calcularProbabilidad(logit);
         
-        const RES_SCORE = probabilidad.toFixed(4);    //no sé si esto se mostraría en el informe o solo para información del médico.
+        const RES_SCORE = probabilidad.toFixed(4);
       
         //Construcción del informe
         let report = '';
-        console.log("PAT_MA: " + PAT_MA);   
+        console.log("PAT_MA: " + PAT_MA);
+           
         if (PAT_MA === 'no') {                  //Si NO hay masa anexial
           const OD_M1 = getValue('OD_M1');
           const OD_M2 = getValue('OD_M2');
@@ -139,52 +142,75 @@ const ResponsesScreen = () => {
           report += `<div>Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL} folículo/s.</div>`;
         
         } else {    //Si SÍ hay masa anexial
-            if (MA_TIPO === 'sólida') {   //Masa anexial SÓLIDA
-              if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {   //Estructura o lateralidad INDEFINIDAS
-                report += `<div>De dependencia indefinida, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO}, de contenido ${MA_CONTENIDO} y vascularización ${MA_SOL_VASC}.</div>`; 
-              } else {    
-                report += `<div>Dependiente de ${MA_ESTRUCTURA} en lado ${MA_LADO}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO}, de contenido ${MA_CONTENIDO} y vascularización ${MA_SOL_VASC}.</div>`;
-              }
-            } else if (MA_TIPO === 'quística' || MA_TIPO === 'sólido-quística') {   //Masa anexial QUÍSTICA o SÓLIDO-QUÍSTICA
-              if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {     //Estructura o lateralidad INDEFINIDAS
-                report += `<div>De dependencia indefinida, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_Q_CONTORNO} y de contenido ${MA_CONTENIDO}.</div>`;
-              } else {
-                report += `<div>Dependiente de ${MA_ESTRUCTURA} en lado ${MA_LADO}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO} y de contenido ${MA_CONTENIDO}.</div>`;
-              }
-              
-              report += `<div>La pared mide ${MA_Q_GROSOR} y su vascularización es ${MA_Q_VASC}.</div>`;
-  
-              if (MA_Q_CONTORNO === 'irregular') {    //Contorno irregular.
-                report += `<div>Contiene ${MA_Q_P} papila/s, la mayor de ellas de ${MA_Q_P_M1} x ${MA_Q_P_M2} mm de morfología ${MA_Q_P_CONTORNO}, con vascularización ${MA_Q_P_VASC}.</div>`;
-              }
-              
-              if (MA_Q_T === 'sí') {      //Presencia de tabiques.
-                report += `<div>Los tabiques son ${MA_Q_T_TIPO}, de grosor ${MA_Q_T_GROSOR} y vascularización ${MA_Q_T_VASC}. La formación tiene ${MA_Q_T_N} lóculos.</div>`;
-              }
-  
-              if (MA_Q_AS === 'sí') {   //Área sólida.
-                report += `<div>Contiene ${MA_Q_AS_N} porción/es sólida/s, la mayor de ellas tiene un tamaño de ${MA_Q_AS_M1} x ${MA_Q_AS_M2} x ${MA_Q_AS_M3} mm con vascularización ${MA_Q_AS_VASC}.</div>`;
-              }
+            const estructurasFemeninas = ['trompa'];
+            if (['sólida', 'quística', 'sólido-quística'].includes(MA_TIPO)) {
+                let dependencia = '';
+                const contorno = MA_TIPO === 'sólida' ? MA_SOL_CONTORNO : MA_Q_CONTORNO;
+
+                //Vascularización sólo para masas sólidas
+                let vascularizacion_MA_SOL = '';
+                if (MA_TIPO === 'sólida') {
+                    vascularizacion_MA_SOL = MA_SOL_VASC === 'nula (score color 1)'
+                        ? ' Es avascular'
+                        : ` Su grado de vascularización es ${MA_SOL_VASC  === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_SOL_VASC}.`;
+                }
+                if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {   //Estructura o lateralidad INDEFINIDAS
+                    dependencia = 'De dependencia indefinida';
+                } else {
+                    const estructura = MA_ESTRUCTURA
+                    const lado = estructurasFemeninas.includes(estructura) 
+                        ? (MA_LADO === 'derecho' ? 'derecha' : MA_LADO === 'izquierdo' ? 'izquierda' : MA_LADO) : MA_LADO;
+                    dependencia = `Dependiente de ${estructura} ${lado}`;
+                }
+                report += `<div>${dependencia}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} cm³) de aspecto ${MA_TIPO} de contorno ${contorno} y de contenido ${MA_CONTENIDO}.${vascularizacion_MA_SOL}.</div>`;
+
+                // Información adicional para masas quísticas y sólido-quísticas 
+                let vascularizacion_MA_Q = '';
+                if (MA_TIPO === 'quística' || MA_TIPO === 'sólido-quística') {
+                    vascularizacion_MA_Q = MA_Q_VASC === 'nula (score color 1)'
+                        ? ' y es avascular'
+                        : ` y su grado de vascularización es ${MA_Q_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_VASC}.`;
+                    report += `<div>La pared mide ${MA_Q_GROSOR} mm ${vascularizacion_MA_Q}. El contorno es ${MA_Q_CONTORNO}.</div>`;
+                    // Papilas
+                    let vascularizacion_papila = '';
+                    vascularizacion_papila = MA_Q_P_VASC === 'nula (score color 1)'
+                        ? 'avascular'
+                        : `con grado de vascularización ${MA_Q_P_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_P_VASC}.`;
+                    if (MA_PAPS === 'sí') {    
+                    report += `<div>Contiene ${MA_Q_P} papila/s, la mayor de ellas de ${MA_Q_P_M1} x ${MA_Q_P_M2} mm de morfología ${MA_Q_P_CONTORNO} y ${vascularizacion_papila}.</div>`;
+                    }
+                    // Tabiques
+                    let vascularizacion_tabiques = '';
+                    vascularizacion_tabiques = MA_Q_T_VASC === 'nula (score color 1)' 
+                        ? ' y avasculares' 
+                        : ` y su grado de vascularización es ${MA_Q_T_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_T_VASC}.`;
+                    if (MA_Q_T === 'sí') {
+                        report += `<div>Los tabiques son ${MA_Q_T_TIPO}, de grosor ${MA_Q_T_GROSOR} mm${vascularizacion_tabiques}. La formación tiene ${MA_Q_T_N} lóculo/s.</div>`;
+                    }
+                    // Área sólida
+                    let vascularizacion_AS = '';
+                    vascularizacion_AS= MA_Q_AS_VASC === 'ninguno (score color 1)' 
+                        ? 'y es avascular' 
+                        : `con grado de vascularización ${MA_Q_AS_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_AS_VASC}.`;
+                    if (MA_Q_AS === 'sí') {
+                        report += `<div>Contiene ${MA_Q_AS_N} porción/es sólida/s, la mayor de ellas tiene un tamaño de ${MA_Q_AS_M1} x ${MA_Q_AS_M2} x ${MA_Q_AS_M3} mm ${vascularizacion_AS}.</div>`;
+                    }
+                }
+                // Esto no depende del tipo de masa anexial.
+                if (MA_SA === 'sí') {   //Sombra acústica posterior.
+                    report += `<div>Presenta sombra posterior.</div>`;
+                }
+                if (MA_PS === 'sí') {   //Parénquima ovárico sano.
+                    report += `<div>Tiene parénquima ovárico sano, de tamaño ${MA_PS_M1} x ${MA_PS_M2} x ${MA_PS_M3} mm.</div>`;
+                }
+                if (MA_ASC === 'sí') {    //Ascitis.
+                    report += `<div>Presenta ascitis de tipo ${MA_ASC_TIPO}.</div>`;
+                }
+                if (MA_CARC === 'sí') {   //Carcinomatosis.
+                    report += '<div>Hay carcinomatosis.</div>';
+                }
             }
-            //Esto ya no depende del tipo de masa anexial.
-  
-            if (MA_SA === 'sí') {   //Sombra acústica posterior.
-              report += `<div>Presenta sombra posterior.</div>`;
-            }
-  
-            if (MA_PS === 'sí') {   //Parénquima ovárico sano.
-              report += `<div>Tiene parénquima ovárico sano, de tamaño ${MA_PS_M1} x ${MA_PS_M2} x ${MA_PS_M3} mm.</div>`;      
-            }
-  
-            if (MA_ASC === 'sí') {    //Ascitis.
-              report += `<div>Presenta ascitis de tipo ${MA_ASC_TIPO}.</div>`;
-            }
-  
-            if (MA_CARC === 'sí') {   //Carcinomatosis.
-              report += '<div>Hay carcinomatosis.</div>';
-            }
-  
-            report += `<div>La probabilidad de que la masa anexial sea maligna es de ${RES_SCORE}. </div>`;
+            report += `<div>La probabilidad de que la masa anexial sea maligna es de ${(RES_SCORE ?? 0)* 100}%.</div>`;
           }
 
           return report;
@@ -320,7 +346,7 @@ const ResponsesScreen = () => {
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
-                label="Buscar por NHC o tipo de encuentro"
+                label="Buscar por paciente o ecografista"
                 variant="outlined"
                 fullWidth
                 sx={{ mt: 5 }}
