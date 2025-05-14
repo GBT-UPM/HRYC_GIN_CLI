@@ -320,7 +320,7 @@ const ResponsesScreen = () => {
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
-                label="Buscar por paciente o tipo de encuentro"
+                label="Buscar por NHC o tipo de encuentro"
                 variant="outlined"
                 fullWidth
                 sx={{ mt: 5 }}
@@ -394,7 +394,7 @@ const ResponsesScreen = () => {
                     </TableHead>
                     <TableBody>
                         {paginatedData.map((item, index) => {
-                            //const questionnaireResponse = JSON.parse(item.questionnaireResponse);
+                            const questionnaireResponse = JSON.parse(item.questionnaireResponse);
                             console.log(item.observation)
                             const observation = item.observation && item.observation !== ""
                                 ? JSON.parse(item.observation)
@@ -519,7 +519,7 @@ const ResponsesScreen = () => {
                         Editar Histología
                     </Typography>
                     <FormControl fullWidth sx={{ mb: 3 }}>
-                        <InputLabel>Estado Histológico</InputLabel>
+                        <InputLabel>Resultado Histológico</InputLabel>
                         <Select
                             value={histology}
                             onChange={(e) => setHistology(e.target.value)}
@@ -540,6 +540,13 @@ const ResponsesScreen = () => {
                         value={pathologyReport}
                         onChange={(e) => setPathologyReport(e.target.value)}
                     />
+                    <Typography
+                        variant="body2"
+                        color="error"
+                        sx={{ mt: 1 }}
+                    >
+                        Una vez guardado, no será posible editar este campo.
+                    </Typography>
                     <Button
                         variant="contained"
                         sx={{ mt: 2 }}
