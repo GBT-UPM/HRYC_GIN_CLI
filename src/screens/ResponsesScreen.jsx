@@ -394,8 +394,7 @@ const ResponsesScreen = () => {
                     </TableHead>
                     <TableBody>
                         {paginatedData.map((item, index) => {
-                            const questionnaireResponse = JSON.parse(item.questionnaireResponse);
-                            console.log(item.observation)
+
                             const observation = item.observation && item.observation !== ""
                                 ? JSON.parse(item.observation)
                                 : null;
