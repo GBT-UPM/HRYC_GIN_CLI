@@ -28,7 +28,7 @@ const ResponsesProbability = ({ responses, event }) => {
   // eslint-disable-next-line no-unused-vars
   const [encounterId, setEncounterId] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [includeProbability, setIncludeProbability] = useState(false);
+  //const [includeProbability, setIncludeProbability] = useState(false);
 
 
   const { keycloak } = useKeycloak();
@@ -44,7 +44,7 @@ const ResponsesProbability = ({ responses, event }) => {
 
   // Verifica si hay masa anexial
   const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
-  const calcularScore = responses[0]?.item?.some(resp => resp.linkId?.toLowerCase() === "ma_prob" && resp.answer?.[0]?.valueCoding?.display !== "No");
+  const calcularScore = responses[0]?.item?.some(resp => resp.linkId?.toLowerCase() === "MA_PROB".toLowerCase() && resp.answer?.[0]?.valueCoding?.display !== "No");
 
   //console.log("La variable calcularScore: " + calcularScore);
   //console.log(hasMassInReports)
