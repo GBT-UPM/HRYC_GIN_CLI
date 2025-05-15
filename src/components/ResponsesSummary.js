@@ -81,6 +81,7 @@ const ResponsesSummary = ({ responses, event }) => {
       const MA_Q_CONTORNO = getValue('MA_Q_CONTORNO');
       const MA_Q_GROSOR = getValue('MA_Q_GROSOR');
       const MA_Q_VASC = getValue('MA_Q_VASC');
+      const MA_PAPS = getValue('MA_PAPS');
       const MA_Q_P = getValue('MA_Q_P');
       const MA_Q_P_M1 = getValue('MA_Q_P_M1');
       const MA_Q_P_M2 = getValue('MA_Q_P_M2');
@@ -126,57 +127,86 @@ const ResponsesSummary = ({ responses, event }) => {
 
         report += `Anejo derecho de ${OD_M1} x ${OD_M2} mm con ${OD_FOL} folículo/s.\n `;
         report += `Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL} folículo/s.\n`;
-      
-      } else {    //Si SÍ hay masa anexial
-          if (MA_TIPO === 'sólida') {   //Masa anexial SÓLIDA
+        
+        return {
+          text: report
+        };
+      } else {  //Si SÍ hay masa anexial
+          const estructurasFemeninas = ['trompa'];
+          if (['sólida', 'quística', 'sólido-quística'].includes(MA_TIPO)) {
+            let dependencia = '';
+            const contorno = MA_TIPO === 'sólida' ? MA_SOL_CONTORNO : MA_Q_CONTORNO;
+
+            // Vascularización sólo para masas sólidas
+            let vascularizacion_MA_SOL = '';
+            if (MA_TIPO === 'sólida') {
+              vascularizacion_MA_SOL = MA_SOL_VASC === 'ninguno (score color 1)' 
+                ? ' Es <b>avascular</b>' 
+                : ` Su grado de vascularización es <b>${MA_SOL_VASC}</b>.`;
+            }
             if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {   //Estructura o lateralidad INDEFINIDAS
-              report += `De dependencia indefinida, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO}, de contenido ${MA_CONTENIDO} y vascularización ${MA_SOL_VASC}.\n`; 
-            } else {    
-              report += `Dependiente de ${MA_ESTRUCTURA} en lado ${MA_LADO}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO}, de contenido ${MA_CONTENIDO} y vascularización ${MA_SOL_VASC}.\n`;
-            }
-          } else if (MA_TIPO === 'quística' || MA_TIPO === 'sólido_quística') {   //Masa anexial QUÍSTICA o SÓLIDO-QUÍSTICA
-            if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {     //Estructura o lateralidad INDEFINIDAS
-              report += `De dependencia indefinida, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_Q_CONTORNO} y de contenido ${MA_CONTENIDO}.\n`;
+              dependencia = 'De dependencia <b>indefinida</b>';
             } else {
-              report += `Dependiente de ${MA_ESTRUCTURA} en lado ${MA_LADO}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} mm³) de aspecto ${MA_TIPO} de contorno ${MA_SOL_CONTORNO} y de contenido ${MA_CONTENIDO}.\n`;
+              const estructura = MA_ESTRUCTURA;
+              const lado = estructurasFemeninas.includes(estructura) 
+                ? (MA_LADO === 'derecho' ? 'derecha' : MA_LADO === 'izquierdo' ? 'izquierda' : MA_LADO) : MA_LADO;
+              dependencia = `Dependiente de <b>${estructura}</b> <b>${lado}</b>`;
             }
-            
-            report += `La pared mide ${MA_Q_GROSOR} y su vascularización es ${MA_Q_VASC}.\n`;
-
-            if (MA_Q_CONTORNO === 'irregular') {    //Contorno irregular.
-              report += `Contiene ${MA_Q_P} papila/s, la mayor de ellas de ${MA_Q_P_M1} x ${MA_Q_P_M2} mm de morfología ${MA_Q_P_CONTORNO}, con vascularización ${MA_Q_P_VASC}.\n`;
+            report += `${dependencia}, se objetiva formación de <b>${MA_M1} x ${MA_M2} x ${MA_M3} mm</b> <b>(${MA_VOL} cm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${contorno}</b> y de contenido <b>${MA_CONTENIDO}</b>.${vascularizacion_MA_SOL}.<br/>`;
+          
+            // Información adicional para masas quísticas y sólido-quísticas
+            let vascularizacion_MA_Q = '';	
+            if (MA_TIPO === 'quística' || MA_TIPO === 'sólido-quística') {
+              vascularizacion_MA_Q = MA_Q_VASC === 'ninguno (score color 1)' 
+                ? ' y es <b>avascular</b>' 
+                : ` y su grado de vascularización es <b>${MA_Q_VASC}</b>`;
+              report += `La pared mide <b>${MA_Q_GROSOR} mm</b>${vascularizacion_MA_Q}. El contorno es <b>${MA_Q_CONTORNO}</b>.<br/>`;
+              // Papilas
+              let vascularizacion_papila = '';
+              vascularizacion_papila = MA_Q_P_VASC === 'ninguno (score color 1)'
+                ? '<b>avascular</b>'
+                : `con grado de vascularización <b>${MA_Q_P_VASC}</b>.`;
+              if (MA_PAPS === 'sí') {    
+                report += `Contiene <b>${MA_Q_P} papila/s</b>, la mayor de ellas de <b>${MA_Q_P_M1} x ${MA_Q_P_M2} mm</b> de morfología <b>${MA_Q_P_CONTORNO}</b> y ${vascularizacion_papila}</b>.<br/>`;
+              }
+              //Tabiques.
+              let vascularizacion_tabiques = '';
+              vascularizacion_tabiques= MA_Q_T_VASC === 'ninguno (score color 1)' 
+                ? ' y <b>avasculares</b>' 
+                : ` y su grado de vascularización es <b>${MA_Q_T_VASC}</b>`;
+              if (MA_Q_T === 'sí') {      
+                report += `Los tabiques son <b>${MA_Q_T_TIPO}</b>, de grosor <b>${MA_Q_T_GROSOR} mm</b>${vascularizacion_tabiques}</b>. La formación tiene <b>${MA_Q_T_N} lóculo/s</b>.<br/>`;
+              }
+              //Área sólida.
+              let vascularizacion_AS = '';
+              vascularizacion_AS= MA_Q_AS_VASC === 'ninguno (score color 1)' 
+                ? 'y es <b>avascular</b>' 
+                : `con grado de vascularización <b>${MA_Q_AS_VASC}</b>`;
+              if (MA_Q_AS === 'sí') {   
+                report += `Contiene <b>${MA_Q_AS_N} porción/es sólida/s</b>, la mayor de ellas tiene un tamaño de <b>${MA_Q_AS_M1} x ${MA_Q_AS_M2} x ${MA_Q_AS_M3} mm</b> ${vascularizacion_AS}.<br/>`;
+              }
             }
-            
-            if (MA_Q_T === 'sí') {      //Presencia de tabiques.
-              report += `Los tabiques son ${MA_Q_T_TIPO}, de grosor ${MA_Q_T_GROSOR} y vascularización ${MA_Q_T_VASC}. La formación tiene ${MA_Q_T_N} lóculos.\n`;
+            //Esto ya no depende del tipo de masa anexial.
+            if (MA_SA === 'sí') {   //Sombra acústica posterior.
+            report += `Presenta sombra posterior.<br/>`;
             }
-
-            if (MA_Q_AS === 'sí') {   //Área sólida.
-              report += `Contiene ${MA_Q_AS_N} porción/es sólida/s, la mayor de ellas tiene un tamaño de ${MA_Q_AS_M1} x ${MA_Q_AS_M2} x ${MA_Q_AS_M3} mm con vascularización ${MA_Q_AS_VASC}.\n`;
+            if (MA_PS === 'sí') {   //Parénquima ovárico sano.
+              report += `Tiene parénquima ovárico sano, de tamaño <b>${MA_PS_M1} x ${MA_PS_M2} x ${MA_PS_M3} mm</b>.<br/>`;
             }
-          }
-          //Esto ya no depende del tipo de masa anexial.
-
-          if (MA_SA === 'sí') {   //Sombra acústica posterior.
-            report += `Presenta sombra posterior.\n`;
-          }
-
-          if (MA_PS === 'sí') {   //Parénquima ovárico sano.
-            report += `Tiene parénquima ovárico sano, de tamaño ${MA_PS_M1} x ${MA_PS_M2} x ${MA_PS_M3} mm.\n`;      
-          }
-
-          if (MA_ASC === 'sí') {    //Ascitis.
-            report += `Presenta ascitis de tipo ${MA_ASC_TIPO}.\n`;
-          }
-
-          if (MA_CARC === 'sí') {   //Carcinomatosis.
-            report += 'Hay carcinomatosis.\n';
-          }
-
-          report += `La probabilidad de que la masa anexial sea maligna es de ${RES_SCORE}. \n`;
+            if (MA_ASC === 'sí') {    //Ascitis.
+              report += `Presenta ascitis de tipo <b>${MA_ASC_TIPO}</b>.<br/>`;
+            }
+            if (MA_CARC === 'sí') {   //Carcinomatosis.
+              report += 'Hay carcinomatosis.<br/>';
+            }
+            //report += `La probabilidad de que la masa anexial sea maligna es de ${(RES_SCORE ?? 0)* 100}%. \n`;
         }
-
-        return report;
+      }
+        return {
+          text: report,
+          score: RES_SCORE,
+          text_score: `La probabilidad de que la masa anexial sea maligna es de ${(RES_SCORE ?? 0)* 100}%.`,
+        };
     };
 
     return (
