@@ -28,6 +28,7 @@ const ResponsesProbability = ({ responses, event }) => {
   // eslint-disable-next-line no-unused-vars
   const [encounterId, setEncounterId] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [includeProbability, setIncludeProbability] = useState(false);
 
 
