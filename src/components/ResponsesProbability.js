@@ -101,6 +101,7 @@ const ResponsesProbability = ({ responses, event }) => {
     const MA_VOL = volumen < 0.01 ? volumen.toFixed(3) : volumen.toFixed(2); // Volumen en cm³
     const MA_SOL_CONTORNO = getValue('MA_SOL_CONTORNO');
     const MA_CONTENIDO = getValue('MA_CONTENIDO');
+    const MA_CONTENIDO_OTRO = getValue('MA_CONTENIDO_OTRO'); // Otro contenido.
     const MA_SOL_VASC = getValue('MA_SOL_VASC');
     const MA_Q_CONTORNO = getValue('MA_Q_CONTORNO');
     const MA_Q_GROSOR = getValue('MA_Q_GROSOR');
@@ -166,7 +167,7 @@ const ResponsesProbability = ({ responses, event }) => {
           let vascularizacion_MA_SOL = '';
           if (MA_TIPO === 'sólida') {
             vascularizacion_MA_SOL = MA_SOL_VASC === 'ninguno (score color 1)' 
-              ? ' Es <b>avascular</b>' 
+              ? ' Es <b>avascular</b>.' 
               : ` Su grado de vascularización es <b>${MA_SOL_VASC}</b>.`;
           }
           if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {   //Estructura o lateralidad INDEFINIDAS
@@ -177,7 +178,8 @@ const ResponsesProbability = ({ responses, event }) => {
               ? (MA_LADO === 'derecho' ? 'derecha' : MA_LADO === 'izquierdo' ? 'izquierda' : MA_LADO) : MA_LADO;
             dependencia = `Dependiente de <b>${estructura}</b> <b>${lado}</b>`;
           }
-          report += `${dependencia}, se objetiva formación de <b>${MA_M1} x ${MA_M2} x ${MA_M3} mm</b> <b>(${MA_VOL} cm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${contorno}</b> y de contenido <b>${MA_CONTENIDO}</b>.${vascularizacion_MA_SOL}.<br/>`;
+          const contenido = MA_CONTENIDO === 'otro' ? MA_CONTENIDO_OTRO : {MA_CONTENIDO};
+          report += `${dependencia}, se objetiva formación de <b>${MA_M1} x ${MA_M2} x ${MA_M3} mm</b> <b>(${MA_VOL} cm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${contorno}</b> y de contenido <b>${contenido}</b>.${vascularizacion_MA_SOL}<br/>`;
           
           // Información adicional para masas quísticas y sólido-quísticas
           let vascularizacion_MA_Q = '';	
@@ -640,7 +642,7 @@ const ResponsesProbability = ({ responses, event }) => {
   
       addField("Nombre:", patientName);
       addField("NHC:", patientNHC);
-      addField("Edad:", patientAge.toString());
+      //addField("Edad:", patientAge.toString());
       addField("FUR:", formatDate(patientFUR));
   
       const addSectionWithAutoBreak = (title, text) => {
@@ -664,7 +666,15 @@ const ResponsesProbability = ({ responses, event }) => {
         }
       };
   
-      addSectionWithAutoBreak("Indicación de la ecografía:", indicacion);
+      //addSectionWithAutoBreak("Indicación de la ecografía:", indicacion);
+      let indicacionFinal = indicacion;
+      if (indicacion.trim() === "otro" && indicacion_otro.trim() !== "") {
+        indicacionFinal = indicacion_otro.trim();
+      }
+      const edadText = patientAge ? `${patientAge} años` : "de edad desconocida";
+      const indicacionText = `Mujer de ${edadText} que acude a consulta de ecografía para valoración por ${indicacionFinal}.`;
+
+      addSectionWithAutoBreak("Indicación de la ecografía:", indicacionText);
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       checkAndAddPage(doc, 10);
@@ -763,22 +773,62 @@ const ResponsesProbability = ({ responses, event }) => {
           {/* Mostrar SÓLO si hay masa anexial */}
           {hasMassInReports && <h4>Masa anexial #{index + 1}</h4>}
 
-          {/* Mostrar SÓLO si hay masa anexial */}
-          {hasMassInReports && calcularScore && (
-            <div className="parts">
-              <span className='tlabel'>Probabilidad de malignidad: </span>
-              <span className='text' dangerouslySetInnerHTML={{ __html: ((report.score ?? 0)* 100).toFixed(2) + '%' }} />
-            </div>
-
-          )}
-
           {/* SIEMPRE se muestra */}
           <div className="parts">
             <div className='tlabel'>Informe:</div>
             <div className='text' dangerouslySetInnerHTML={{ __html: report.text }} />
           </div>
-          {/* Campo de texto para observación */}
 
+          {/* Mostrar SÓLO si hay masa anexial
+          {hasMassInReports && calcularScore && (
+            <div className="parts">
+              <span className='tlabel'>Probabilidad de malignidad: </span>
+              <span className='text' dangerouslySetInnerHTML={{ __html: ((report.score ?? 0)* 100).toFixed(2) + '%' }} />
+            </div>
+          )} */}
+
+          {/* Mostrar SÓLO si hay masa anexial
+          {hasMassInReports && calcularScore && (
+            <div className="parts">
+              <span className='tlabel'>Probabilidad de malignidad: </span>
+              <span className='text' dangerouslySetInnerHTML={{ __html: ((report.score ?? 0)* 100).toFixed(2) + '%' }} />
+              <span 
+                title='Probabilidad de malignidad orientativa calculada según datos ecográficos aportados y fórmula publicada en Rodríguez-Rubio C, Vegas-Viedma S, Del Olmo-Reillo M, Quintana-Zapata P, Sancho-Sauco J, Pablos-Antona MJ, Alcázar JL, Pelayo-Delgado I. ECO-SCORE: Development of a New Ultrasound Score for the Study of Cystic and Solid-Cystic Adnexal Masses Based on Imaging Characteristics. Biomedicines. 2025 Jan 29;13(2):317. doi: 10.3390/biomedicines13020317.'
+                style={{ marginLeft: '6px', cursor:'help', color: '#555' }}
+                >
+                ℹ️
+              </span>
+            </div>
+          )} */}
+
+          {/* Mostrar SÓLO si hay masa anexial */}
+          {hasMassInReports && calcularScore && (
+            <div className="parts">
+              <span className='tlabel'>Probabilidad de malignidad: </span>
+              <span className='text' dangerouslySetInnerHTML={{ __html: ((report.score ?? 0)* 100).toFixed(2) + '%' }} />
+              <span className='tooltip-container'>
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  fill="currentColor"
+                  className="info-icon"
+                  viewBox="0 0 16 16"
+                >
+                  <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14z"/>
+                  <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.098-.252 1.293-.597l.088-.416c-.287.346-.567.548-.873.548-.275 0-.375-.194-.304-.527l.738-3.468c.194-.897-.105-1.319-.808-1.319z"/>
+                  <circle cx="8" cy="4.5" r="1"/>
+                </svg>
+                <span className='tooltip-text'>
+                    Probabilidad de malignidad orientativa calculada según datos ecográficos aportados y fórmula publicada en Rodríguez-Rubio C, Vegas-Viedma S, Del Olmo-Reillo M, Quintana-Zapata P, Sancho-Sauco J, Pablos-Antona MJ, Alcázar JL, Pelayo-Delgado I. ECO-SCORE: Development of a New Ultrasound Score for the Study of Cystic and Solid-Cystic Adnexal Masses Based on Imaging Characteristics. Biomedicines. 2025 Jan 29;13(2):317. doi: 10.3390/biomedicines13020317.
+                </span>
+              </span>
+            </div>
+          )}
+
+
+
+          {/* Campo de texto para observación */}
           <div className="parts">
             <div className='tlabel'>Conclusión del ecografista:</div>
             <div className='text'>

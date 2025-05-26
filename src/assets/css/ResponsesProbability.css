@@ -15,3 +15,41 @@
   font-weight: bold;
   font-size: medium;
 }
+.tooltip-container {
+  position: relative;
+  display: inline-block;
+  margin-left: 8px;
+}
+/* .tooltip-container:hover .info-icon {
+  color: #4d6378;
+  transform: scale(1.2);
+} */
+.info-icon {
+  color: #4d6378;
+  cursor: pointer;
+  font-size: 20px;
+  /* transition: color 0.3s, transform 0.3s; */
+}
+.tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  background-color: #333;
+  color: #fff;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  width: 260px;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%; /* Posición del tooltip sobre el icono */
+  left: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 0px 10px rgba(0, 0, 0, 0.25);
+  transition: opacity 0.3s;
+}
+/* Mostrar tooltip cuando el contenedor está en hover */
+.tooltip-container:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}

@@ -475,6 +475,7 @@ const renderInput = (item) => {
       "PAT_EDAD", // Edad
       "PAT_FUR", // FUR
       "PAT_IND", // Indicación ecografía
+      "PAT_IND_OTRO", // Indicación ecografía otro
       "PAT_MA",  // ¿Hay alguna masa anexial?
       "MA_PROB" // Probabilidad
     ];
