@@ -8,7 +8,18 @@ const Header = (props) => {
   <div class="logo-section">
     <img src={LogoHRYC} alt="Logo" class="logo"/>
     <img src={LogoIrycis} alt="Logo" class="logo"/>    
-    <span class="app-name">ECO-DATA</span>
+    {/* <span class="app-name">GEMA</span> */}
+    <span
+      style={{
+        fontSize: '24px',
+        fontWeight: 'bold',
+        letterSpacing: '1px'
+      }}
+    >
+    GEMA 
+    </span>
+
+
   </div>
   
   <div class="user-section">

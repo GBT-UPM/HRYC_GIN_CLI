@@ -618,6 +618,7 @@ const ResponsesProbability = ({ responses, event }) => {
       const patientAge = getResponse("PAT_EDAD");
       const patientFUR = getResponse("PAT_FUR");
       const indicacion = getResponse("PAT_IND");
+      const indicacion_otro = getResponse("PAT_IND_OTRO");
   
       let yPosition = 50;
       doc.setFontSize(12);
