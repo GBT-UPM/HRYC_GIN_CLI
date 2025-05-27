@@ -60,7 +60,7 @@ const EncountersScreen = () => {
         const date = new Date(dateStr);
         return isNaN(date) ? '' : date.toLocaleDateString('es-ES');
     };
-    const handlePrintButtonClick = (responses, observations) => {
+    const handlePrintButtonClick = (responses, observations, practitionerName) => {
         try {
 
             const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
@@ -211,7 +211,7 @@ const EncountersScreen = () => {
             doc.setFont("helvetica", "italic");
             doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
             doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
-            const practitionerName = sessionStorage.getItem('practitionerName');
+            //const practitionerName = sessionStorage.getItem('practitionerName');
             doc.text("Ecografista: " + practitionerName, 10, 270);
 
             doc.autoPrint();
@@ -433,10 +433,10 @@ const EncountersScreen = () => {
         }
     });
     // Función para abrir el modal con el detalle del cuestionario
-    const handleRowClick = (questionnaireResponse, observations) => {
+    const handleRowClick = (questionnaireResponse, observations, practitionerName) => {
         console.log("questionnaireResponse", JSON.parse(questionnaireResponse))
         setSelectedQuestionnaire(JSON.parse(questionnaireResponse));
-        handlePrintButtonClick(JSON.parse(questionnaireResponse), JSON.parse(observations));
+        handlePrintButtonClick(JSON.parse(questionnaireResponse), JSON.parse(observations),practitionerName);
         //  setOpenModal(true);
     };
     // Abrir modal de edición
@@ -631,7 +631,7 @@ const EncountersScreen = () => {
                                         <Tooltip title="Ver Detalles">
                                             <IconButton
                                                 color="primary"
-                                                onClick={() => handleRowClick(item.questionnaireResponse, item.observation)}
+                                                onClick={() => handleRowClick(item.questionnaireResponse, item.observation, item.practitionerName)}
                                             >
                                                 <LocalPrintshopIcon />
                                             </IconButton>
