@@ -591,7 +591,8 @@ const ResponsesProbability = ({ responses, event }) => {
         const answer = responses[0].item.find(
           (resp) => resp.linkId.toLowerCase() === key.toLowerCase()
         )?.answer?.[0];
-  
+        
+        console.log(`Respuesta para ${key}:`, answer);
         return (
           answer?.valueString ||
           answer?.valueInteger ||
@@ -668,9 +669,10 @@ const ResponsesProbability = ({ responses, event }) => {
   
       //addSectionWithAutoBreak("Indicación de la ecografía:", indicacion);
       let indicacionFinal = indicacion;
-      if (indicacion.trim() === "otro" && indicacion_otro.trim() !== "") {
+      if (indicacion === "1" && indicacion_otro.trim() !== "") {
         indicacionFinal = indicacion_otro.trim();
       }
+      indicacionFinal = indicacionFinal.toLowerCase()
       const edadText = patientAge ? `${patientAge} años` : "de edad desconocida";
       const indicacionText = `Mujer de ${edadText} que acude a consulta de ecografía para valoración por ${indicacionFinal}.`;
 
