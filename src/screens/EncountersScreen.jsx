@@ -25,7 +25,6 @@ import { useObservationHistologyTemplate } from '../hooks/useObservationHistolog
 import { v4 as uuidv4 } from "uuid";
 import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
-import { faBullseye } from '@fortawesome/free-solid-svg-icons';
 // Datos de ejemplo (pueden ser obtenidos de una API)
 
 
