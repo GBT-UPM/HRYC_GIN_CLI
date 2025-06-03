@@ -192,7 +192,7 @@ const ResponsesProbability = ({ responses, event }) => {
             let vascularizacion_papila = '';
             vascularizacion_papila = MA_Q_P_VASC === 'ninguno (score color 1)'
               ? '<b>avascular</b>'
-              : `con grado de vascularización <b>${MA_Q_P_VASC}</b>.`;
+              : `con grado de vascularización <b>${MA_Q_P_VASC}</b>`;
             if (MA_PAPS === 'sí') {    
               report += `Contiene <b>${MA_Q_P} papila/s</b>, la mayor de ellas de <b>${MA_Q_P_M1} x ${MA_Q_P_M2} mm</b> de morfología <b>${MA_Q_P_CONTORNO}</b> y ${vascularizacion_papila}</b>.<br/>`;
             }
