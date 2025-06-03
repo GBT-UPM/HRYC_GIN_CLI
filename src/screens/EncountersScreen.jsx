@@ -25,6 +25,7 @@ import { useObservationHistologyTemplate } from '../hooks/useObservationHistolog
 import { v4 as uuidv4 } from "uuid";
 import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
+import { faBullseye } from '@fortawesome/free-solid-svg-icons';
 // Datos de ejemplo (pueden ser obtenidos de una API)
 
 
@@ -45,6 +46,8 @@ const EncountersScreen = () => {
     const [pathologyReport, setPathologyReport] = useState('');
     const [histology, setHistology] = useState('');
     const [selectedRow, setSelectedRow] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [pendingPrintData, setPendingPrintData] = useState(null);
     const { generateObservation } = useObservationHistologyTemplate();
     /*    const histologyOptions = {
             "Benigno": { code: "37310001", display: "Benign neoplasm (disorder)" },
@@ -60,9 +63,9 @@ const EncountersScreen = () => {
         const date = new Date(dateStr);
         return isNaN(date) ? '' : date.toLocaleDateString('es-ES');
     };
-    const handlePrintButtonClick = (responses, observations, practitionerName) => {
+    const handlePrintButtonClick = (includeProbability, responses, observations, practitionerName) => {
         try {
-
+            console.log("include Prbability: ", includeProbability);
             const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
             console.log("hasMassInReports", hasMassInReports);
 
@@ -481,10 +484,10 @@ const EncountersScreen = () => {
         }
     });
     // Función para abrir el modal con el detalle del cuestionario
-    const handleRowClick = (questionnaireResponse, observations, practitionerName) => {
+    const handleRowClick = (questionnaireResponse, observations, practitionerName, includeProbability) => {
         console.log("questionnaireResponse", JSON.parse(questionnaireResponse))
         setSelectedQuestionnaire(JSON.parse(questionnaireResponse));
-        handlePrintButtonClick(JSON.parse(questionnaireResponse), JSON.parse(observations),practitionerName);
+        handlePrintButtonClick(includeProbability, JSON.parse(questionnaireResponse), JSON.parse(observations),practitionerName);
         //  setOpenModal(true);
     };
     // Abrir modal de edición
@@ -501,6 +504,7 @@ const EncountersScreen = () => {
         if (answer.valueInteger) return answer.valueInteger.toString();
         if (answer.valueDecimal) return answer.valueDecimal.toString();
         if (answer.valueBoolean) return answer.valueBoolean ? "Sí" : "No";
+        if (answer.valueCoding) return answer.valueCoding.code;
         return "No disponible";
     };
     // Paginación de datos
@@ -628,7 +632,9 @@ const EncountersScreen = () => {
                                 if (!qItem || !Array.isArray(qItem.answer) || qItem.answer.length === 0) return null;
                                 return getAnswerValue(qItem.answer[0]);
                             };
-                            const hasMass = getAnswerByLinkId(item.questionnaireResponse, "PAT_MA") === "1";
+                            const hasMass = getAnswerByLinkId(item.questionnaireResponse, "PAT_MA") === "Sí";
+                            // console.log("hasMass en encounters = " + hasMass)
+                            // console.log("getAnswerByLinkId: " + getAnswerByLinkId(item.questionnaireResponse, "PAT_MA"))
                             return (
                                 <TableRow
                                     className="table-row"
@@ -676,15 +682,40 @@ const EncountersScreen = () => {
                                                 </IconButton>
                                             </Tooltip>
                                         )}
-                                        <Tooltip title="Ver Detalles">
+                                        <Tooltip title="Imprimir informe">
                                             <IconButton
                                                 color="primary"
-                                                onClick={() => handleRowClick(item.questionnaireResponse, item.observation, item.practitionerName)}
+                                                // Abrir modal para dar posibilidad de incluir probabilidad en el informe
+                                                onClick={() => {
+                                                    const parsedArray = typeof item.questionnaireResponse === 'string'
+                                                     ? JSON.parse(item.questionnaireResponse) : item.questionnaireResponse;
+                                                    const parsedResponse = parsedArray[0];
+                                                    const patMaItem = parsedResponse?.item?.find((r) => r.linkId === 'PAT_MA');
+                                                    let hasMass = false;
+                                                    if (patMaItem?.answer?.[0]) {
+                                                        const answer = patMaItem.answer[0];
+                                                        hasMass = 
+                                                            (answer.valueCoding?.display === "Sí") ||
+                                                            (answer.valueString === "1") ||
+                                                            (answer.valueCoding?.code === "1");
+                                                    }
+                                                    console.log("hasMass en encounters = " + hasMass)
+
+                                                    if (hasMass) {
+                                                        setPendingPrintData({
+                                                            responses: item.questionnaireResponse,
+                                                            observations: item.observation,
+                                                            practitionerName: item.practitionerName
+                                                        });
+                                                        setIsModalOpen(true);
+                                                    } else {
+                                                        handleRowClick(item.questionnaireResponse, item.observation, item.practitionerName, false);
+                                                    }
+                                                }}
                                             >
                                                 <LocalPrintshopIcon />
                                             </IconButton>
                                         </Tooltip>
-
                                     </TableCell>
                                 </TableRow>
                             );
@@ -771,6 +802,47 @@ const EncountersScreen = () => {
                     >
                         Cancelar
                     </Button>
+                </Box>
+            </Modal>
+            {/* Modal para imprimir el informe */}
+            <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)}>
+                <Box sx={{ p: 4, backgroundColor: 'white', borderRadius: 2, maxWidth: 400, mx: 'auto', my: '20%' }}>
+                    <Typography variant="h6" gutterBottom>
+                        Confirmación
+                    </Typography>
+                    <Typography sx={{ mt: 2}}>
+                        ¿Desea incluir la probabilidad de malignidad en el informe?
+                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                        <Button variant="contained" color="primary"
+                            onClick={() => {
+                                handleRowClick(
+                                    pendingPrintData.responses,
+                                    pendingPrintData.observations,
+                                    pendingPrintData.practitionerName,
+                                    true
+                                );
+                                setPendingPrintData(null);
+                                setIsModalOpen(false);
+                            }}
+                        >
+                            Sí
+                        </Button>
+                        <Button variant="outlined" color="secondary" 
+                            onClick={() => {
+                                handleRowClick(
+                                    pendingPrintData.responses,
+                                    pendingPrintData.observations,
+                                    pendingPrintData.practitionerName,
+                                    false
+                                );
+                                setPendingPrintData(null);
+                                setIsModalOpen(false);
+                            }}
+                        >
+                            No
+                        </Button>
+                    </Box>
                 </Box>
             </Modal>
         </Container>

@@ -89,6 +89,7 @@ const ResponsesScreen = () => {
         const MA_VOL = volumen < 0.01 ? volumen.toFixed(3) : volumen.toFixed(2); // Volumen en cm³
         const MA_SOL_CONTORNO = getValue('MA_SOL_CONTORNO');
         const MA_CONTENIDO = getValue('MA_CONTENIDO');
+        const MA_CONTENIDO_OTRO = getValue('MA_CONTENIDO_OTRO'); // Otro contenido.
         const MA_SOL_VASC = getValue('MA_SOL_VASC');
         const MA_Q_CONTORNO = getValue('MA_Q_CONTORNO');
         const MA_Q_GROSOR = getValue('MA_Q_GROSOR');
@@ -141,6 +142,7 @@ const ResponsesScreen = () => {
           report += `<div>Anejo derecho de ${OD_M1} x ${OD_M2} mm con ${OD_FOL} folículo/s.</div>`;
           report += `<div>Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL} folículo/s.</div>`;
         
+          return report;
         } else {    //Si SÍ hay masa anexial
             const estructurasFemeninas = ['trompa'];
             if (['sólida', 'quística', 'sólido-quística'].includes(MA_TIPO)) {
@@ -150,8 +152,8 @@ const ResponsesScreen = () => {
                 //Vascularización sólo para masas sólidas
                 let vascularizacion_MA_SOL = '';
                 if (MA_TIPO === 'sólida') {
-                    vascularizacion_MA_SOL = MA_SOL_VASC === 'nula (score color 1)'
-                        ? ' Es avascular'
+                    vascularizacion_MA_SOL = MA_SOL_VASC === 'ninguno (score color 1)'
+                        ? ' Es avascular.'
                         : ` Su grado de vascularización es ${MA_SOL_VASC  === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_SOL_VASC}.`;
                 }
                 if (MA_ESTRUCTURA === 'indefinido' || MA_LADO === 'indefinido') {   //Estructura o lateralidad INDEFINIDAS
@@ -162,28 +164,29 @@ const ResponsesScreen = () => {
                         ? (MA_LADO === 'derecho' ? 'derecha' : MA_LADO === 'izquierdo' ? 'izquierda' : MA_LADO) : MA_LADO;
                     dependencia = `Dependiente de ${estructura} ${lado}`;
                 }
-                report += `<div>${dependencia}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} cm³) de aspecto ${MA_TIPO} de contorno ${contorno} y de contenido ${MA_CONTENIDO}.${vascularizacion_MA_SOL}.</div>`;
+                const contenido = MA_CONTENIDO === 'otro' ? MA_CONTENIDO_OTRO : MA_CONTENIDO;
+                report += `<div>${dependencia}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} cm³) de aspecto ${MA_TIPO} de contorno ${contorno} y de contenido ${contenido}.${vascularizacion_MA_SOL}</div>`;
 
                 // Información adicional para masas quísticas y sólido-quísticas 
                 let vascularizacion_MA_Q = '';
                 if (MA_TIPO === 'quística' || MA_TIPO === 'sólido-quística') {
-                    vascularizacion_MA_Q = MA_Q_VASC === 'nula (score color 1)'
+                    vascularizacion_MA_Q = MA_Q_VASC === 'ninguno (score color 1)'
                         ? ' y es avascular'
-                        : ` y su grado de vascularización es ${MA_Q_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_VASC}.`;
+                        : ` y su grado de vascularización es ${MA_Q_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_VASC}`;
                     report += `<div>La pared mide ${MA_Q_GROSOR} mm ${vascularizacion_MA_Q}. El contorno es ${MA_Q_CONTORNO}.</div>`;
                     // Papilas
                     let vascularizacion_papila = '';
-                    vascularizacion_papila = MA_Q_P_VASC === 'nula (score color 1)'
+                    vascularizacion_papila = MA_Q_P_VASC === 'ninguno (score color 1)'
                         ? 'avascular'
-                        : `con grado de vascularización ${MA_Q_P_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_P_VASC}.`;
+                        : `con grado de vascularización ${MA_Q_P_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_P_VASC}`;
                     if (MA_PAPS === 'sí') {    
                     report += `<div>Contiene ${MA_Q_P} papila/s, la mayor de ellas de ${MA_Q_P_M1} x ${MA_Q_P_M2} mm de morfología ${MA_Q_P_CONTORNO} y ${vascularizacion_papila}.</div>`;
                     }
                     // Tabiques
                     let vascularizacion_tabiques = '';
-                    vascularizacion_tabiques = MA_Q_T_VASC === 'nula (score color 1)' 
+                    vascularizacion_tabiques = MA_Q_T_VASC === 'ninguno (score color 1)' 
                         ? ' y avasculares' 
-                        : ` y su grado de vascularización es ${MA_Q_T_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_T_VASC}.`;
+                        : ` y su grado de vascularización es ${MA_Q_T_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_T_VASC}`;
                     if (MA_Q_T === 'sí') {
                         report += `<div>Los tabiques son ${MA_Q_T_TIPO}, de grosor ${MA_Q_T_GROSOR} mm${vascularizacion_tabiques}. La formación tiene ${MA_Q_T_N} lóculo/s.</div>`;
                     }
@@ -191,7 +194,7 @@ const ResponsesScreen = () => {
                     let vascularizacion_AS = '';
                     vascularizacion_AS= MA_Q_AS_VASC === 'ninguno (score color 1)' 
                         ? 'y es avascular' 
-                        : `con grado de vascularización ${MA_Q_AS_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_AS_VASC}.`;
+                        : `con grado de vascularización ${MA_Q_AS_VASC === 'moderada (score color 3)' ? 'moderado (score color 3)' : MA_Q_AS_VASC}`;
                     if (MA_Q_AS === 'sí') {
                         report += `<div>Contiene ${MA_Q_AS_N} porción/es sólida/s, la mayor de ellas tiene un tamaño de ${MA_Q_AS_M1} x ${MA_Q_AS_M2} x ${MA_Q_AS_M3} mm ${vascularizacion_AS}.</div>`;
                     }
