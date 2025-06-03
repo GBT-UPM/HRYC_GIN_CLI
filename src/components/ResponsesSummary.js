@@ -154,7 +154,7 @@ const ResponsesSummary = ({ responses, event }) => {
               dependencia = `Dependiente de <b>${estructura}</b> <b>${lado}</b>`;
             }
             const contenido = MA_CONTENIDO === 'otro' ? MA_CONTENIDO_OTRO : {MA_CONTENIDO};
-            report += `${dependencia}, se objetiva formación de <b>${MA_M1} x ${MA_M2} x ${MA_M3} mm</b> <b>(${MA_VOL} cm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${contorno}</b> y de contenido <b>${contenido}</b>.${vascularizacion_MA_SOL}.<br/>`;
+            report += `HOLAAAAA ${dependencia}, se objetiva formación de <b>${MA_M1} x ${MA_M2} x ${MA_M3} mm</b> <b>(${MA_VOL} cm³)</b> de aspecto <b>${MA_TIPO}</b> de contorno <b>${contorno}</b> y de contenido <b>${contenido}</b>.${vascularizacion_MA_SOL}.<br/>`;
           
             // Información adicional para masas quísticas y sólido-quísticas
             let vascularizacion_MA_Q = '';	
