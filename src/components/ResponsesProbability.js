@@ -808,27 +808,13 @@ const ResponsesProbability = ({ responses, event }) => {
             <div className="parts">
               <span className='tlabel'>Probabilidad de malignidad: </span>
               <span className='text' dangerouslySetInnerHTML={{ __html: ((report.score ?? 0)* 100).toFixed(2) + '%' }} />
-              <span className='tooltip-container'>
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  fill="currentColor"
-                  className="info-icon"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14z"/>
-                  <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.098-.252 1.293-.597l.088-.416c-.287.346-.567.548-.873.548-.275 0-.375-.194-.304-.527l.738-3.468c.194-.897-.105-1.319-.808-1.319z"/>
-                  <circle cx="8" cy="4.5" r="1"/>
-                </svg>
-                <span className='tooltip-text'>
-                    Probabilidad de malignidad orientativa calculada según datos ecográficos aportados y fórmula publicada en Rodríguez-Rubio C, Vegas-Viedma S, Del Olmo-Reillo M, Quintana-Zapata P, Sancho-Sauco J, Pablos-Antona MJ, Alcázar JL, Pelayo-Delgado I. ECO-SCORE: Development of a New Ultrasound Score for the Study of Cystic and Solid-Cystic Adnexal Masses Based on Imaging Characteristics. Biomedicines. 2025 Jan 29;13(2):317. doi: 10.3390/biomedicines13020317.
-                </span>
-              </span>
+              <p style={{ fontSize: '0.70em', color: '#555', marginTop: '5px' }}>
+                <em>
+                  (Rodríguez-Rubio C, Vegas-Viedma S, Del Olmo-Reillo M, Quintana-Zapata P, Sancho-Sauco J, Pablos-Antona MJ, Alcázar JL, Pelayo-Delgado I. ECO-SCORE: Development of a New Ultrasound Score for the Study of Cystic and Solid-Cystic Adnexal Masses Based on Imaging Characteristics. Biomedicines. 2025 Jan 29;13(2):317. doi: 10.3390/biomedicines13020317. PMID: 40002730; PMCID: PMC11852474)
+                </em>
+              </p>
             </div>
           )}
-
-
 
           {/* Campo de texto para observación */}
           <div className="parts">
