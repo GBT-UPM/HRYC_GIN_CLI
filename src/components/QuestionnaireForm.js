@@ -476,6 +476,10 @@ const renderInput = (item) => {
       "PAT_FUR", // FUR
       "PAT_IND", // Indicación ecografía
       "PAT_IND_OTRO", // Indicación ecografía otro
+      "ECO_EXP_SIGLAS", // Siglas del ecografista
+      "HOSPITAL_REF", // Hospital de referencia
+      "ECO_EXP", // Ecografista experto
+      "CENTRO_REF", // Centro de referencia
       "PAT_MA",  // ¿Hay alguna masa anexial?
       "MA_PROB" // Probabilidad
     ];
