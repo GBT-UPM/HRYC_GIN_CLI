@@ -345,7 +345,7 @@ const ResponsesScreen = () => {
         <Container className="container">
 
             <Typography variant="h4" gutterBottom>
-                📋 Lista de Informes
+                📋 Lista de Cuestionarios
             </Typography>
             {/* Campo de búsqueda */}
             <TextField

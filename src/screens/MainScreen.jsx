@@ -64,7 +64,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
         {[
           { label: 'Pacientes Atendidos', icon: <People fontSize="large" color="primary" />, count: counts.Patient, tooltip: 'Número total de pacientes registrados en el sistema.' },
           { label: 'Citas Cursadas', icon: <CalendarMonth fontSize="large" color="success" />, count: counts.Encounter, tooltip: 'Total de citas clínicos realizadas.' },
-          { label: 'Informes Registrados', icon: <MedicalInformation fontSize="large" color="warning" />, count: counts.QuestionnaireResponse, tooltip: 'Informes completados durante las visitas.' },
+          { label: 'Cuestionarios Realizados', icon: <MedicalInformation fontSize="large" color="warning" />, count: counts.QuestionnaireResponse, tooltip: 'Informes completados durante las visitas.' },
           { label: 'Masas Anexiales', icon: <LocalHospital fontSize="large" color="error" />, count: counts.RiskAssessment, tooltip: 'Casos en los que se ha evaluado riesgo de masa anexial.' },
         ].map(({ label, icon, count,tooltip }, index) => (
           <Grid2 item xs={12} sm={6} md={4} key={index} sx={{ display: 'flex' }}>
@@ -111,7 +111,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
                 '&:hover': {
                   backgroundColor: '#bd5806', // color al pasar el cursor
                 },
-              }}>Revisar Informes </Button>
+              }}>Revisar Cuestionarios </Button>
               <Button onClick={handleEncountersClick} variant="contained" sx={{
                 backgroundColor: '#2e7d32', // color personalizado
                 color: '#fff',              // color del texto

@@ -547,7 +547,7 @@ const EncountersScreen = () => {
         <Container className="container">
 
             <Typography variant="h4" gutterBottom>
-                📋 Lista de Citas cursadas
+                📋 Lista de Citas Cursadas
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
