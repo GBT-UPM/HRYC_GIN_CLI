@@ -73,7 +73,7 @@ const DownloadScreen = () => {
                     alignItems="center"
                     sx={{ px: 4, py: 2 }}
                 >
-                    <Tooltip title="Descargar respuestas completados en formato csv">
+                    <Tooltip title="Descargar cuestionarios completados en formato CSV">
                         <Box
                             component="img"
                             src={dq}
@@ -82,7 +82,7 @@ const DownloadScreen = () => {
                         />
                     </Tooltip>
                     <Typography variant="subtitle1" sx={{ mt: 2, textTransform: 'uppercase' }}>
-                        Descargar respuestas
+                        Descargar cuestionarios
                     </Typography>
                 </Grid2>
 
@@ -101,7 +101,7 @@ const DownloadScreen = () => {
                     alignItems="center"
                     sx={{ px: 4, py: 2 }}
                 >
-                    <Tooltip title="Descargar resultados y observaciones por paciente en formato csv">
+                    <Tooltip title="Descargar resultados y observaciones por paciente en formato CSV">
                         <Box
                             component="img"
                             src={du}
@@ -110,7 +110,7 @@ const DownloadScreen = () => {
                         />
                     </Tooltip>
                     <Typography variant="subtitle1" sx={{ mt: 2, textTransform: 'uppercase' }}>
-                        Descargar resultados pacientes
+                        Descargar resultados de pacientes
                     </Typography>
                 </Grid2>
 
