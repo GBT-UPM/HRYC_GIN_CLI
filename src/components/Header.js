@@ -16,7 +16,7 @@ const Header = (props) => {
         letterSpacing: '1px'
       }}
     >
-    GEMA 
+    MIA 
     </span>
 
 
