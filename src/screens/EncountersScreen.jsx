@@ -96,10 +96,10 @@ const EncountersScreen = () => {
             const doc = new jsPDF();
 
             doc.addImage(LogoHRYC, "JPEG", 10, 10, 70, 15);
-            doc.addImage(Logo12oct, "JPEG", 10, 80, 70, 15);
+            doc.addImage(Logo12oct, "JPEG", 8, 30, 75, 17);
             doc.setFont("helvetica", "bold");
             doc.setFontSize(12);
-            doc.text("Servicio de Ginecología y Obstetricia", 120, 20);
+            doc.text("Servicio de Ginecología y Obstetricia", 110, 30);
 
             const hospital = getResponse("HOSPITAL_REF");
             const patientName = getResponse("PAT_NOMBRE");
@@ -109,7 +109,7 @@ const EncountersScreen = () => {
             const indicacion = getResponse("PAT_IND");
             const indicacion_otro = getResponse("PAT_IND_OTRO");
 
-            let yPosition = 50;
+            let yPosition = 60;
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             checkAndAddPage(doc, 10);

@@ -5,7 +5,7 @@ import '../assets/css/ResponsesSummary.css';
 import '../assets/css/ResponsesProbability.css';
 import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
-import Logo12oct from "../assets/images/Logo12Oct.jpg";
+import Logo12oct from "../assets/images/Logo12oct.jpg";
 
 import Modal from "./Modal";
 
@@ -621,10 +621,10 @@ const ResponsesProbability = ({ responses, event }) => {
       const doc = new jsPDF();
   
       doc.addImage(LogoHRYC, "JPEG", 10, 10, 70, 15);
-      doc.addImage(Logo12oct, "JPEG", 10, 80, 70, 15);
+      doc.addImage(Logo12oct, "JPEG", 8, 30, 75, 17);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
-      doc.text("Servicio de Ginecología y Obstetricia", 120, 20);
+      doc.text("Servicio de Ginecología y Obstetricia", 110, 30);
   
       const patientName = getResponse("PAT_NOMBRE");
       const patientNHC = getResponse("PAT_NHC");
@@ -634,7 +634,7 @@ const ResponsesProbability = ({ responses, event }) => {
       const indicacion_otro = getResponse("PAT_IND_OTRO");
       const hospital = getResponse("HOSPITAL_REF");
   
-      let yPosition = 50;
+      let yPosition = 60;
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       checkAndAddPage(doc, 10);
@@ -858,7 +858,7 @@ const ResponsesProbability = ({ responses, event }) => {
         Guardar e Imprimir
       </button> */}
       <button className="save-btn" onClick={() => {
-        if (calcularScore)  {
+        if (sco)  {
           setIsModalOpen(true);
         } else {
           handlePrintButtonClick(false);
