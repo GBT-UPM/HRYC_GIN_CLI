@@ -90,7 +90,7 @@ const ResponsesProbability = ({ responses, event }) => {
       }
       return '';  //Si no encuentra nada.
     };
-
+    
     const PAT_MA = getValue('PAT_MA');
     const MA_TIPO = getValue('MA_TIPO');
     const MA_ESTRUCTURA = getValue('MA_ESTRUCTURA');
@@ -630,6 +630,7 @@ const ResponsesProbability = ({ responses, event }) => {
       const patientFUR = getResponse("PAT_FUR");
       const indicacion = getResponse("PAT_IND");
       const indicacion_otro = getResponse("PAT_IND_OTRO");
+      const hospital = getResponse("HOSPITAL_REF");
   
       let yPosition = 50;
       doc.setFontSize(12);
@@ -759,7 +760,7 @@ const ResponsesProbability = ({ responses, event }) => {
       const today = new Date();
       doc.setFontSize(10);
       doc.setFont("helvetica", "italic");
-      doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
+      doc.text(hospital, 10, 260);
       doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
       const practitionerName = sessionStorage.getItem('practitionerName');
       doc.text("Ecografista: " + practitionerName, 10, 270);
