@@ -5,6 +5,7 @@ import '../assets/css/ResponsesSummary.css';
 import '../assets/css/ResponsesProbability.css';
 import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
+import Logo12oct from "../assets/images/Logo12Oct.jpg";
 
 import Modal from "./Modal";
 
@@ -90,7 +91,7 @@ const ResponsesProbability = ({ responses, event }) => {
       }
       return '';  //Si no encuentra nada.
     };
-    
+
     const PAT_MA = getValue('PAT_MA');
     const MA_TIPO = getValue('MA_TIPO');
     const MA_ESTRUCTURA = getValue('MA_ESTRUCTURA');
@@ -619,7 +620,8 @@ const ResponsesProbability = ({ responses, event }) => {
   
       const doc = new jsPDF();
   
-      doc.addImage(LogoHRYC, "JPEG", 10, 10, 90, 15);
+      doc.addImage(LogoHRYC, "JPEG", 10, 10, 70, 15);
+      doc.addImage(Logo12oct, "JPEG", 10, 80, 70, 15);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
       doc.text("Servicio de Ginecología y Obstetricia", 120, 20);

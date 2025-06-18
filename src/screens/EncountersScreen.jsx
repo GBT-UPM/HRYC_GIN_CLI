@@ -25,6 +25,7 @@ import { useObservationHistologyTemplate } from '../hooks/useObservationHistolog
 import { v4 as uuidv4 } from "uuid";
 import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
+import Logo12oct from "../assets/images/Logo12oct.jpg";
 // Datos de ejemplo (pueden ser obtenidos de una API)
 
 
@@ -94,11 +95,13 @@ const EncountersScreen = () => {
 
             const doc = new jsPDF();
 
-            doc.addImage(LogoHRYC, "JPEG", 10, 10, 90, 15);
+            doc.addImage(LogoHRYC, "JPEG", 10, 10, 70, 15);
+            doc.addImage(Logo12oct, "JPEG", 10, 80, 70, 15);
             doc.setFont("helvetica", "bold");
             doc.setFontSize(12);
             doc.text("Servicio de Ginecología y Obstetricia", 120, 20);
 
+            const hospital = getResponse("HOSPITAL_REF");
             const patientName = getResponse("PAT_NOMBRE");
             const patientNHC = getResponse("PAT_NHC");
             const patientAge = getResponse("PAT_EDAD");
@@ -230,7 +233,8 @@ const EncountersScreen = () => {
             const today = new Date();
             doc.setFontSize(10);
             doc.setFont("helvetica", "italic");
-            doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
+            // doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
+            doc.text(hospital, 10, 260);
             doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
             //const practitionerName = sessionStorage.getItem('practitionerName');
             doc.text("Ecografista: " + practitionerName, 10, 270);
