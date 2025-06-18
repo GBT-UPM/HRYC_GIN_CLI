@@ -30,7 +30,8 @@ const ResponsesProbability = ({ responses, event }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [includeProbability, setIncludeProbability] = useState(false);
-
+  const [mass, setMass] = useState(false);
+  const [sco, setSco] = useState(false);
 
   const { keycloak } = useKeycloak();
   // eslint-disable-next-line no-unused-vars
@@ -44,8 +45,8 @@ const ResponsesProbability = ({ responses, event }) => {
 
 
   // Verifica si hay masa anexial
-  const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
-  const calcularScore = responses[0]?.item?.some(resp => resp.linkId?.toLowerCase() === "MA_PROB".toLowerCase() && resp.answer?.[0]?.valueCoding?.display !== "No");
+  // const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
+  // const calcularScore = responses[0]?.item?.some(resp => resp.linkId?.toLowerCase() === "MA_PROB".toLowerCase() && resp.answer?.[0]?.valueCoding?.display !== "No");
 
   //console.log("La variable calcularScore: " + calcularScore);
   //console.log(hasMassInReports)
@@ -243,6 +244,12 @@ const ResponsesProbability = ({ responses, event }) => {
 
     console.log("ENTRA");
     console.log("Respuestas:", responses);
+
+    const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
+    const calcularScore = responses[0]?.item?.some(resp => resp.linkId?.toLowerCase() === "MA_PROB".toLowerCase() && resp.answer?.[0]?.valueCoding?.display !== "No");
+
+    setMass(hasMassInReports);
+    setSco(calcularScore);
 
     const generated = responses.map((r) => generateReport(r));
     setReports(generated);
@@ -773,7 +780,7 @@ const ResponsesProbability = ({ responses, event }) => {
         <div key={index} className="report-item">
 
           {/* Mostrar SÓLO si hay masa anexial */}
-          {hasMassInReports && <h4>Masa anexial #{index + 1}</h4>}
+          {mass  && <h4>Masa anexial #{index + 1}</h4>}
 
           {/* SIEMPRE se muestra */}
           <div className="parts">
@@ -804,7 +811,7 @@ const ResponsesProbability = ({ responses, event }) => {
           )} */}
 
           {/* Mostrar SÓLO si hay masa anexial */}
-          {hasMassInReports && calcularScore && (
+          {mass && sco && (
             <div className="parts">
               <span className='tlabel'>Probabilidad de malignidad: </span>
               <span className='text' dangerouslySetInnerHTML={{ __html: ((report.score ?? 0)* 100).toFixed(2) + '%' }} />
