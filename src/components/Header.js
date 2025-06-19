@@ -8,8 +8,8 @@ const Header = (props) => {
   <div class="logo-section">
     <img src={LogoHRYC} alt="Logo" class="logo"/>
     <img src={LogoIrycis} alt="Logo" class="logo"/>    
-    {/* <span class="app-name">GEMA</span> */}
-    <span
+  
+    {/* <span
       style={{
         fontSize: '24px',
         fontWeight: 'bold',
@@ -17,9 +17,15 @@ const Header = (props) => {
       }}
     >
     MIA 
-    </span>
-
-
+    </span> */}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginLeft: '10px' }}>
+      <span style={{ fontSize: '24px', fontWeight: 'bold', letterSpacing: '1px' }}>
+        MIA
+      </span>
+      <span style={{ fontSize: '12px', fontStyle: 'italic', color: '#555' }}>
+        Masses Identification Assistant
+      </span>
+    </div>
   </div>
   
   <div class="user-section">
