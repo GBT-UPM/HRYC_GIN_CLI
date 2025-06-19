@@ -16,7 +16,7 @@ const DownloadScreen = () => {
             if (recurso === 'p') {
                 response = await ApiService(keycloak.token, 'GET', `/downloadexcel/patients`, {});
             } else {
-                response = await ApiService(keycloak.token, 'GET', `/downloadexcel`, {});
+                response = await ApiService(keycloak.token, 'GET', `/downloadexcel/downloadExcel`, {});
             }
             // const response = await ApiService(keycloak.token, 'GET', `/downloadcsv`, {});
             if (response.status === 200) {
