@@ -22,7 +22,7 @@ const Header = (props) => {
       <span style={{ fontSize: '24px', fontWeight: 'bold', letterSpacing: '1px' }}>
         MIA
       </span>
-      <span style={{ fontSize: '12px', fontStyle: 'italic', color: '#555' }}>
+      <span style={{ fontSize: '15px', fontStyle: 'italic', color: '#555' }}>
         Masses Identification Assistant
       </span>
     </div>
