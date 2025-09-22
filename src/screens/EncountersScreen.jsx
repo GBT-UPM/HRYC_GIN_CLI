@@ -27,7 +27,7 @@ import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
 import Logo12oct from "../assets/images/Logo12oct.jpg";
 // Datos de ejemplo (pueden ser obtenidos de una API)
-
+import CloseIcon from "@mui/icons-material/Close";
 
 const EncountersScreen = () => {
     const { keycloak, initialized } = useKeycloak();
@@ -814,44 +814,71 @@ const EncountersScreen = () => {
             </Modal>
             {/* Modal para imprimir el informe */}
             <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)}>
-                <Box sx={{ p: 4, backgroundColor: 'white', borderRadius: 2, maxWidth: 400, mx: 'auto', my: '20%' }}>
-                    <Typography variant="h6" gutterBottom>
-                        Confirmación
-                    </Typography>
-                    <Typography sx={{ mt: 2}}>
-                        ¿Desea incluir la probabilidad de malignidad en el informe?
-                    </Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-                        <Button variant="contained" color="primary"
-                            onClick={() => {
-                                handleRowClick(
-                                    pendingPrintData.responses,
-                                    pendingPrintData.observations,
-                                    pendingPrintData.practitionerName,
-                                    true
-                                );
-                                setPendingPrintData(null);
-                                setIsModalOpen(false);
-                            }}
-                        >
-                            Sí
-                        </Button>
-                        <Button variant="outlined" color="secondary" 
-                            onClick={() => {
-                                handleRowClick(
-                                    pendingPrintData.responses,
-                                    pendingPrintData.observations,
-                                    pendingPrintData.practitionerName,
-                                    false
-                                );
-                                setPendingPrintData(null);
-                                setIsModalOpen(false);
-                            }}
-                        >
-                            No
-                        </Button>
-                    </Box>
+                <Box
+                    sx={{
+                    p: 4,
+                    backgroundColor: "white",
+                    borderRadius: 2,
+                    maxWidth: 400,
+                    mx: "auto",
+                    my: "20%",
+                    position: "relative",
+                    }}
+                >
+                {/* Cabecera con título y botón de cierre */}
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography variant="h6">Confirmación</Typography>
+                <IconButton
+                    aria-label="close"
+                    onClick={() => setIsModalOpen(false)}
+                    sx={{ color: (theme) => theme.palette.grey[500] }}
+                >
+                    <CloseIcon />
+                </IconButton>
                 </Box>
+
+                {/* Texto de confirmación */}
+                <Typography sx={{ mt: 2 }}>
+                ¿Desea incluir la probabilidad de malignidad en el informe?
+                </Typography>
+
+                {/* Botones de acción */}
+                <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
+                <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => {
+                    handleRowClick(
+                        pendingPrintData.responses,
+                        pendingPrintData.observations,
+                        pendingPrintData.practitionerName,
+                        true
+                    );
+                    setPendingPrintData(null);
+                    setIsModalOpen(false);
+                    }}
+                >
+                    Sí
+                </Button>
+
+                <Button
+                    variant="outlined"
+                    color="secondary"
+                    onClick={() => {
+                    handleRowClick(
+                        pendingPrintData.responses,
+                        pendingPrintData.observations,
+                        pendingPrintData.practitionerName,
+                        false
+                    );
+                    setPendingPrintData(null);
+                    setIsModalOpen(false);
+                    }}
+                >
+                    No
+                </Button>
+                </Box>
+            </Box>
             </Modal>
         </Container>
     );
