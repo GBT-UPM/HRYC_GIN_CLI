@@ -95,11 +95,16 @@ const EncountersScreen = () => {
 
             const doc = new jsPDF();
 
-            doc.addImage(LogoHRYC, "JPEG", 10, 10, 70, 15);
-            doc.addImage(Logo12oct, "JPEG", 8, 30, 75, 17);
+            // Tamaño más pequeño
+            const width = 55;   // ancho en mm
+            const height = 10;  // alto en mm
+
+            // Coordenadas Y iguales → quedan alineados en horizontal
+            doc.addImage(LogoHRYC, "JPEG", 10, 10, width, height);
+            doc.addImage(Logo12oct, "JPEG", 70, 10, width, height);
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(12);
-            doc.text("Servicio de Ginecología y Obstetricia", 110, 30);
+            doc.setFontSize(14);
+            doc.text("Servicio de Ginecología y Obstetricia", 10, 35);
 
             const hospital = getResponse("HOSPITAL_REF");
             const patientName = getResponse("PAT_NOMBRE");
@@ -109,7 +114,7 @@ const EncountersScreen = () => {
             const indicacion = getResponse("PAT_IND");
             const indicacion_otro = getResponse("PAT_IND_OTRO");
 
-            let yPosition = 60;
+            let yPosition = 50;
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             checkAndAddPage(doc, 10);
@@ -122,7 +127,7 @@ const EncountersScreen = () => {
                 doc.setFont("helvetica", "bold");
                 doc.text(label, 15, yPosition);
                 doc.setFont("helvetica", "normal");
-                doc.text(value, 65, yPosition);
+                doc.text(value, 45, yPosition);
                 yPosition += 10;
             };
 
