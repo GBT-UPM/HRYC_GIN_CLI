@@ -2,13 +2,14 @@ import React from 'react';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
 import LogoUser from "../assets/images/user.png";
 import LogoIrycis from "../assets/images/logo-irycis.png";
+import LogoMIA from "../assets/images/logo-mia.png";
 const Header = (props) => {
   return (
     <header class="header">
   <div class="logo-section">
     <img src={LogoHRYC} alt="Logo" class="logo"/>
     <img src={LogoIrycis} alt="Logo" class="logo"/>    
-  
+    <img src={LogoMIA} alt="Logo" class="logo logo-mia"/>    
     {/* <span
       style={{
         fontSize: '24px',
@@ -17,7 +18,7 @@ const Header = (props) => {
       }}
     >
     MIA 
-    </span> */}
+    </span> 
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginLeft: '10px' }}>
       <span style={{ fontSize: '24px', fontWeight: 'bold', letterSpacing: '1px' }}>
         MIA
@@ -26,6 +27,7 @@ const Header = (props) => {
         Masses Identification Assistant
       </span>
     </div>
+    */}
   </div>
   
   <div class="user-section">
