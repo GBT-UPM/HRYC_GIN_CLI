@@ -37,7 +37,19 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
 
   const navigate = useNavigate();
 
-  const handleNewPatientClick = () => {
+  const handleNewPatientClick = async () => {
+    console.log("Iniciar nuevo cuestionario");
+       try {
+            const body = {
+              action: "START_QUESTIONNAIRE",
+              details: "Usuario inició cuestionario",
+              durationMs: 0
+            }
+            const  res = await ApiService(keycloak.token, 'POST', `/audit/register`, body);
+            console.log("observation: " + res.status)
+        } catch (error) {
+            console.error("Error al auditar el inicio de cuestionario:", error);
+        }
     navigate('/questionnaire');
   };
   const handleResponsesClick = () => {

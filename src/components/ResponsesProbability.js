@@ -297,6 +297,19 @@ const ResponsesProbability = ({ responses, event }) => {
    */
   const handleSaveButtonClick = async (index) => {
     console.log(`Botón de guardado clicado`);
+        try {
+            const body = {
+              action: "SAVE_QUESTIONNAIRE",
+              details: "Usuario guarda cuestionario",
+              durationMs: 0
+            }
+            const  res = await ApiService(keycloak.token, 'POST', `/audit/register`, body);
+            console.log("observation: " + res.status)
+        } catch (error) {
+            console.error("Error al auditar el inicio de cuestionario:", error);
+        }
+
+
     try {
       console.log("Index: " + index);
 
@@ -620,11 +633,16 @@ const ResponsesProbability = ({ responses, event }) => {
   
       const doc = new jsPDF();
   
-      doc.addImage(LogoHRYC, "JPEG", 10, 10, 70, 15);
-      doc.addImage(Logo12oct, "JPEG", 8, 30, 75, 17);
+      // Tamaño más pequeño
+      const width = 55;   // ancho en mm
+      const height = 10;  // alto en mm
+
+      // Coordenadas Y iguales → quedan alineados en horizontal
+      doc.addImage(LogoHRYC, "JPEG", 10, 10, width, height);
+      doc.addImage(Logo12oct, "JPEG", 70, 10, width, height);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text("Servicio de Ginecología y Obstetricia", 110, 30);
+      doc.setFontSize(14);
+      doc.text("Servicio de Ginecología y Obstetricia", 10, 35);
   
       const patientName = getResponse("PAT_NOMBRE");
       const patientNHC = getResponse("PAT_NHC");
@@ -634,7 +652,7 @@ const ResponsesProbability = ({ responses, event }) => {
       const indicacion_otro = getResponse("PAT_IND_OTRO");
       const hospital = getResponse("HOSPITAL_REF");
   
-      let yPosition = 60;
+      let yPosition = 50;
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       checkAndAddPage(doc, 10);
@@ -647,7 +665,7 @@ const ResponsesProbability = ({ responses, event }) => {
         doc.setFont("helvetica", "bold");
         doc.text(label, 15, yPosition);
         doc.setFont("helvetica", "normal");
-        doc.text(value, 65, yPosition);
+        doc.text(value, 45, yPosition);
         yPosition += 10;
       };
   
