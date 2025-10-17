@@ -223,7 +223,7 @@ const ResponsesProbability = ({ responses, event }) => {
             report += `Tiene parénquima ovárico sano, de tamaño <b>${MA_PS_M1} x ${MA_PS_M2} x ${MA_PS_M3} mm</b>.<br/>`;
           }
           if (MA_ASC === 'sí') {    //Ascitis.
-            report += `Presenta ascitis de tipo <b>${MA_ASC_TIPO}</b>.<br/>`;
+            report += `Presenta ascitis <b>${MA_ASC_TIPO}</b>.<br/>`;
           }
           if (MA_CARC === 'sí') {   //Carcinomatosis.
             report += 'Hay carcinomatosis.<br/>';
@@ -322,16 +322,27 @@ const ResponsesProbability = ({ responses, event }) => {
        specificAnswer = responses.item.find(answer => answer.linkId === "PAT_IND");
        const observation = specificAnswer?.answer?.[0]?.valueString || '';*/
       var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NHC".toLowerCase());
-      const nhc = response?.answer?.[0]?.valueString || '';
+      const nhc = response?.answer?.[0]?.valueString || 'Pseudonymized';
       console.log(response)
       response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NOMBRE".toLowerCase());
-      const given = response?.answer?.[0]?.valueString || '';
+      const given = response?.answer?.[0]?.valueString || 'Pseudonymized';
       const family = "" //de momento no se pregunta
       response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase());
       const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
 
+      var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_CODIGO".toLowerCase());
+      const patientCode = response?.answer?.[0]?.valueString || '';
+
+      var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "HOSPITAL_REF".toLowerCase());
+      const hospitalName = response?.answer?.[0]?.valueString || '';
+
+      console.log("CÓDIGO: " + patientCode);
+      console.log("HOSPITAL: " + hospitalName);
+      console.log(response);
+      console.log(hospitalName);
+
       let patientId = generateId();
-      const Patient = generatePatient(patientId, nhc, family, given)
+      const Patient = generatePatient(patientId, nhc, family, given,patientCode,hospitalName);
       // response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_IND".toLowerCase());
       // const observationImagen = response?.answer?.[0]?.valueString || '';
       const patient = await ApiService(keycloak.token, 'POST', `/fhir/Patient/check-or-create`, Patient);

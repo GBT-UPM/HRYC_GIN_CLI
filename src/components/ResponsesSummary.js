@@ -196,7 +196,7 @@ const ResponsesSummary = ({ responses, event }) => {
               report += `Tiene parénquima ovárico sano, de tamaño <b>${MA_PS_M1} x ${MA_PS_M2} x ${MA_PS_M3} mm</b>.<br/>`;
             }
             if (MA_ASC === 'sí') {    //Ascitis.
-              report += `Presenta ascitis de tipo <b>${MA_ASC_TIPO}</b>.<br/>`;
+              report += `Presenta ascitis <b>${MA_ASC_TIPO}</b>.<br/>`;
             }
             if (MA_CARC === 'sí') {   //Carcinomatosis.
               report += 'Hay carcinomatosis.<br/>';

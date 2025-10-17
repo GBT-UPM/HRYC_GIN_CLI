@@ -49,9 +49,26 @@ const ResponsesScreen = () => {
             "Desconocido / Incierto": { code: "70852002", display: "Neoplasm of uncertain or unknown behaviour (disorder)" }
         }; */
     const histologyOptions = {
-        "Benigno": { code: "37310001", display: "Benigno" },
-        "Maligno": { code: "363346000", display: "Maligno" },
-        "Desconocido / Incierto": { code: "70852002", display: "Desconocido / Incierto" }
+    "Benigno": {
+        code: "37310001",
+        display: "Benigno"
+    },
+    "Borderline": {
+        code: "448829000",
+        display: "Tumor borderline"
+    },
+    "Maligno": {
+        code: "363346000",
+        display: "Maligno"
+    },
+    "Tumor no anexial": {
+        code: "128241005",
+        display: "Tumor no anexial"
+    },
+    "Desconocido / Incierto": {
+        code: "70852002",
+        display: "Desconocido / Incierto"
+    }
     };
     const generateReport = () => {
         const getValue = (id) => {
@@ -207,7 +224,7 @@ const ResponsesScreen = () => {
                     report += `<div>Tiene parénquima ovárico sano, de tamaño ${MA_PS_M1} x ${MA_PS_M2} x ${MA_PS_M3} mm.</div>`;
                 }
                 if (MA_ASC === 'sí') {    //Ascitis.
-                    report += `<div>Presenta ascitis de tipo ${MA_ASC_TIPO}.</div>`;
+                    report += `<div>Presenta ascitis  ${MA_ASC_TIPO}.</div>`;
                 }
                 if (MA_CARC === 'sí') {   //Carcinomatosis.
                     report += '<div>Hay carcinomatosis.</div>';
