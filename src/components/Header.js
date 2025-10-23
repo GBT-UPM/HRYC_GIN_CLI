@@ -5,35 +5,19 @@ import LogoIrycis from "../assets/images/logo-irycis.png";
 import LogoMIA from "../assets/images/logo-mia.png";
 const Header = (props) => {
   return (
-    <header class="header">
-  <div class="logo-section">
-    <img src={LogoHRYC} alt="Logo" class="logo"/>
-    <img src={LogoIrycis} alt="Logo" class="logo"/>    
-    <img src={LogoMIA} alt="Logo" class="logo logo-mia"/>    
-    {/* <span
-      style={{
-        fontSize: '24px',
-        fontWeight: 'bold',
-        letterSpacing: '1px'
-      }}
-    >
-    MIA 
-    </span> 
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginLeft: '10px' }}>
-      <span style={{ fontSize: '24px', fontWeight: 'bold', letterSpacing: '1px' }}>
-        MIA
-      </span>
-      <span style={{ fontSize: '15px', fontStyle: 'italic', color: '#555' }}>
-        Masses Identification Assistant
-      </span>
-    </div>
-    */}
+<header className="header">
+  <div className="logo-section">
+    <img src={LogoHRYC} alt="Logo HRYC" className="logo" />
+    <img src={LogoIrycis} alt="Logo IRYCIS" className="logo" />
+    <img src={LogoMIA} alt="Logo MIA" className="logo logo-mia" />
   </div>
-  
-  <div class="user-section">
-    <img src={LogoUser}  alt="Avatar" class="user-avatar"/>
-    <span class="user-name">{props.name}</span>
-    <button onClick={props.closeSession} class="logout-btn">Cerrar Sesión</button>
+
+  <div className="user-section">
+    <img src={LogoUser} alt="Avatar" className="user-avatar" />
+    <span className="user-name">{props.name}</span>
+    <button onClick={props.closeSession} className="logout-btn">
+      Cerrar Sesión
+    </button>
   </div>
 </header>
   );

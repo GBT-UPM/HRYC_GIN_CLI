@@ -330,10 +330,10 @@ const ResponsesProbability = ({ responses, event }) => {
       response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase());
       const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
 
-      var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_CODIGO".toLowerCase());
+      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_CODIGO".toLowerCase());
       const patientCode = response?.answer?.[0]?.valueString || '';
 
-      var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "HOSPITAL_REF".toLowerCase());
+      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "HOSPITAL_REF".toLowerCase());
       const hospitalName = response?.answer?.[0]?.valueString || '';
 
       console.log("CÓDIGO: " + patientCode);

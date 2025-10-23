@@ -60,43 +60,73 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
   };
 
   return (
-    <Box sx={{ px: 4, py: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Panel de Control - Revisión Ginecológica
-      </Typography>
+    <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 2, md: 3 } }}>
+    <Typography
+      variant="h4"
+      gutterBottom
+      sx={{
+        fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+        textAlign: { xs: 'center', sm: 'left' },
+      }}
+    >
+      Panel de Control - Revisión Ginecológica
+    </Typography>
 
       {/* Contenedor de estadísticas con separación */}
 
       <Grid2
         container
-        spacing={3}
-        alignItems="stretch" // <- clave para que cada tarjeta tenga la misma altura
+        spacing={{ xs: 2, sm: 3 }}
+        alignItems="stretch"
         sx={{ mb: 4 }}
       >
         {[
           { label: 'Pacientes Atendidas', icon: <People fontSize="large" color="primary" />, count: counts.Patient, tooltip: 'Número total de pacientes registrados en el sistema.' },
-          { label: 'Citas Cursadas', icon: <CalendarMonth fontSize="large" color="success" />, count: counts.Encounter, tooltip: 'Total de citas clínicos realizadas.' },
+          { label: 'Citas Cursadas', icon: <CalendarMonth fontSize="large" color="success" />, count: counts.Encounter, tooltip: 'Total de citas clínicas realizadas.' },
           { label: 'Cuestionarios Realizados', icon: <MedicalInformation fontSize="large" color="warning" />, count: counts.QuestionnaireResponse, tooltip: 'Informes completados durante las visitas.' },
           { label: 'Masas Anexiales', icon: <LocalHospital fontSize="large" color="error" />, count: counts.RiskAssessment, tooltip: 'Casos en los que se ha evaluado riesgo de masa anexial.' },
-        ].map(({ label, icon, count,tooltip }, index) => (
-          <Grid2 item xs={12} sm={6} md={4} key={index} sx={{ display: 'flex' }}>
+        ].map(({ label, icon, count, tooltip }, index) => (
+          <Grid2
+            item
+            xs={12}
+            sm={6}
+            md={3}
+            key={index}
+            sx={{ display: 'flex' }}
+          >
             <Tooltip title={tooltip} placement="top">
               <Paper
                 sx={{
-                  flex: 1, // <- ocupa todo el espacio dentro del grid
+                  flex: 1,
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'center',
                   alignItems: 'center',
-                  padding: 3,
+                  p: { xs: 2, sm: 3 },
                   textAlign: 'center',
-                  minWidth: '200px',
-                  minHeight: 180, // puedes ajustar esta altura según tu gusto
+                  borderRadius: 2,
+                  boxShadow: 2,
+                  transition: 'transform 0.2s ease',
+                  '&:hover': { transform: 'translateY(-4px)' },
+                  minHeight: { xs: 140, sm: 160, md: 180 },
                 }}
               >
                 {icon}
-                <Typography variant="h6" sx={{ mt: 1 }}>{label}</Typography>
-                <Typography variant="h4">{count}</Typography>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    mt: 1,
+                    fontSize: { xs: '1rem', sm: '1.1rem' },
+                  }}
+                >
+                  {label}
+                </Typography>
+                <Typography
+                  variant="h4"
+                  sx={{ fontSize: { xs: '1.6rem', sm: '2rem' } }}
+                >
+                  {count}
+                </Typography>
               </Paper>
             </Tooltip>
           </Grid2>
@@ -105,54 +135,95 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
 
 
       {/* Acciones rápidas centradas debajo */}
-      <Grid2
-        container
-        spacing={3}
-        alignItems="flex-start"
-        wrap="nowrap"
+<Grid2 container spacing={3} alignItems="stretch" flexWrap="wrap">
+  <Grid2 item xs={12} md={12}>
+    <Paper
+      sx={{
+        p: 3,
+        display: 'flex',
+        flexDirection: { xs: 'column', md: 'row' },
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 3,
+      }}
+    >
+      {/* Bloque de acciones rápidas */}
+      <Box
+        sx={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: { xs: 'center', md: 'flex-start' },
+          gap: 2,
+        }}
       >
-        {/* Columna: Acciones Rápidas */}
-        <Grid2 item xs={12} sm={6}>
-          <Paper sx={{ p: 3, height: '100%' }}>
-            <Typography variant="h6">Acciones Rápidas</Typography>
-            <Box display="flex" flexDirection="column" gap={2} mt={2}>
-              <Button onClick={handleNewPatientClick} variant="contained" color="primary">Iniciar Cuestionario</Button>
-              <Button onClick={handleResponsesClick} variant="contained" sx={{
-                backgroundColor: '#ed6c02', // color personalizado
-                color: '#fff',              // color del texto
-                '&:hover': {
-                  backgroundColor: '#bd5806', // color al pasar el cursor
-                },
-              }}>Revisar Cuestionarios </Button>
-              <Button onClick={handleEncountersClick} variant="contained" sx={{
-                backgroundColor: '#2e7d32', // color personalizado
-                color: '#fff',              // color del texto
-                '&:hover': {
-                  backgroundColor: '#236026', // color al pasar el cursor
-                },
-              }}>Revisar Citas </Button>
-            </Box>
-
-          </Paper>
-        </Grid2>
-
-        {/* Columna: Imagen de doctora (oculta en xs) */}
-        <Grid2
-          item
-          sm={6}
-          sx={{ display: { xs: 'none', sm: 'flex' } }}
-          justifyContent="center"
-          alignItems="flex-start"
-
+        <Typography
+          variant="h6"
+          sx={{
+            textAlign: { xs: 'center', md: 'left' },
+            mb: 1,
+          }}
         >
-          <Box
-            component="img"
-            src={doctora}
-            alt="Doctora"
-            sx={{ maxWidth: '60%', height: 'auto', objectFit: 'contain' }}
-          />
-        </Grid2>
-      </Grid2>
+          Acciones Rápidas
+        </Typography>
+
+        <Button
+          onClick={handleNewPatientClick}
+          variant="contained"
+          color="primary"
+          fullWidth={false}
+          sx={{ width: { xs: '100%', sm: '80%', md: '65%' } }}
+        >
+          Iniciar Cuestionario
+        </Button>
+
+        <Button
+          onClick={handleResponsesClick}
+          variant="contained"
+          sx={{
+            backgroundColor: '#ed6c02',
+            color: '#fff',
+            '&:hover': { backgroundColor: '#bd5806' },
+            width: { xs: '100%', sm: '80%', md: '65%' },
+          }}
+        >
+          Revisar Cuestionarios
+        </Button>
+
+        <Button
+          onClick={handleEncountersClick}
+          variant="contained"
+          sx={{
+            backgroundColor: '#2e7d32',
+            color: '#fff',
+            '&:hover': { backgroundColor: '#236026' },
+            width: { xs: '100%', sm: '80%', md: '65%' },
+          }}
+        >
+          Revisar Citas
+        </Button>
+      </Box>
+
+      {/* Imagen al lado derecho */}
+      <Box
+        component="img"
+        src={doctora}
+        alt="Doctora"
+        sx={{
+          flexShrink: 0,
+          maxWidth: { xs: '60%', sm: '40%', md: '40%' },
+          height: 'auto',
+          objectFit: 'contain',
+          borderRadius: 2,
+          boxShadow: 0,
+          mt: { xs: 3, md: 0 },
+          marginRight: { xs: 'opx', sm: '10px', md: '40px' },  
+        }}
+      />
+    </Paper>
+  </Grid2>
+</Grid2>
+
 
 
     </Box>

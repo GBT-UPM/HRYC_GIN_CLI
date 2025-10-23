@@ -387,10 +387,10 @@ const ResponsesScreen = () => {
                                     direction={orderDirection}
                                     onClick={() => handleSortRequest('patientIdentifier')}
                                 >
-                                    NHC
+                                    Código Paciente
                                 </TableSortLabel>
                             </TableCell>
-                            <TableCell>
+                            {/* <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'patientName'}
                                     direction={orderDirection}
@@ -398,7 +398,7 @@ const ResponsesScreen = () => {
                                 >
                                     Nombre
                                 </TableSortLabel>
-                            </TableCell>
+                            </TableCell> */}
                             <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'risk'}
@@ -463,7 +463,7 @@ const ResponsesScreen = () => {
                                     style={{ cursor: 'pointer' }}
                                 >
                                     <TableCell>{item.patientIdentifier}</TableCell>
-                                    <TableCell>{item.patientName}</TableCell>
+                                    {/* <TableCell>{item.patientName}</TableCell> */}
                                     <TableCell>{!isNaN(parseFloat(item.risk))
                                                 ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
                                                 : 'No procede'}

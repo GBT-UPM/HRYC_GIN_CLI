@@ -575,7 +575,7 @@ const EncountersScreen = () => {
                 <Table>
                     <TableHead>
                         <TableRow className="table-header2">
-                            {/* <TableCell>
+                            <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'patientIdentifier'}
                                     direction={orderDirection}
@@ -584,7 +584,7 @@ const EncountersScreen = () => {
                                     NHC
                                 </TableSortLabel>
                             </TableCell>
-                            <TableCell>
+                          {/*   <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'patientName'}
                                     direction={orderDirection}
@@ -651,8 +651,8 @@ const EncountersScreen = () => {
 
                                     style={{ cursor: 'pointer' }}
                                 >
-                                    {/* <TableCell>{item.patientIdentifier}</TableCell>
-                                    <TableCell>{item.patientName}</TableCell> */}
+                                    <TableCell>{item.patientIdentifier}</TableCell>
+                                   {/* <TableCell>{item.patientName}</TableCell> */}
                                     <TableCell>
                                         {(() => {
                                             let parsed = [];
