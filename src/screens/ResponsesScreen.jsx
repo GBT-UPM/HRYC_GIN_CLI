@@ -70,6 +70,11 @@ const ResponsesScreen = () => {
         display: "Desconocido / Incierto"
     }
     };
+    const tipoMap = {
+    'sólida': 'sólido',
+    'quística': 'quístico',
+    'sólido-quística': 'sólido-quístico'
+  };
     const generateReport = () => {
         const getValue = (id) => {
             //const responses = JSON.parse(questionnaireResponse)
@@ -182,7 +187,8 @@ const ResponsesScreen = () => {
                     dependencia = `Dependiente de ${estructura} ${lado}`;
                 }
                 const contenido = MA_CONTENIDO === 'otro' ? MA_CONTENIDO_OTRO : MA_CONTENIDO;
-                report += `<div>${dependencia}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} cm³) de aspecto ${MA_TIPO} de contorno ${contorno} y de contenido ${contenido}.${vascularizacion_MA_SOL}</div>`;
+                const tipoMasculino = tipoMap[MA_TIPO] || MA_TIPO;
+                report += `<div>${dependencia}, se objetiva formación de ${MA_M1} x ${MA_M2} x ${MA_M3} mm (${MA_VOL} cm³) de aspecto ${tipoMasculino} de contorno ${contorno} y de contenido ${contenido}.${vascularizacion_MA_SOL}</div>`;
 
                 // Información adicional para masas quísticas y sólido-quísticas 
                 let vascularizacion_MA_Q = '';
