@@ -2,6 +2,12 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import '../assets/css/ResponsesSummary.css';
 
+
+  const tipoMap = {
+    'sólida': 'sólido',
+    'quística': 'quístico',
+    'sólido-quística': 'sólido-quístico'
+  };
 const ResponsesSummary = ({ responses, event }) => {
     /* // Función para renderizar las respuestas 
     const renderAnswer = (answer) => {
@@ -22,11 +28,7 @@ const ResponsesSummary = ({ responses, event }) => {
     }; */
 
     // Función para calcular logit(p)
-    const tipoMap = {
-      'sólida': 'sólido',
-      'quística': 'quístico',
-      'sólido-quística': 'sólido-quístico'
-    };
+ 
     const calcularLogit = (contorno, sombra, vascAreaSolida, vascPapila) =>{
       let logit = -3.625;
 

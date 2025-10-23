@@ -29,6 +29,12 @@ import Logo12oct from "../assets/images/Logo12oct.jpg";
 // Datos de ejemplo (pueden ser obtenidos de una API)
 import CloseIcon from "@mui/icons-material/Close";
 
+const tipoMap = {
+    'sólida': 'sólido',
+    'quística': 'quístico',
+    'sólido-quística': 'sólido-quístico'
+};
+
 const EncountersScreen = () => {
     const { keycloak, initialized } = useKeycloak();
     const [data, setData] = useState([]);
@@ -59,11 +65,7 @@ const EncountersScreen = () => {
         "Maligno": { code: "363346000", display: "Maligno" },
         "Desconocido / Incierto": { code: "70852002", display: "Desconocido / Incierto" }
     };
-    const tipoMap = {
-        'sólida': 'sólido',
-        'quística': 'quístico',
-        'sólido-quística': 'sólido-quístico'
-    };
+
     const formatDate = (dateStr) => {
         const date = new Date(dateStr);
         return isNaN(date) ? '' : date.toLocaleDateString('es-ES');

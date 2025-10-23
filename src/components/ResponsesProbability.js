@@ -19,6 +19,11 @@ import { generatePeriod } from '../screens/QuestionnaireScreen';
 import { useRiskAssessmentTemplate } from '../hooks/useRiskAssessmentTemplate';
 import { usePatientTemplate } from '../hooks/usePatientTemplate';
 
+  const tipoMap = {
+    'sólida': 'sólido',
+    'quística': 'quístico',
+    'sólido-quística': 'sólido-quístico'
+  };
 
 const ResponsesProbability = ({ responses, event }) => {
   const [reports, setReports] = useState([]);
@@ -69,11 +74,7 @@ const ResponsesProbability = ({ responses, event }) => {
     // Añadir más tipos de respuesta según sea necesario
     return JSON.stringify(answer);
   }; */
-  const tipoMap = {
-    'sólida': 'sólido',
-    'quística': 'quístico',
-    'sólido-quística': 'sólido-quístico'
-  };
+
   const generateReport = useCallback((res) => {
 
     const getValue = (id) => {

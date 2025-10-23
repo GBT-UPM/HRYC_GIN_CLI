@@ -23,7 +23,11 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useObservationHistologyTemplate } from '../hooks/useObservationHistologyTemplate';
 import { v4 as uuidv4 } from "uuid";
 // Datos de ejemplo (pueden ser obtenidos de una API)
-
+    const tipoMap = {
+    'sólida': 'sólido',
+    'quística': 'quístico',
+    'sólido-quística': 'sólido-quístico'
+  };
 
 const ResponsesScreen = () => {
     const { keycloak, initialized } = useKeycloak();
@@ -70,11 +74,7 @@ const ResponsesScreen = () => {
         display: "Desconocido / Incierto"
     }
     };
-    const tipoMap = {
-    'sólida': 'sólido',
-    'quística': 'quístico',
-    'sólido-quística': 'sólido-quístico'
-  };
+
     const generateReport = () => {
         const getValue = (id) => {
             //const responses = JSON.parse(questionnaireResponse)
