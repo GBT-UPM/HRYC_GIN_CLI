@@ -69,7 +69,9 @@ const ResponsesSummary = ({ responses, event }) => {
             return answer.valueInteger.toString(); // Campo valueInteger convertido a string
           } else if (answer.valueDate) {
             return answer.valueDate; // Campo valueDate como está (ya es un string)
-            }
+          }else if (answer.valueDecimal) {
+            return answer.valueDecimal.toString(); // Campo valueDecimal convertido a string
+          }
         }
         return '';  //Si no encuentra nada.
       };
