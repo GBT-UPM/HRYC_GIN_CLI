@@ -391,6 +391,12 @@ const ResponsesProbability = ({ responses, event }) => {
                   reference: `Encounter/${encId}`
                 }
               ];
+              qResponse.subject = {
+                reference: `Patient/${patientId}`
+              };
+              qResponse.encounter = {
+                reference: `Encounter/${encId}`
+              };
               const response = await ApiService(keycloak.token, 'POST', `/fhir/QuestionnaireResponse`, qResponse);
               //let resId = 0
               if (response.ok) {

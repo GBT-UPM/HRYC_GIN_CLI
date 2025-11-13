@@ -79,9 +79,8 @@ const ResponsesScreen = () => {
         const getValue = (id) => {
             //const responses = JSON.parse(questionnaireResponse)
             const responses = selectedQuestionnaire.item
-           console.log(responses) 
+
           const response = responses.find((resp) => resp.linkId.toLowerCase() === id.toLowerCase());
-          console.log(responses)
           if (response && response.answer.length > 0) {
   
             const answer = response.answer[0];
@@ -95,6 +94,8 @@ const ResponsesScreen = () => {
               return answer.valueInteger.toString(); // Campo valueInteger convertido a string
             } else if (answer.valueDate) {
               return answer.valueDate; // Campo valueDate como está (ya es un string)
+            }else if (answer.valueDecimal) {
+              return answer.valueDecimal.toString(); // Campo valueDecimal convertido a string
             }
           }
           return '';  //Si no encuentra nada.
@@ -166,6 +167,7 @@ const ResponsesScreen = () => {
         
           return report;
         } else {    //Si SÍ hay masa anexial
+             console.log("MA_Q_GROSOR: " + MA_Q_GROSOR);
             const estructurasFemeninas = ['trompa'];
             if (['sólida', 'quística', 'sólido-quística'].includes(MA_TIPO)) {
                 let dependencia = '';
