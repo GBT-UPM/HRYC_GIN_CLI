@@ -18,6 +18,13 @@ import { generateId } from '../screens/QuestionnaireScreen';
 import { generatePeriod } from '../screens/QuestionnaireScreen';
 import { useRiskAssessmentTemplate } from '../hooks/useRiskAssessmentTemplate';
 import { usePatientTemplate } from '../hooks/usePatientTemplate';
+import { sanitizeQuestionnaireResponse } from '../utils/privacy';
+import { formatDuplicateCaseSummary, validateCaseMetadata } from '../utils/caseMetadata';
+import {
+  addSecondaryEvaluation,
+  checkDuplicateCase,
+  createCase,
+} from '../services/caseService';
 
   const tipoMap = {
     'sólida': 'sólido',
@@ -25,7 +32,32 @@ import { usePatientTemplate } from '../hooks/usePatientTemplate';
     'sólido-quística': 'sólido-quístico'
   };
 
-const ResponsesProbability = ({ responses, event }) => {
+const getDuplicateMatches = (duplicateResult) => {
+  if (Array.isArray(duplicateResult)) return duplicateResult;
+
+  const matches =
+    duplicateResult?.matches ||
+    duplicateResult?.duplicates ||
+    duplicateResult?.cases ||
+    duplicateResult?.data ||
+    [];
+
+  if (Array.isArray(matches)) return matches;
+
+  if (
+    duplicateResult?.duplicate ||
+    duplicateResult?.hasDuplicate ||
+    duplicateResult?.hasDuplicates ||
+    duplicateResult?.exists ||
+    duplicateResult?.caseId
+  ) {
+    return [matches || duplicateResult.case || duplicateResult.caseRecord || duplicateResult];
+  }
+
+  return [];
+};
+
+const ResponsesProbability = ({ responses, event, transientNhc, onClearTransientNhc }) => {
   const [reports, setReports] = useState([]);
   const [observations, setObservations] = useState([]);
   //nuevo
@@ -34,10 +66,15 @@ const ResponsesProbability = ({ responses, event }) => {
   // eslint-disable-next-line no-unused-vars
   const [encounterId, setEncounterId] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [includeProbability, setIncludeProbability] = useState(false);
   const [mass, setMass] = useState(false);
   const [sco, setSco] = useState(false);
+  const [pendingDuplicate, setPendingDuplicate] = useState(null);
+  const [duplicateMatches, setDuplicateMatches] = useState([]);
+  const [selectedDuplicateCaseId, setSelectedDuplicateCaseId] = useState("");
+  const [saveInProgress, setSaveInProgress] = useState(false);
 
   const { keycloak } = useKeycloak();
   // eslint-disable-next-line no-unused-vars
@@ -53,9 +90,6 @@ const ResponsesProbability = ({ responses, event }) => {
   // Verifica si hay masa anexial
   // const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
   // const calcularScore = responses[0]?.item?.some(resp => resp.linkId?.toLowerCase() === "MA_PROB".toLowerCase() && resp.answer?.[0]?.valueCoding?.display !== "No");
-
-  //console.log("La variable calcularScore: " + calcularScore);
-  //console.log(hasMassInReports)
 
   /* // Función para renderizar las respuestas 
   const renderAnswer = (answer) => {
@@ -252,9 +286,6 @@ const ResponsesProbability = ({ responses, event }) => {
     if (!responses || responses.length === 0) return;
 
 
-    console.log("ENTRA");
-    console.log("Respuestas:", responses);
-
     const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
     const calcularScore = responses[0]?.item?.some(resp => resp.linkId?.toLowerCase() === "MA_PROB".toLowerCase() && resp.answer?.[0]?.valueCoding?.display !== "No");
 
@@ -298,14 +329,126 @@ const ResponsesProbability = ({ responses, event }) => {
       updated[index] = newValue;
       return updated;
     });
-    console.log("Conclusión: " + observations);
   };
   /**
    * Ejemplo de función que maneje el click del botón en cada reporte.
    * Podrías hacer lo que necesites (guardar, eliminar, etc.)
    */
-  const handleSaveButtonClick = async (index) => {
-    console.log(`Botón de guardado clicado`);
+  const clearTransientCaseState = () => {
+    onClearTransientNhc();
+    setPendingDuplicate(null);
+    setDuplicateMatches([]);
+    setSelectedDuplicateCaseId("");
+    setIsDuplicateModalOpen(false);
+  };
+
+  const buildPreparedQuestionnaireResponses = () => {
+    return responses.map((qResponse) => {
+      const sanitizedQuestionnaireResponse = sanitizeQuestionnaireResponse(qResponse);
+      const metadata = validateCaseMetadata(sanitizedQuestionnaireResponse);
+
+      if (!metadata.isValid) {
+        throw new Error(metadata.errors.join(" "));
+      }
+
+      return {
+        questionnaireResponse: sanitizedQuestionnaireResponse,
+        metadata,
+      };
+    });
+  };
+
+  const runDuplicateChecks = async ({ nhc, options, preparedResponses, decisions = {}, startIndex = 0 }) => {
+    for (let index = startIndex; index < preparedResponses.length; index++) {
+      const { metadata } = preparedResponses[index];
+      const duplicateResult = await checkDuplicateCase(keycloak.token, {
+        centerId: metadata.centerId,
+        nhc,
+        lateralityCode: metadata.lateralityCode,
+        lateralityDisplay: metadata.lateralityDisplay,
+        anatomicalStructureCode: metadata.anatomicalStructureCode,
+        anatomicalStructureDisplay: metadata.anatomicalStructureDisplay,
+      });
+      const matches = getDuplicateMatches(duplicateResult);
+
+      if (matches.length > 0) {
+        setPendingDuplicate({
+          nhc,
+          options,
+          preparedResponses,
+          decisions,
+          index,
+        });
+        setDuplicateMatches(matches);
+        setSelectedDuplicateCaseId(String(matches[0]?.caseId || matches[0]?.id || ""));
+        setIsDuplicateModalOpen(true);
+        return;
+      }
+    }
+
+    await persistCaseFlow({ nhc, options, preparedResponses, decisions });
+  };
+
+  const beginCaseSave = async (options) => {
+    const nhc = transientNhc.trim();
+    if (!nhc) {
+      setError("Debe introducir el NHC para comprobar duplicados.");
+      return;
+    }
+
+    try {
+      setSaveInProgress(true);
+      setError(null);
+      const preparedResponses = buildPreparedQuestionnaireResponses();
+      await runDuplicateChecks({
+        nhc,
+        options: options || { shouldPrint: false, includeProbability: false },
+        preparedResponses,
+      });
+    } catch (error) {
+      setError(error.message || "Error al preparar el guardado del caso.");
+    } finally {
+      setSaveInProgress(false);
+    }
+  };
+
+  const handleDuplicateDecision = async (type) => {
+    if (!pendingDuplicate) return;
+
+    const selectedCaseId = selectedDuplicateCaseId || duplicateMatches[0]?.caseId || duplicateMatches[0]?.id;
+    if (type === "secondary" && !selectedCaseId) {
+      setError("Debe seleccionar un caso existente para añadir la evaluación secundaria.");
+      return;
+    }
+
+    const decisions = {
+      ...pendingDuplicate.decisions,
+      [pendingDuplicate.index]: type === "secondary"
+        ? { type, caseId: selectedCaseId }
+        : { type },
+    };
+
+    const nextRequest = {
+      ...pendingDuplicate,
+      decisions,
+      startIndex: pendingDuplicate.index + 1,
+    };
+
+    setIsDuplicateModalOpen(false);
+    setPendingDuplicate(null);
+
+    try {
+      setSaveInProgress(true);
+      await runDuplicateChecks(nextRequest);
+    } catch (error) {
+      setError(error.message || "Error al resolver duplicados.");
+      clearTransientCaseState();
+    } finally {
+      setSaveInProgress(false);
+    }
+  };
+
+  const persistCaseFlow = async ({ nhc, options, preparedResponses, decisions }) => {
         try {
             const body = {
               action: "SAVE_QUESTIONNAIRE",
@@ -313,52 +456,26 @@ const ResponsesProbability = ({ responses, event }) => {
               durationMs: 0
             }
             const  res = await ApiService(keycloak.token, 'POST', `/audit/register`, body);
-            console.log("observation: " + res.status)
+            if (process.env.NODE_ENV === "development") {
+              console.debug("Audit status:", res.status);
+            }
         } catch (error) {
             console.error("Error al auditar el inicio de cuestionario:", error);
         }
 
-
     try {
-      console.log("Index: " + index);
-
       setProbality(true);
 
-      //const firstResponse = responses[index];
-      /* var specificAnswer = responses.item.find(answer => answer.linkId === "PAT_NHC");
-       const patientId = specificAnswer?.answer?.[0]?.valueString || '';
-       console.log("NHC paciente: " + patientId);
-       specificAnswer = responses.item.find(answer => answer.linkId === "PAT_IND");
-       const observation = specificAnswer?.answer?.[0]?.valueString || '';*/
-      var response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NHC".toLowerCase());
-      const nhc = response?.answer?.[0]?.valueString || 'Pseudonymized';
-      console.log(response)
-      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_NOMBRE".toLowerCase());
-      const given = response?.answer?.[0]?.valueString || 'Pseudonymized';
-      const family = "" //de momento no se pregunta
-      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase());
       const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
 
-      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_CODIGO".toLowerCase());
-      const patientCode = response?.answer?.[0]?.valueString || '';
-
-      response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "HOSPITAL_REF".toLowerCase());
-      const hospitalName = response?.answer?.[0]?.valueString || '';
-
-      console.log("CÓDIGO: " + patientCode);
-      console.log("HOSPITAL: " + hospitalName);
-      console.log(response);
-      console.log(hospitalName);
-
       let patientId = generateId();
-      const Patient = generatePatient(patientId, nhc, family, given,patientCode,hospitalName);
+      const Patient = generatePatient(patientId);
       // response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_IND".toLowerCase());
       // const observationImagen = response?.answer?.[0]?.valueString || '';
       const patient = await ApiService(keycloak.token, 'POST', `/fhir/Patient/check-or-create`, Patient);
       if (patient.ok) {
 
         //patientId = pat.id;
-        console.log("ID paciente: " + patientId);
         const encId = generateId();
 
         const imgStuId = generateId();
@@ -370,69 +487,79 @@ const ResponsesProbability = ({ responses, event }) => {
         //const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observationImagen);
         const ImageStudy = generateImagingStudy(imgStuId, encId, patientId, serieId);
 
-        const successfulResponses = [];
-
-
         const encounter = await ApiService(keycloak.token, 'POST', `/fhir/Encounter`, Encounter);
         if (encounter.status === 200) {
 
-          //const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
-          //console.log("observation: " + observation.status)
           const imageStudy = await ApiService(keycloak.token, 'POST', `/fhir/ImagingStudy`, ImageStudy);
-          console.log("imageStudy: " + imageStudy.status)
+          if (process.env.NODE_ENV === "development") {
+            console.debug("ImageStudy status:", imageStudy.status);
+          }
 
 
           let index = 0
-          for (const qResponse of responses) {
-            // Aquí puedes procesar cada respuesta
-            console.log("Response --------------")
+          for (const preparedResponse of preparedResponses) {
             // Aquí puedes añador la lógica para enviar las respuestas a un servidor o guardarlas localmente 
             try {
-              qResponse.partOf = [
-                {
+              const sanitizedQuestionnaireResponse = sanitizeQuestionnaireResponse({
+                ...preparedResponse.questionnaireResponse,
+                partOf: [
+                  {
+                    reference: `Encounter/${encId}`
+                  }
+                ],
+                subject: {
+                  reference: `Patient/${patientId}`
+                },
+                encounter: {
                   reference: `Encounter/${encId}`
-                }
-              ];
-              qResponse.subject = {
-                reference: `Patient/${patientId}`
-              };
-              qResponse.encounter = {
-                reference: `Encounter/${encId}`
-              };
-              const response = await ApiService(keycloak.token, 'POST', `/fhir/QuestionnaireResponse`, qResponse);
-              //let resId = 0
-              if (response.ok) {
-                const result = await response.json();
-                console.log("Nuevo ID:", result.id);
-                // resId = result.id;
-                const obsId = generateId();
-                const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
-                await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
-                if (hasMassInReports) {
-                  const riskId = generateId();
-                  const RiskAssessment = generateRiskAssessment(riskId, encId, patientId, practitioner, reports[index].score, "", qResponse.id)
-                  await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
-                }
-                index++;
-                successfulResponses.push(qResponse);
-              } else {
-                throw new Error(`Error en la respuesta: ${response.status}`);
+                },
+              });
+
+              const decision = decisions[index];
+              const caseResponse = decision?.type === "secondary"
+                ? await addSecondaryEvaluation(keycloak.token, decision.caseId, {
+                    questionnaireResponse: sanitizedQuestionnaireResponse,
+                    encounterId: encId,
+                    observerInitials: preparedResponse.metadata.observerInitials,
+                  })
+                : await createCase(keycloak.token, {
+                    centerId: preparedResponse.metadata.centerId,
+                    nhc,
+                    lateralityCode: preparedResponse.metadata.lateralityCode,
+                    lateralityDisplay: preparedResponse.metadata.lateralityDisplay,
+                    anatomicalStructureCode: preparedResponse.metadata.anatomicalStructureCode,
+                    anatomicalStructureDisplay: preparedResponse.metadata.anatomicalStructureDisplay,
+                    questionnaireResponse: sanitizedQuestionnaireResponse,
+                    encounterId: encId,
+                    observerInitials: preparedResponse.metadata.observerInitials,
+                  });
+
+              const questionnaireResponseId = caseResponse.questionnaireResponseFhirId;
+              if (!questionnaireResponseId) {
+                throw new Error("El backend no devolvió questionnaireResponseFhirId.");
               }
+
+              const obsId = generateId();
+              const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
+              await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
+              if (hasMassInReports) {
+                const riskId = generateId();
+                const RiskAssessment = generateRiskAssessment(riskId, encId, patientId, practitioner, reports[index].score, "", questionnaireResponseId)
+                await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
+              }
+              index++;
 
             } catch (error) {
               console.error("Error al guardar la respuesta:", error);
               setError("Error al guardar la respuesta.");
+              throw error;
             }
           }
           index = 0
-          // for (const report of reports) {
-          //   const riskId = generateId();
-          //   const RiskAssessment= generateRiskAssessment(riskId, encId, patientId, practitioner, report.score, "",observations[index])
-          //   const risk = await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
-          //     console.log("risk: " + risk.status)
-          //     index++;
-          // }
-
+          if (options?.shouldPrint) {
+            generatePdf(options.includeProbability);
+          }
+          clearTransientCaseState();
           event();
         } else {
           throw new Error(`Error en el encounter: ${encounter.status}`);
@@ -443,6 +570,7 @@ const ResponsesProbability = ({ responses, event }) => {
     } catch (error) {
       console.error("Error al guardar el encounter:", error);
       setError("Error al guardar el encounter.");
+      clearTransientCaseState();
     }
   };
 
@@ -451,195 +579,15 @@ const ResponsesProbability = ({ responses, event }) => {
     return isNaN(date) ? '' : date.toLocaleDateString('es-ES');
   };
 
-  // const handlePrintButtonClick = () => {
-  //   try {
-  //     handleSaveButtonClick();
-  //     console.log("Se han guardado los datos en la BD.")
-
-  //     const getResponse = (key) => {
-  //       const answer = responses[0].item.find(
-  //         (resp) => resp.linkId.toLowerCase() === key.toLowerCase()
-  //       )?.answer?.[0];
-
-  //       return (
-  //         answer?.valueString ||
-  //         answer?.valueInteger ||
-  //         answer?.valueDate ||
-  //         answer?.valueCoding?.display ||
-  //         ''
-  //       );
-  //     };
-
-  //     //const getReport = (title) => reports.find((report) => report.title === title)?.text || '';
-  //     const patientName = getResponse("PAT_NOMBRE");
-  //     const patientNHC = getResponse("PAT_NHC");
-  //     //const patientAge = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_EDAD".toLowerCase())?.answer?.[0]?.valueInteger || '';
-  //     const patientAge = getResponse("PAT_EDAD");
-  //     const patientFUR = getResponse("PAT_FUR");
-  //     const indicacion = getResponse("PAT_IND");
-
-  //     const doc = new jsPDF();  // Crea una nueva instancia de jsPDF
-
-  //     //Encabezado: logo, hospital y servicio
-  //     doc.addImage(LogoHRYC, "JPEG", 10, 10, 90, 15);
-  //     doc.setFont("helvetica", "bold");
-  //     //doc.setFontSize(16);
-  //     //doc.text("Hospital Universitario Ramón y Cajal", 115, 20);
-  //     doc.setFontSize(12);
-  //     doc.text("Servicio de Ginecología y Obstetricia", 120, 20);
-
-  //     /*doc.autoTable({
-  //       startY: 40,
-  //       head: [["Nombre", "NHC", "Fecha de nacimiento", "Fecha de Última Regla"]],
-  //       body: [[patientName, patientNHC, birthDate(patientAge), patientFUR]],
-  //       theme: 'grid'
-  //     });*/
-
-  //     //Datos de la paciente
-  //     doc.setFontSize(12);
-  //     doc.setFont("helvetica", "bold");
-  //     doc.text("Datos de la paciente:", 10, 50);
-
-  //     doc.setFontSize(11);
-  //     doc.setFont("helvetica", "bold");
-  //     doc.text("Nombre:", 15, 60);
-  //     doc.setFont("helvetica", "normal");
-  //     doc.text(patientName, 65, 60);
-
-  //     doc.setFont("helvetica", "bold");
-  //     doc.text("NHC:", 15, 70);
-  //     doc.setFont("helvetica", "normal");
-  //     doc.text(patientNHC, 65, 70);
-
-  //     doc.setFont("helvetica", "bold");
-  //     doc.text("Edad:", 15, 80);
-  //     doc.setFont("helvetica", "normal");
-  //     doc.text(patientAge.toString(), 65, 80);
-
-  //     doc.setFont("helvetica", "bold");
-  //     doc.text("FUR:", 15, 90);
-  //     doc.setFont("helvetica", "normal");
-  //     doc.text(formatDate(patientFUR), 65, 90);
-
-  //     let yPosition = 100; // Posición inicial en Y para el primer bloque de texto
-
-  //     //Sección del informe: indicación, descripción y conclusión
-  //     const addSection = (title, text, massIndex = null) => {
-  //       doc.setFontSize(12);
-  //       doc.setFont("helvetica", "bold");
-  //       doc.text(title, 10, yPosition);
-  //       yPosition += 10; // Espacio entre el título y el texto
-
-  //       //Si hay más de una masa anexial, se añade el título de la masa
-  //       if (massIndex !== null) {
-  //         doc.setFontSize(11);
-  //         doc.setFont("helvetica", "bold");
-  //         doc.text("Conclusión de la Masa Anexial " + (massIndex + 1), 15, yPosition);
-  //         yPosition += 10;
-  //       }
-
-  //       doc.setFontSize(11);
-  //       doc.setFont("helvetica", "normal");
-  //       const textLines = doc.splitTextToSize(text, 180); // Ajusta el ancho según sea necesario  
-  //       doc.text(textLines, 10, yPosition);
-  //       yPosition += textLines.length * 4 + 10; // Actualiza la posición en Y para el siguiente bloque de texto
-  //     };
-
-  //     addSection("Indicación de la ecografía: ", indicacion);
-  //     doc.setFontSize(12);
-  //     doc.setFont("helvetica", "bold");
-  //     doc.text("Descripción de la imagen: ", 10, yPosition);
-  //     yPosition += 10;
-
-  //     doc.setFontSize(11);
-  //     doc.setFont("helvetica", "normal");
-  //     reports.forEach((report, index) => {
-  //       if (hasMassInReports) {
-  //         doc.setFontSize(11);
-  //         doc.setFont("helvetica", "bold");
-  //         doc.text("Masa anexial " + (index + 1), 15, yPosition);
-  //         yPosition += 10;
-  //       }
-  //       doc.setFont("helvetica", "normal");
-
-  //       // Reemplaza <br> por saltos de línea
-  //       const htmlConSaltos = report.text.replace(/<br\s*\/?>/gi, "\n");
-
-  //       // Crea un elemento temporal para interpretar el HTML
-  //       const tempDiv = document.createElement("div");
-  //       tempDiv.innerHTML = htmlConSaltos;
-
-  //       // Extrae el texto plano (ahora con saltos de línea donde estaban los <br>)
-  //       let plainText = tempDiv.innerText;
-
-  //       // Opcional: normaliza el texto (por ejemplo, eliminando múltiples saltos de línea consecutivos)
-  //       const normalizedText = plainText.replace(/\n+/g, "\n").trim();
-
-  //       // Usa splitTextToSize para dividir el texto en líneas según el ancho máximo
-  //       const maxWidth = 180; // Ancho máximo en el PDF (ajusta según tus necesidades)
-  //       const textLines = doc.splitTextToSize(normalizedText, maxWidth);
-  //       doc.setFontSize(11);
-  //       // Agrega el bloque de texto al PDF
-  //       doc.text(textLines, 10, yPosition, { align: "left" });
-
-  //       // Actualiza la posición en Y para el siguiente reporte
-  //       yPosition += textLines.length * 4 + 10;
-  //     });
-
-  //     // Espacio para las conclusiones
-  //     const validObservations = observations.filter((observation) => observation.trim().length > 0); // Filtra las observaciones vacías o nulas
-  //     if (validObservations.length > 0) {
-  //       doc.setFontSize(12);
-  //       doc.setFont("helvetica", "bold");
-  //       doc.text("Conclusiones del ecografista: ", 10, yPosition);
-  //       yPosition += 10;
-
-  //       validObservations.forEach((observation, index) => {
-  //         if (validObservations.length > 1) {
-  //           doc.setFontSize(11);
-  //           doc.setFont("helvetica", "bold");
-  //           doc.text("Conclusión de la Masa Anexial " + (index + 1), 15, yPosition);
-  //           yPosition += 10;
-  //         }
-  //         doc.setFontSize(11);
-  //         doc.setFont("helvetica", "normal");
-  //         const textLines = doc.splitTextToSize(observation, 180); // Ajusta el ancho según sea necesario
-  //         doc.text(textLines, 10, yPosition);
-  //         yPosition += textLines.length + 10; // Actualiza la posición en Y para el siguiente bloque de texto
-  //       });
-  //     }
-
-  //     //Pie de página: nombre del médico y fecha
-  //     const today = new Date();
-  //     doc.setFontSize(10);
-  //     doc.setFont("helvetica", "italic");
-  //     doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
-  //     doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
-  //     const practitionerName = sessionStorage.getItem('practitionerName');
-  //     doc.text("Ecografista: " + practitionerName, 10, 270);
-
-  //     // Guarda el PDF
-  //     //doc.save("informe.pdf");
-  //     // Configura el PDF para que se imprima automáticamente
-  //     doc.autoPrint();
-  //     window.open(doc.output("bloburl"), "_blank");  // Abre el PDF en una nueva pestaña
-
-  //   } catch (error) {
-  //     console.error("Error al guardar el encounter:", error);
-  //     setError("Error al guardar el encounter.");
-  //   }
-  // };
-  const handlePrintButtonClick = (includeProbability) => {
+  const generatePdf = (includeProbability) => {
     try {
-      handleSaveButtonClick(); 
       const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
 
       const getResponse = (key) => {
         const answer = responses[0].item.find(
           (resp) => resp.linkId.toLowerCase() === key.toLowerCase()
         )?.answer?.[0];
-        
-        console.log(`Respuesta para ${key}:`, answer);
+
         return (
           answer?.valueString ||
           answer?.valueInteger ||
@@ -670,35 +618,35 @@ const ResponsesProbability = ({ responses, event }) => {
       doc.setFontSize(14);
       doc.text("Servicio de Ginecología y Obstetricia", 10, 35);
   
-      const patientName = getResponse("PAT_NOMBRE");
-      const patientNHC = getResponse("PAT_NHC");
       const patientAge = getResponse("PAT_EDAD");
       const patientFUR = getResponse("PAT_FUR");
       const indicacion = getResponse("PAT_IND");
       const indicacion_otro = getResponse("PAT_IND_OTRO");
       const hospital = getResponse("HOSPITAL_REF");
+      const sonographerInitials = getResponse("ECO_EXP_SIGLAS");
   
       let yPosition = 50;
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       checkAndAddPage(doc, 10);
-      doc.text("Datos de la paciente:", 10, yPosition);
+      doc.text("Datos del estudio:", 10, yPosition);
       yPosition += 10;
   
       const addField = (label, value) => {
+        if (value === undefined || value === null || value === "") return;
         checkAndAddPage(doc, 10);
         doc.setFontSize(11);
         doc.setFont("helvetica", "bold");
         doc.text(label, 15, yPosition);
         doc.setFont("helvetica", "normal");
-        doc.text(value, 45, yPosition);
+        doc.text(String(value), 65, yPosition);
         yPosition += 10;
       };
   
-      addField("Nombre:", patientName);
-      addField("NHC:", patientNHC);
-      //addField("Edad:", patientAge.toString());
+      addField("Edad:", patientAge ? `${patientAge} años` : "");
       addField("FUR:", formatDate(patientFUR));
+      addField("Hospital:", hospital);
+      addField("Ecografista:", sonographerInitials);
   
       const addSectionWithAutoBreak = (title, text) => {
         const textLines = text.trim() !== "" ? doc.splitTextToSize(text, 180) : [];
@@ -726,7 +674,7 @@ const ResponsesProbability = ({ responses, event }) => {
       if (indicacion === "1" && indicacion_otro.trim() !== "") {
         indicacionFinal = indicacion_otro.trim();
       }
-      indicacionFinal = indicacionFinal.toLowerCase()
+      indicacionFinal = String(indicacionFinal || "").toLowerCase()
       const edadText = patientAge ? `${patientAge} años` : "de edad desconocida";
       const indicacionText = `Mujer de ${edadText} que acude a consulta de ecografía para valoración por ${indicacionFinal}.`;
 
@@ -791,7 +739,6 @@ const ResponsesProbability = ({ responses, event }) => {
   
           doc.setFontSize(11);
           doc.setFont("helvetica", "normal");
-          console.log("Observation: " + observation);
           const text = observation;
           const textLines = doc.splitTextToSize(text, 180);
           textLines.forEach((line) => {
@@ -809,7 +756,7 @@ const ResponsesProbability = ({ responses, event }) => {
       doc.text(hospital, 10, 260);
       doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
       const practitionerName = sessionStorage.getItem('practitionerName');
-      doc.text("Ecografista: " + practitionerName, 10, 270);
+      doc.text("Ecografista: " + (sonographerInitials || practitionerName || ""), 10, 270);
   
       doc.autoPrint();
       window.open(doc.output("bloburl"), "_blank");  // Abre el PDF en una nueva pestaña
@@ -891,23 +838,26 @@ const ResponsesProbability = ({ responses, event }) => {
         </div>
       ))}
 
-      {/* Botón final para volver 
-      <button className="save-btn" onClick={event}>
-        Volver al cuestionario
-      </button>*/}
-      <button className="save-btn" onClick={handleSaveButtonClick}>
+	      {/* Botón final para volver 
+	      <button className="save-btn" onClick={event}>
+	        Volver al cuestionario
+	      </button>*/}
+      {error && <p className="error-message">{error}</p>}
+	      <button
+        className="save-btn"
+        onClick={() => beginCaseSave({ shouldPrint: false, includeProbability: false })}
+        disabled={saveInProgress}
+      >
         Guardar
       </button>
-      {/* <button className="save-btn" onClick={handlePrintButtonClick}>
-        Guardar e Imprimir
-      </button> */}
       <button className="save-btn" onClick={() => {
         if (sco)  {
           setIsModalOpen(true);
         } else {
-          handlePrintButtonClick(false);
+          beginCaseSave({ shouldPrint: true, includeProbability: false });
         }
       }}
+      disabled={saveInProgress}
       >
         Guardar e Imprimir
       </button>
@@ -916,17 +866,53 @@ const ResponsesProbability = ({ responses, event }) => {
       <h2>Confirmación</h2> 
       <p>¿Desea incluir la probabilidad de malignidad en el informe?</p>
       <button className="save" onClick={() => {
-          handlePrintButtonClick(true);
           setIsModalOpen(false);
+          beginCaseSave({ shouldPrint: true, includeProbability: true });
       }}>Sí
       </button>
       <button className="cancel" onClick={() => {
-        handlePrintButtonClick(false);
         setIsModalOpen(false);
+        beginCaseSave({ shouldPrint: true, includeProbability: false });
       }}>No
       </button>
     </Modal>
-  </div>
+      <Modal isOpen={isDuplicateModalOpen} onClose={clearTransientCaseState}>
+        <h2>Posible caso ya registrado</h2>
+        <p>
+          Ya existe un caso registrado para esta paciente con la misma lateralidad y estructura anatómica. Indique si esta exploración corresponde a una nueva evaluación del caso existente o a un caso independiente.
+        </p>
+        {error && <p className="error-message">{error}</p>}
+        {duplicateMatches.length > 0 && (
+          <div>
+            {duplicateMatches.map((match, index) => {
+              const caseId = match.caseId || match.id;
+              return (
+                <label key={`${caseId || "case"}-${index}`} style={{ display: "block", marginBottom: "8px" }}>
+                  <input
+                    type="radio"
+                    name="duplicateCase"
+                    value={caseId || ""}
+                    checked={String(selectedDuplicateCaseId) === String(caseId || "")}
+                    onChange={(event) => setSelectedDuplicateCaseId(event.target.value)}
+                  />
+                  {" "}
+                  {formatDuplicateCaseSummary(match)}
+                </label>
+              );
+            })}
+          </div>
+        )}
+        <button className="save" onClick={() => handleDuplicateDecision("secondary")} disabled={saveInProgress}>
+          Añadir como nueva evaluación
+        </button>
+        <button className="continue" onClick={() => handleDuplicateDecision("independent")} disabled={saveInProgress}>
+          Crear caso independiente
+        </button>
+        <button className="cancel" onClick={clearTransientCaseState} disabled={saveInProgress}>
+          Cancelar
+        </button>
+      </Modal>
+	  </div>
   );
 }
 
@@ -938,6 +924,8 @@ ResponsesProbability.propTypes = {
     })
   ).isRequired,
   event: PropTypes.func.isRequired,
+  transientNhc: PropTypes.string.isRequired,
+  onClearTransientNhc: PropTypes.func.isRequired,
 };
 
 export default ResponsesProbability;

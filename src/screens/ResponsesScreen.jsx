@@ -75,6 +75,52 @@ const ResponsesScreen = () => {
     }
     };
 
+    const parseQuestionnaireResponses = (questionnaireResponse) => {
+        try {
+            const parsed = typeof questionnaireResponse === 'string'
+                ? JSON.parse(questionnaireResponse)
+                : questionnaireResponse;
+            return Array.isArray(parsed) ? parsed : [parsed];
+        } catch (error) {
+            return [];
+        }
+    };
+
+    const findItemByLinkId = (items, linkId) => {
+        if (!Array.isArray(items)) return null;
+        for (const item of items) {
+            if (item.linkId === linkId) return item;
+            const nested = findItemByLinkId(item.item, linkId);
+            if (nested) return nested;
+        }
+        return null;
+    };
+
+    const getAnswerValue = (answer) => {
+        if (answer.valueString) return answer.valueString;
+        if (answer.valueDate) return new Date(answer.valueDate).toLocaleDateString();
+        if (answer.valueInteger) return answer.valueInteger.toString();
+        if (answer.valueDecimal) return answer.valueDecimal.toString();
+        if (answer.valueBoolean) return answer.valueBoolean ? "Sí" : "No";
+        if (answer.valueCoding) return answer.valueCoding.display || answer.valueCoding.code;
+        return "No disponible";
+    };
+
+    const getQuestionnaireValue = (questionnaireResponse, linkId) => {
+        const responses = parseQuestionnaireResponses(questionnaireResponse);
+        for (const response of responses) {
+            const item = findItemByLinkId(response?.item, linkId);
+            if (item?.answer?.length > 0) {
+                return getAnswerValue(item.answer[0]);
+            }
+        }
+        return "";
+    };
+
+    const getStudyCode = (item) => item.studyCode || item.patientCode || getQuestionnaireValue(item.questionnaireResponse, "PAT_CODIGO") || "—";
+    const getCenter = (item) => item.center || item.centerName || getQuestionnaireValue(item.questionnaireResponse, "HOSPITAL_REF") || "—";
+    const getLaterality = (item) => item.laterality || getQuestionnaireValue(item.questionnaireResponse, "MA_LADO") || "—";
+
     const generateReport = () => {
         const getValue = (id) => {
             //const responses = JSON.parse(questionnaireResponse)
@@ -152,8 +198,6 @@ const ResponsesScreen = () => {
       
         //Construcción del informe
         let report = '';
-        console.log("PAT_MA: " + PAT_MA);
-           
         if (PAT_MA === 'no') {                  //Si NO hay masa anexial
           const OD_M1 = getValue('OD_M1');
           const OD_M2 = getValue('OD_M2');
@@ -167,7 +211,6 @@ const ResponsesScreen = () => {
         
           return report;
         } else {    //Si SÍ hay masa anexial
-             console.log("MA_Q_GROSOR: " + MA_Q_GROSOR);
             const estructurasFemeninas = ['trompa'];
             if (['sólida', 'quística', 'sólido-quística'].includes(MA_TIPO)) {
                 let dependencia = '';
@@ -268,7 +311,6 @@ const ResponsesScreen = () => {
             const response = await ApiService(keycloak.token, 'GET', `/app/QuestionnaireResponse`, {});
             if (response.status === 200) {
                 const data = await response.json();
-                console.log(data);
                 if (data && data.length > 0) {
                     setData(data);
                 }
@@ -297,19 +339,31 @@ const ResponsesScreen = () => {
 
     // Filtrado de datos basado en la búsqueda
     const filteredData = data.filter((item) =>
-        item.practitionerName.toLowerCase().includes(search.toLowerCase()) ||
-        item.patientIdentifier.toLowerCase().includes(search.toLowerCase()) ||
-        item.patientName.toLowerCase().includes(search.toLowerCase()) ||
-        item.risk.toLowerCase().includes(search.toLowerCase()) ||
-        new Date(item.encounterPeriodStart).toLocaleString().includes(search.toLowerCase()) 
+        [
+            item.practitionerName,
+            item.risk,
+            item.histology,
+            getStudyCode(item),
+            getCenter(item),
+            getLaterality(item),
+            new Date(item.encounterPeriodStart).toLocaleString()
+        ].join(" ").toLowerCase().includes(search.toLowerCase())
     );
 
     // Ordenación de datos
     const sortedData = filteredData.sort((a, b) => {
+        const getSortValue = (item, property) => {
+            if (property === "studyCode") return getStudyCode(item);
+            if (property === "center") return getCenter(item);
+            if (property === "laterality") return getLaterality(item);
+            return item[property] || "";
+        };
+        const firstValue = getSortValue(a, orderBy);
+        const secondValue = getSortValue(b, orderBy);
         if (orderDirection === 'asc') {
-            return a[orderBy] < b[orderBy] ? -1 : 1;
+            return firstValue < secondValue ? -1 : 1;
         } else {
-            return a[orderBy] > b[orderBy] ? -1 : 1;
+            return firstValue > secondValue ? -1 : 1;
         }
     });
     // Función para abrir el modal con el detalle del cuestionario
@@ -324,15 +378,6 @@ const ResponsesScreen = () => {
         setHistology(row.histology || '');  // Cargar valor actual
         setPathologyReport(row.pathologyReport || '');
         setOpenHistoModal(true);
-    };
-    // Función para obtener el valor de la respuesta de acuerdo al tipo
-    const getAnswerValue = (answer) => {
-        if (answer.valueString) return answer.valueString;
-        if (answer.valueDate) return new Date(answer.valueDate).toLocaleDateString();
-        if (answer.valueInteger) return answer.valueInteger.toString();
-        if (answer.valueDecimal) return answer.valueDecimal.toString();
-        if (answer.valueBoolean) return answer.valueBoolean ? "Sí" : "No";
-        return "No disponible";
     };
     // Paginación de datos
     const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
@@ -355,12 +400,10 @@ const ResponsesScreen = () => {
         //    const Observation= generateObservation(generateId(), selectedRow.encounterId, selectedRow.questionnaireResponse.id,selectedRow.patientId, code, display, histology, pathologyReport)
         try {
             const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, Observation);
-            console.log("observation: " + observation.status)
 
             if (observation.status === 200) {
                 await fetchQuestionnaire();
             }
-            // console.log(updatedData);
             setOpenHistoModal(false);
         } catch (error) {
             console.error("Error al guardar la observación:", error);
@@ -374,7 +417,7 @@ const ResponsesScreen = () => {
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
-                label="Buscar por paciente o ecografista"
+                label="Buscar por código, centro, lateralidad o ecografista"
                 variant="outlined"
                 fullWidth
                 sx={{ mt: 5 }}
@@ -391,22 +434,31 @@ const ResponsesScreen = () => {
                         <TableRow className="table-header">
                             <TableCell>
                                 <TableSortLabel
-                                    active={orderBy === 'patientIdentifier'}
+                                    active={orderBy === 'studyCode'}
                                     direction={orderDirection}
-                                    onClick={() => handleSortRequest('patientIdentifier')}
+                                    onClick={() => handleSortRequest('studyCode')}
                                 >
-                                    Código Paciente
+                                    Código de estudio
                                 </TableSortLabel>
                             </TableCell>
-                            {/* <TableCell>
+                            <TableCell>
                                 <TableSortLabel
-                                    active={orderBy === 'patientName'}
+                                    active={orderBy === 'center'}
                                     direction={orderDirection}
-                                    onClick={() => handleSortRequest('patientName')}
+                                    onClick={() => handleSortRequest('center')}
                                 >
-                                    Nombre
+                                    Centro
                                 </TableSortLabel>
-                            </TableCell> */}
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'laterality'}
+                                    direction={orderDirection}
+                                    onClick={() => handleSortRequest('laterality')}
+                                >
+                                    Lateralidad
+                                </TableSortLabel>
+                            </TableCell>
                             <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'risk'}
@@ -470,8 +522,9 @@ const ResponsesScreen = () => {
 
                                     style={{ cursor: 'pointer' }}
                                 >
-                                    <TableCell>{item.patientIdentifier}</TableCell>
-                                    {/* <TableCell>{item.patientName}</TableCell> */}
+                                    <TableCell>{getStudyCode(item)}</TableCell>
+                                    <TableCell>{getCenter(item)}</TableCell>
+                                    <TableCell>{getLaterality(item)}</TableCell>
                                     <TableCell>{!isNaN(parseFloat(item.risk))
                                                 ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
                                                 : 'No procede'}

@@ -22,7 +22,6 @@ const DownloadScreen = () => {
             if (response.status === 200) {
 
                 const disposition = response.headers.get("Content-Disposition");
-                console.log("Content-Disposition:", disposition);
 
                 const filenameMatch = disposition && disposition.match(/filename="?([^"]+)"?/);
                 const filename = filenameMatch ? filenameMatch[1] : "questionnaire.csv";
@@ -45,7 +44,7 @@ const DownloadScreen = () => {
                 throw new Error(`Error en la respuesta: ${response.status}`);
             }
         } catch (error) {
-            console.error("Error al obtener los datos del paciente:", error);
+            console.error("Error al descargar los registros del estudio:", error);
 
         }
 
@@ -86,7 +85,7 @@ const DownloadScreen = () => {
                     </Typography>
                 </Grid2>
 
-                {/* Imagen de Resultados Pacientes */}
+                {/* Imagen de Resultados del estudio */}
                 <Grid2
                     onClick={() => handleDownload('p')}
                     border={"5px solid"}
@@ -101,7 +100,7 @@ const DownloadScreen = () => {
                     alignItems="center"
                     sx={{ px: 4, py: 2 }}
                 >
-                    <Tooltip title="Descargar resultados y observaciones por paciente en formato CSV">
+                    <Tooltip title="Descargar resultados y observaciones del estudio en formato CSV">
                         <Box
                             component="img"
                             src={du}
@@ -110,7 +109,7 @@ const DownloadScreen = () => {
                         />
                     </Tooltip>
                     <Typography variant="subtitle1" sx={{ mt: 2, textTransform: 'uppercase' }}>
-                        Descargar resultados de pacientes
+                        Descargar resultados del estudio
                     </Typography>
                 </Grid2>
 

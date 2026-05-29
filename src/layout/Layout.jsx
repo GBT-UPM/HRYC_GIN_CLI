@@ -30,17 +30,7 @@ const Layout = ({ children, sidebarOpen,toggleSidebar,handleDownload,closeSessio
         <Sidebar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} download={handleDownload} />
         <div className="main-content">
           <Header name={preferred_username} closeSession={closeSession} />
-          {/* Mostrar diferentes secciones basadas en el rol del usuario */}
-          {isAdmin ? (
-                 <Outlet />
-          ) : //(
-          //   <div>
-          //     <h2>Sección de Usuario</h2>
-          //     <p>Esta es una sección visible para usuarios regulares.</p>
-          //   </div>
-          // )
-              null
-          }
+          <Outlet />
           {/* <Footer/> */}
         </div>
       </Container>

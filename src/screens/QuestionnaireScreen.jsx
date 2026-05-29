@@ -36,6 +36,7 @@ export default function QuestionnaireScreen() {
   // eslint-disable-next-line no-unused-vars
   const [responses, setResponses] = useState([]);
   const [questionnaireResponses, setQuestionnaireResponses] = useState([]);
+  const [transientNhc, setTransientNhc] = useState("");
 
 
   //const {probability,setProbality}=useState(false);
@@ -51,8 +52,7 @@ export default function QuestionnaireScreen() {
       );
   
       if (response.status === 200) {
-        const data = await response.json();
-        console.log(data);
+          const data = await response.json();
         if (data && data.length > 0) {
           setQuestionnaire(data[0]);
         }
@@ -67,21 +67,14 @@ export default function QuestionnaireScreen() {
   const handleSave = async (anwers) => {
     // const confirmSave = window.confirm("¿Está seguro de que desea guardar las respuestas?");
     // if (!confirmSave) return;
-    console.log("CLICK SAVE")
- 
     const questionnaireResponse = {
       resourceType: "QuestionnaireResponse",
       status: "completed",
       id: generateId(),
       item: anwers,
     };
-    console.log("Saved Responses (antes de setState):", questionnaireResponses);
-
     // Misma idea: NO uses .push, haz un spread
     setQuestionnaireResponses((prev) => [...prev, questionnaireResponse]);
-
-    // Aquí inmediatamente seguirá mostrando el viejo estado
-    console.log("Saved Responses (después de setState):", questionnaireResponses);
 
     // Para ver el estado actualizado, puedes usar un useEffect
     setProbality(true);
@@ -94,18 +87,13 @@ export default function QuestionnaireScreen() {
       id: generateId(),
       item: answers,
     };
-    console.log("Saved Responses:", questionnaireResponse);
-  
     // Agregar sin mutar el estado
     setQuestionnaireResponses((prev) => [...prev, questionnaireResponse]);
-  
-    // ¡Ojo! Aquí, inmediatamente después de setState, `questionnaireResponses`
-    // todavía NO reflejará el nuevo valor. Para verlo, hazlo en un useEffect.
-    console.log("Saved Responses2 (inmed. after setState):", questionnaireResponses);
   };
   const QBack = async (anwers) => {
     setQuestionnaireResponses([]);
     setResponses([]);
+    setTransientNhc("");
     // checkUserRoles();
 
     fetchQuestionnaire();
@@ -117,10 +105,9 @@ export default function QuestionnaireScreen() {
   }
 
   useEffect(() => {
-    console.log(keycloak);
-  
     setQuestionnaireResponses([]);
     setResponses([]);
+    setTransientNhc("");
     // checkUserRoles();
   
     fetchQuestionnaire();
@@ -130,10 +117,21 @@ export default function QuestionnaireScreen() {
     <div>
       {questionnaire ? (
         !probability ? (
-          <QuestionnaireForm eventContinue={handleContinue} event={handleSave} questionnaire={questionnaire.resourceData}/>
-        ) : (
-          // <ResponsesSummary event={QBack} responses={responses} />
-          <ResponsesProbability responses={questionnaireResponses} event={QBack} />
+	          <QuestionnaireForm
+              eventContinue={handleContinue}
+              event={handleSave}
+              questionnaire={questionnaire.resourceData}
+              transientNhc={transientNhc}
+              onTransientNhcChange={setTransientNhc}
+            />
+	        ) : (
+	          // <ResponsesSummary event={QBack} responses={responses} />
+	          <ResponsesProbability
+              responses={questionnaireResponses}
+              event={QBack}
+              transientNhc={transientNhc}
+              onClearTransientNhc={() => setTransientNhc("")}
+            />
         )
       ) : (
         null

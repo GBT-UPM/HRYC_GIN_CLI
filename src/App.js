@@ -92,10 +92,13 @@ function App() {
     keycloak.logout();
   }
   useEffect(() => {
-    console.log(keycloak)
     if (initialized && keycloak.authenticated) {
       const realmRoles = keycloak.tokenParsed?.realm_access?.roles || [];
-      const clientRoles = keycloak.tokenParsed?.resource_access?.['my-api-client']?.roles || [];
+      const configuredClientId = process.env.REACT_APP_KEYCLOAK_CLIENT_ID || 'my-api-client';
+      const resourceAccess = keycloak.tokenParsed?.resource_access || {};
+      const configuredClientRoles = resourceAccess[configuredClientId]?.roles || [];
+      const allClientRoles = Object.values(resourceAccess).flatMap((client) => client?.roles || []);
+      const clientRoles = [...configuredClientRoles, ...allClientRoles];
   
       if (realmRoles.includes('practitioner') || clientRoles.includes('practitioner')) {
         setIsAdmin(true);

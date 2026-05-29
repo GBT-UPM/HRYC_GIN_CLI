@@ -3,7 +3,10 @@ import '../assets/css/QuestionnaireForm.css';
 
 import Modal from "./Modal";
 
-const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
+export const HIDDEN_LINK_IDS = new Set(["PAT_CODIGO", "PAT_NHC", "PAT_NOMBRE"]);
+export const isHiddenQuestionnaireItem = (linkId) => HIDDEN_LINK_IDS.has(linkId);
+
+const QuestionnaireForm = ({ questionnaire,event,eventContinue, transientNhc, onTransientNhcChange }) => {
   const [answers, setAnswers] = useState([]);
   const [error, setError] = useState("");
   const [disabledFields, setDisabledFields] = useState([]);
@@ -11,8 +14,6 @@ const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
 
   // Verifica si hay masa anexial
   const hasMass = answers.find(a => a.linkId === "PAT_MA")?.answer?.[0]?.valueCoding.display === "Sí" || false;
-  /**console.log("La variable hasMass:")
-  console.log(hasMass)*/
 
   /**
  * Recorre recursivamente el cuestionario (items e hijos) para
@@ -60,8 +61,6 @@ function getEnabledLinkIds(items, currentAnswers) {
 
       switch (type) {
         case "choice":
-          //console.log(value)
-          //console.log(display)
         //newAnswer.answer = [{ valueCoding: { code: value, display: display } }];
          newAnswer.answer = value;
           break;
@@ -93,7 +92,7 @@ function getEnabledLinkIds(items, currentAnswers) {
       // --- Nuevo paso para limpiar respuestas de ítems no habilitados ---
       const enabledLinkIds = getEnabledLinkIds(questionnaire.item, updatedAnswers);
       const cleanedAnswers = updatedAnswers.filter((ans) =>
-        enabledLinkIds.includes(ans.linkId)
+        enabledLinkIds.includes(ans.linkId) && !HIDDEN_LINK_IDS.has(ans.linkId)
       );
 
       return cleanedAnswers;
@@ -434,7 +433,7 @@ const renderInput = (item) => {
   const getRequiredItems = (items) => {
     let requiredItems = [];
     items.forEach((item) => {
-      if (item.required) {
+      if (item.required && !HIDDEN_LINK_IDS.has(item.linkId)) {
         requiredItems.push(item);
       }
       if (item.item && item.item.length > 0) {
@@ -447,10 +446,14 @@ const renderInput = (item) => {
    /**
    * Valida los campos requeridos que estén habilitados.
    */
-   const validate = () => {
-    const requiredItems = getRequiredItems(questionnaire.item);
+	   const validate = () => {
+	    const requiredItems = getRequiredItems(questionnaire.item);
+      if (!String(transientNhc || "").trim()) {
+        setError("Debe introducir el NHC.");
+        return false;
+      }
 
-    // Solo se requieren los ítems que verdaderamente estén habilitados
+	    // Solo se requieren los ítems que verdaderamente estén habilitados
     const missingAnswers = requiredItems.filter((item) => {
       if (!isItemEnabled(item)) return false; // si no está habilitado, no se valida
       const answer = answers.find((a) => a.linkId === item.linkId);
@@ -460,7 +463,6 @@ const renderInput = (item) => {
     if (missingAnswers.length > 0) {
       const missingLabels = missingAnswers.map((item) => `- ${item.text || item.linkId}`);
       const message = `Los siguientes campos están sin rellenar:\n\n${missingLabels.join('\n')}`;
-      console.log(message);    
       setError(message);
       return false;
     } else {
@@ -470,8 +472,6 @@ const renderInput = (item) => {
   };
    const handleReset = () => {
     const preservedLinkIds = [
-      "PAT_NOMBRE", // Nombre
-      "PAT_NHC",  // NHC
       "PAT_EDAD", // Edad
       "PAT_FUR", // FUR
       "PAT_IND", // Indicación ecografía
@@ -517,7 +517,7 @@ const renderInput = (item) => {
               const style = parseStyleString(styleString);
   
               // Solo renderizamos si el ítem está habilitado
-              if (!isItemEnabled(child)) return null;
+              if (!isItemEnabled(child) || HIDDEN_LINK_IDS.has(child.linkId)) return null;
   
               return child.type === "group" ? (
                 renderGroup(child)
@@ -541,12 +541,28 @@ const renderInput = (item) => {
       );
     };
 
-  return (
-    <><h2 className="questionnaire-title">{questionnaire.title}</h2>
-    <div className="questionnaire-container">
-        {questionnaire.item.map((item) => {
+	  return (
+	    <><h2 className="questionnaire-title">{questionnaire.title}</h2>
+	    <div className="questionnaire-container">
+        <div className="questionnaire-item">
+          <label htmlFor="transient-nhc">
+            NHC
+            <span className="required-asterisk">*</span>
+          </label>
+          <input
+            id="transient-nhc"
+            type="text"
+            value={transientNhc}
+            onChange={(event) => onTransientNhcChange(event.target.value)}
+            autoComplete="off"
+          />
+          <small>
+            El NHC se utilizará únicamente para comprobar si ya existe un caso registrado para esta paciente y lateralidad. No se almacenará en el recurso FHIR ni se incluirá en las exportaciones del estudio.
+          </small>
+        </div>
+	        {questionnaire.item.map((item) => {
           // Si no está habilitado, no lo mostramos
-          if (!isItemEnabled(item)) return null;
+          if (!isItemEnabled(item) || HIDDEN_LINK_IDS.has(item.linkId)) return null;
 
           if (item.type === "group") {
             return renderGroup(item);
@@ -574,10 +590,6 @@ const renderInput = (item) => {
             );
           }
         })}
-      </div>
-      <div style={{display:"none"}} className="questionnaire-responses">
-        <h3>Respuestas:</h3>
-        <pre>{JSON.stringify({ resourceType: "QuestionnaireResponse", status: "completed", item: answers }, null, 2)}</pre>
       </div>
       <button className="save-btn" onClick={() => { validate(); setIsModalOpen(true) } }>Siguiente</button>
       {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}

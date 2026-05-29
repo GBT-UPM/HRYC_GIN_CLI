@@ -66,15 +66,59 @@ const EncountersScreen = () => {
         "Desconocido / Incierto": { code: "70852002", display: "Desconocido / Incierto" }
     };
 
+    const parseQuestionnaireResponses = (questionnaireResponse) => {
+        try {
+            const parsed = typeof questionnaireResponse === 'string'
+                ? JSON.parse(questionnaireResponse)
+                : questionnaireResponse;
+            return Array.isArray(parsed) ? parsed : [parsed];
+        } catch (error) {
+            return [];
+        }
+    };
+
+    const findItemByLinkId = (items, linkId) => {
+        if (!Array.isArray(items)) return null;
+        for (const item of items) {
+            if (item.linkId === linkId) return item;
+            const nested = findItemByLinkId(item.item, linkId);
+            if (nested) return nested;
+        }
+        return null;
+    };
+
+    const getAnswerValue = (answer) => {
+        if (answer.valueString) return answer.valueString;
+        if (answer.valueDate) return new Date(answer.valueDate).toLocaleDateString();
+        if (answer.valueInteger) return answer.valueInteger.toString();
+        if (answer.valueDecimal) return answer.valueDecimal.toString();
+        if (answer.valueBoolean) return answer.valueBoolean ? "Sí" : "No";
+        if (answer.valueCoding) return answer.valueCoding.display || answer.valueCoding.code;
+        return "No disponible";
+    };
+
+    const getQuestionnaireValue = (questionnaireResponse, linkId) => {
+        const responses = parseQuestionnaireResponses(questionnaireResponse);
+        for (const response of responses) {
+            const item = findItemByLinkId(response?.item, linkId);
+            if (item?.answer?.length > 0) {
+                return getAnswerValue(item.answer[0]);
+            }
+        }
+        return "";
+    };
+
+    const getStudyCode = (item) => item.studyCode || item.patientCode || getQuestionnaireValue(item.questionnaireResponse, "PAT_CODIGO") || "—";
+    const getCenter = (item) => item.center || item.centerName || getQuestionnaireValue(item.questionnaireResponse, "HOSPITAL_REF") || "—";
+    const getLaterality = (item) => item.laterality || getQuestionnaireValue(item.questionnaireResponse, "MA_LADO") || "—";
+
     const formatDate = (dateStr) => {
         const date = new Date(dateStr);
         return isNaN(date) ? '' : date.toLocaleDateString('es-ES');
     };
     const handlePrintButtonClick = (includeProbability, responses, observations, practitionerName) => {
         try {
-            console.log("include Prbability: ", includeProbability);
             const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
-            console.log("hasMassInReports", hasMassInReports);
 
             const generated = responses.map((r) => generateReport(r));
 
@@ -114,34 +158,38 @@ const EncountersScreen = () => {
             doc.text("Servicio de Ginecología y Obstetricia", 10, 35);
 
             const hospital = getResponse("HOSPITAL_REF");
-            const patientName = getResponse("PAT_NOMBRE");
-            const patientNHC = getResponse("PAT_NHC");
+            const patientCode = getResponse("PAT_CODIGO");
             const patientAge = getResponse("PAT_EDAD");
             const patientFUR = getResponse("PAT_FUR");
             const indicacion = getResponse("PAT_IND");
             const indicacion_otro = getResponse("PAT_IND_OTRO");
+            const sonographerInitials = getResponse("ECO_EXP_SIGLAS");
+            const laterality = getResponse("MA_LADO");
 
             let yPosition = 50;
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
             checkAndAddPage(doc, 10);
-            doc.text("Datos de la paciente:", 10, yPosition);
+            doc.text("Datos del estudio:", 10, yPosition);
             yPosition += 10;
 
             const addField = (label, value) => {
+                if (value === undefined || value === null || value === "") return;
                 checkAndAddPage(doc, 10);
                 doc.setFontSize(11);
                 doc.setFont("helvetica", "bold");
                 doc.text(label, 15, yPosition);
                 doc.setFont("helvetica", "normal");
-                doc.text(value, 45, yPosition);
+                doc.text(String(value), 65, yPosition);
                 yPosition += 10;
             };
 
-            addField("Nombre:", patientName);
-            addField("NHC:", patientNHC);
-            //addField("Edad:", patientAge.toString());
+            addField("Código de estudio:", patientCode);
+            addField("Edad:", patientAge ? `${patientAge} años` : "");
             addField("FUR:", formatDate(patientFUR));
+            addField("Centro:", hospital);
+            addField("Ecografista:", sonographerInitials);
+            addField("Lateralidad:", laterality);
 
             const addSectionWithAutoBreak = (title, text) => {
                 const textLines = text.trim() !== "" ? doc.splitTextToSize(text, 180) : [];
@@ -169,7 +217,7 @@ const EncountersScreen = () => {
             if (indicacion === "1" && indicacion_otro.trim() !== "") {
                 indicacionFinal = indicacion_otro.trim();
             }
-            indicacionFinal = indicacionFinal.toLowerCase()
+            indicacionFinal = String(indicacionFinal || "").toLowerCase()
             const edadText = patientAge ? `${patientAge} años` : "de edad desconocida";
             const indicacionText = `Mujer de ${edadText} que acude a consulta de ecografía para valoración por ${indicacionFinal}.`;
 
@@ -249,7 +297,7 @@ const EncountersScreen = () => {
             doc.text(hospital, 10, 260);
             doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
             //const practitionerName = sessionStorage.getItem('practitionerName');
-            doc.text("Ecografista: " + practitionerName, 10, 270);
+            doc.text("Ecografista: " + (sonographerInitials || practitionerName || ""), 10, 270);
 
             doc.autoPrint();
             window.open(doc.output("bloburl"), "_blank");
@@ -261,7 +309,6 @@ const EncountersScreen = () => {
     const generateReport = useCallback((res) => {
 
         const getValue = (id) => {
-            console.log("ID", id)
             const response = res.item.find((resp) => resp.linkId.toLowerCase() === id.toLowerCase());
 
             if (response && response.answer.length > 0) {
@@ -457,7 +504,6 @@ const EncountersScreen = () => {
             const response = await ApiService(keycloak.token, 'GET', `/app/Encounter`, {});
             if (response.status === 200) {
                 const data = await response.json();
-                console.log(data);
                 if (data && data.length > 0) {
                     setData(data);
                 }
@@ -486,24 +532,35 @@ const EncountersScreen = () => {
 
     // Filtrado de datos basado en la búsqueda
     const filteredData = data.filter((item) =>
-        item.practitionerName.toLowerCase().includes(search.toLowerCase()) ||
-        item.patientIdentifier.toLowerCase().includes(search.toLowerCase()) ||
-        item.patientName.toLowerCase().includes(search.toLowerCase()) ||
-        item.risk.toLowerCase().includes(search.toLowerCase()) ||
-        new Date(item.encounterPeriodStart).toLocaleString().includes(search.toLowerCase())
+        [
+            item.practitionerName,
+            item.risk,
+            item.histology,
+            getStudyCode(item),
+            getCenter(item),
+            getLaterality(item),
+            new Date(item.encounterPeriodStart).toLocaleString()
+        ].join(" ").toLowerCase().includes(search.toLowerCase())
     );
 
     // Ordenación de datos
     const sortedData = filteredData.sort((a, b) => {
+        const getSortValue = (item, property) => {
+            if (property === "studyCode") return getStudyCode(item);
+            if (property === "center") return getCenter(item);
+            if (property === "laterality") return getLaterality(item);
+            return item[property] || "";
+        };
+        const firstValue = getSortValue(a, orderBy);
+        const secondValue = getSortValue(b, orderBy);
         if (orderDirection === 'asc') {
-            return a[orderBy] < b[orderBy] ? -1 : 1;
+            return firstValue < secondValue ? -1 : 1;
         } else {
-            return a[orderBy] > b[orderBy] ? -1 : 1;
+            return firstValue > secondValue ? -1 : 1;
         }
     });
     // Función para abrir el modal con el detalle del cuestionario
     const handleRowClick = (questionnaireResponse, observations, practitionerName, includeProbability) => {
-        console.log("questionnaireResponse", JSON.parse(questionnaireResponse))
         setSelectedQuestionnaire(JSON.parse(questionnaireResponse));
         handlePrintButtonClick(includeProbability, JSON.parse(questionnaireResponse), JSON.parse(observations),practitionerName);
         //  setOpenModal(true);
@@ -515,16 +572,6 @@ const EncountersScreen = () => {
         setPathologyReport(row.pathologyReport || '');
         setOpenHistoModal(true);
     };
-    // Función para obtener el valor de la respuesta de acuerdo al tipo
-    const getAnswerValue = (answer) => {
-        if (answer.valueString) return answer.valueString;
-        if (answer.valueDate) return new Date(answer.valueDate).toLocaleDateString();
-        if (answer.valueInteger) return answer.valueInteger.toString();
-        if (answer.valueDecimal) return answer.valueDecimal.toString();
-        if (answer.valueBoolean) return answer.valueBoolean ? "Sí" : "No";
-        if (answer.valueCoding) return answer.valueCoding.code;
-        return "No disponible";
-    };
     // Paginación de datos
     const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
     const generateId = () => {
@@ -532,12 +579,6 @@ const EncountersScreen = () => {
     };
     // Guardar cambios y cerrar modal
     const handleSaveChanges = async () => {
-        console.log(histology)
-        console.log(pathologyReport)
-        console.log(selectedRow.encounterId)
-        console.log(selectedRow.patientId)
-        console.log(JSON.parse(selectedRow.questionnaireResponse).id)
-
         const histologyData = histologyOptions[histology];
         const code = histologyData.code;
         const display = histologyData.display;
@@ -551,12 +592,10 @@ const EncountersScreen = () => {
         //    const Observation= generateObservation(generateId(), selectedRow.encounterId, selectedRow.questionnaireResponse.id,selectedRow.patientId, code, display, histology, pathologyReport)
         try {
             const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, Observation);
-            console.log("observation: " + observation.status)
 
             if (observation.status === 200) {
                 await fetchQuestionnaire();
             }
-            // console.log(updatedData);
             setOpenHistoModal(false);
         } catch (error) {
             console.error("Error al guardar la observación:", error);
@@ -570,7 +609,7 @@ const EncountersScreen = () => {
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
-                label="Buscar por paciente o ecografista"
+                label="Buscar por código, centro, lateralidad o ecografista"
                 variant="outlined"
                 fullWidth
                 sx={{ mt: 5 }}
@@ -585,24 +624,33 @@ const EncountersScreen = () => {
                 <Table>
                     <TableHead>
                         <TableRow className="table-header2">
-                            <TableCell>
-                                <TableSortLabel
-                                    active={orderBy === 'patientIdentifier'}
-                                    direction={orderDirection}
-                                    onClick={() => handleSortRequest('patientIdentifier')}
-                                >
-                                    NHC
-                                </TableSortLabel>
-                            </TableCell>
-                          {/*   <TableCell>
-                                <TableSortLabel
-                                    active={orderBy === 'patientName'}
-                                    direction={orderDirection}
-                                    onClick={() => handleSortRequest('patientName')}
-                                >
-                                    Nombre
-                                </TableSortLabel>
-                            </TableCell> */}
+	                            <TableCell>
+	                                <TableSortLabel
+	                                    active={orderBy === 'studyCode'}
+	                                    direction={orderDirection}
+	                                    onClick={() => handleSortRequest('studyCode')}
+	                                >
+	                                    Código de estudio
+	                                </TableSortLabel>
+	                            </TableCell>
+	                            <TableCell>
+	                                <TableSortLabel
+	                                    active={orderBy === 'center'}
+	                                    direction={orderDirection}
+	                                    onClick={() => handleSortRequest('center')}
+	                                >
+	                                    Centro
+	                                </TableSortLabel>
+	                            </TableCell>
+	                            <TableCell>
+	                                <TableSortLabel
+	                                    active={orderBy === 'laterality'}
+	                                    direction={orderDirection}
+	                                    onClick={() => handleSortRequest('laterality')}
+	                                >
+	                                    Lateralidad
+	                                </TableSortLabel>
+	                            </TableCell>
                             <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'risk'}
@@ -637,22 +685,12 @@ const EncountersScreen = () => {
                     <TableBody>
                         {paginatedData.map((item, index) => {
                             //const questionnaireResponse = JSON.parse(item.questionnaireResponse);
-                            console.log(item.observation)
-                            const observation = item.observation && item.observation !== ""
+	                            const observation = item.observation && item.observation !== ""
                                 ? JSON.parse(item.observation)
                                 : null;
 
-                            //Función para obtener el valor de la respuesta de acuerdo al linkId
-                            const getAnswerByLinkId = (questionnaireResponse, linkId) => {
-                                const responses = JSON.parse(questionnaireResponse)
-                                if (!responses || !Array.isArray(responses.item)) return null;
-                                const qItem = responses.item.find(i => i.linkId === linkId);
-                                if (!qItem || !Array.isArray(qItem.answer) || qItem.answer.length === 0) return null;
-                                return getAnswerValue(qItem.answer[0]);
-                            };
-                            const hasMass = getAnswerByLinkId(item.questionnaireResponse, "PAT_MA") === "Sí";
-                            // console.log("hasMass en encounters = " + hasMass)
-                            // console.log("getAnswerByLinkId: " + getAnswerByLinkId(item.questionnaireResponse, "PAT_MA"))
+                            const massAnswer = getQuestionnaireValue(item.questionnaireResponse, "PAT_MA");
+                            const hasMass = massAnswer === "Sí" || massAnswer === "1";
                             return (
                                 <TableRow
                                     className="table-row"
@@ -661,8 +699,9 @@ const EncountersScreen = () => {
 
                                     style={{ cursor: 'pointer' }}
                                 >
-                                    <TableCell>{item.patientIdentifier}</TableCell>
-                                   {/* <TableCell>{item.patientName}</TableCell> */}
+	                                    <TableCell>{getStudyCode(item)}</TableCell>
+	                                    <TableCell>{getCenter(item)}</TableCell>
+	                                    <TableCell>{getLaterality(item)}</TableCell>
                                     <TableCell>
                                         {(() => {
                                             let parsed = [];
@@ -705,9 +744,7 @@ const EncountersScreen = () => {
                                                 color="primary"
                                                 // Abrir modal para dar posibilidad de incluir probabilidad en el informe
                                                 onClick={() => {
-                                                    const parsedArray = typeof item.questionnaireResponse === 'string'
-                                                     ? JSON.parse(item.questionnaireResponse) : item.questionnaireResponse;
-                                                    const parsedResponse = parsedArray[0];
+                                                    const parsedResponse = parseQuestionnaireResponses(item.questionnaireResponse)[0];
                                                     const patMaItem = parsedResponse?.item?.find((r) => r.linkId === 'PAT_MA');
                                                     let hasMass = false;
                                                     if (patMaItem?.answer?.[0]) {
@@ -717,9 +754,7 @@ const EncountersScreen = () => {
                                                             (answer.valueString === "1") ||
                                                             (answer.valueCoding?.code === "1");
                                                     }
-                                                    console.log("hasMass en encounters = " + hasMass)
-
-                                                    if (hasMass) {
+	                                                    if (hasMass) {
                                                         setPendingPrintData({
                                                             responses: item.questionnaireResponse,
                                                             observations: item.observation,
