@@ -4,25 +4,65 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ApiService from "../services/ApiService";
 import doctora from "../assets/images/doctora.png";
+
+const getUniqueCount = (items, selector) => {
+  const values = new Set();
+
+  items.forEach((item) => {
+    const value = selector(item);
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      values.add(String(value));
+    }
+  });
+
+  return values.size;
+};
+
+export const buildDashboardCounts = (evaluations = []) => {
+  const safeEvaluations = Array.isArray(evaluations) ? evaluations : [];
+
+  return {
+    Patient: getUniqueCount(
+      safeEvaluations,
+      (item) => item.studyPatientCode || item.patientCode || item.patientId || item.caseId || item.caseDisplayId
+    ),
+    Encounter: safeEvaluations.length,
+    QuestionnaireResponse: safeEvaluations.filter((item) => item.questionnaireResponseFhirId).length,
+    RiskAssessment: getUniqueCount(
+      safeEvaluations,
+      (item) => item.caseId || item.caseDisplayId || item.studyPatientCode || item.patientCode
+    ),
+  };
+};
+
 const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
+  const token = keycloak?.token;
 
   const [counts, setCounts] = useState({
     Patient: 0,
     Encounter: 0,
-    Condition: 0,
+    QuestionnaireResponse: 0,
+    RiskAssessment: 0,
   });
+
+  console.log("[MainScreen] rendering with counts:", counts);
+
   useEffect(() => {
-    console.log("ENTRA");
-    console.log(keycloak.token);
-    if (!keycloak || !keycloak.token) return;
+    if (!token) {
+      console.log("[MainScreen] waiting for keycloak token", keycloak);
+      return;
+    }
+
     const fetchCounts = async () => {
       try {
-        if (!keycloak || !keycloak.token) return; // 🛑 Salir si no está listo
-        const response = await ApiService(keycloak.token, 'GET', `/fhir/count-all-types`, {});
+        const response = await ApiService(token, 'GET', `/app/cases/evaluations`, {});
+
         if (response.status === 200) {
           const data = await response.json();
-          console.log("Datos recibidos:", data);
-          setCounts(data);
+          const nextCounts = buildDashboardCounts(data);
+          console.log("[MainScreen] /app/cases/evaluations response:", data);
+          console.log("[MainScreen] calculated dashboard counts:", nextCounts);
+          setCounts(nextCounts);
         } else {
           console.warn("Error al obtener conteos:", response.status);
         }
@@ -32,7 +72,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
     };
 
     fetchCounts();
-  }, [keycloak]);
+  }, [token, keycloak]);
 
 
   const navigate = useNavigate();

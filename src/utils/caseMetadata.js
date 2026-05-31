@@ -33,6 +33,25 @@ const getAnswerValue = (questionnaireResponse, linkId) => {
   );
 };
 
+const getFirstNonEmptyValue = (...values) =>
+  values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
+
+const normalizeQuestionnaireResponse = (questionnaireResponse) => {
+  if (typeof questionnaireResponse === "string") {
+    try {
+      return JSON.parse(questionnaireResponse);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  if (Array.isArray(questionnaireResponse)) {
+    return questionnaireResponse[0] || null;
+  }
+
+  return questionnaireResponse;
+};
+
 export const normalizeLaterality = (laterality) => {
   const normalized = normalize(laterality);
 
@@ -92,7 +111,59 @@ export const mapCenterToCode = (center) => {
 };
 
 export const extractStudyCode = (questionnaireResponse) =>
-  getAnswerValue(questionnaireResponse, "PAT_CODIGO");
+  getAnswerValue(normalizeQuestionnaireResponse(questionnaireResponse), "PAT_CODIGO");
+
+export const resolveDisplayStudyIdentifier = (item = {}) => {
+  const evaluationDisplayId = getFirstNonEmptyValue(item.evaluationDisplayId, item.evaluation?.displayId);
+  const caseDisplayId = getFirstNonEmptyValue(item.caseDisplayId, item.case?.displayId);
+
+  if (evaluationDisplayId) {
+    return evaluationDisplayId;
+  }
+
+  if (caseDisplayId) {
+    return caseDisplayId;
+  }
+
+  const caseId = getFirstNonEmptyValue(item.caseId, item.case?.id);
+  const evaluationId = getFirstNonEmptyValue(item.evaluationId, item.evaluation?.id);
+
+  if (caseId && evaluationId) {
+    return `Caso ${caseId} · Evaluación ${evaluationId}`;
+  }
+
+  if (evaluationId) {
+    return `Evaluación ${evaluationId}`;
+  }
+
+  if (caseId) {
+    return `Caso ${caseId}`;
+  }
+
+  return (
+    getFirstNonEmptyValue(
+      item.studyCode,
+      item.patientCode,
+      extractStudyCode(item.questionnaireResponse)
+    ) || "—"
+  );
+};
+
+export const formatCodeStatusLabel = (codeStatus) => {
+  switch (codeStatus) {
+    case "PENDING_CODE":
+      return "Código pendiente";
+    case "CODE_ASSIGNED":
+      return "Código asignado";
+    case "CODE_CONFLICT":
+      return "Conflicto de código";
+    default:
+      return "—";
+  }
+};
+
+export const resolveStudyCodeDisplay = (item = {}) =>
+  getFirstNonEmptyValue(item.studyPatientCode, item.studyCode, item.patientCode) || "Pendiente";
 
 export const extractCenterId = (questionnaireResponse) =>
   mapCenterToCode(getAnswerValue(questionnaireResponse, "HOSPITAL_REF"));

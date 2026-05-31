@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 
 import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
 import '../assets/css/ResponsesScreen.css';
 import { useKeycloak } from '@react-keycloak/web';
 import ApiService from '../services/ApiService';
@@ -26,6 +25,7 @@ import { v4 as uuidv4 } from "uuid";
 import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
 import Logo12oct from "../assets/images/Logo12oct.jpg";
+import { formatCodeStatusLabel, resolveDisplayStudyIdentifier, resolveStudyCodeDisplay } from '../utils/caseMetadata';
 // Datos de ejemplo (pueden ser obtenidos de una API)
 import CloseIcon from "@mui/icons-material/Close";
 
@@ -41,7 +41,7 @@ const EncountersScreen = () => {
     // eslint-disable-next-line no-unused-vars
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
-    const [orderBy, setOrderBy] = useState('encounterPeriodStart');
+    const [orderBy, setOrderBy] = useState('createdAt');
     const [orderDirection, setOrderDirection] = useState('desc');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -108,15 +108,29 @@ const EncountersScreen = () => {
         return "";
     };
 
-    const getStudyCode = (item) => item.studyCode || item.patientCode || getQuestionnaireValue(item.questionnaireResponse, "PAT_CODIGO") || "—";
-    const getCenter = (item) => item.center || item.centerName || getQuestionnaireValue(item.questionnaireResponse, "HOSPITAL_REF") || "—";
-    const getLaterality = (item) => item.laterality || getQuestionnaireValue(item.questionnaireResponse, "MA_LADO") || "—";
+    const getIdentifier = (item) => resolveDisplayStudyIdentifier(item);
+    const getStudyCode = (item) => resolveStudyCodeDisplay(item);
+    const getCodeStatus = (item) => formatCodeStatusLabel(item.codeStatus);
+    const getCenter = (item) => item.centerId || item.center || item.centerName || getQuestionnaireValue(item.questionnaireResponse, "HOSPITAL_REF") || "—";
+    const getLaterality = (item) => item.lateralityDisplay || item.laterality || getQuestionnaireValue(item.questionnaireResponse, "MA_LADO") || "—";
+
+    const fetchQuestionnaireResponseByFhirId = useCallback(async (questionnaireResponseFhirId) => {
+        if (!questionnaireResponseFhirId) {
+            return null;
+        }
+
+        const response = await ApiService(keycloak.token, 'GET', `/app/QuestionnaireResponse/${questionnaireResponseFhirId}`, {});
+        if (response.status !== 200) {
+            throw new Error(`Error en la respuesta: ${response.status}`);
+        }
+        return response.json();
+    }, [keycloak.token]);
 
     const formatDate = (dateStr) => {
         const date = new Date(dateStr);
         return isNaN(date) ? '' : date.toLocaleDateString('es-ES');
     };
-    const handlePrintButtonClick = (includeProbability, responses, observations, practitionerName) => {
+    const handlePrintButtonClick = (includeProbability, responses, observations, practitionerName, rowItem = {}) => {
         try {
             const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
 
@@ -158,7 +172,10 @@ const EncountersScreen = () => {
             doc.text("Servicio de Ginecología y Obstetricia", 10, 35);
 
             const hospital = getResponse("HOSPITAL_REF");
-            const patientCode = getResponse("PAT_CODIGO");
+            const studyIdentifier = resolveDisplayStudyIdentifier({
+                ...rowItem,
+                questionnaireResponse: responses,
+            });
             const patientAge = getResponse("PAT_EDAD");
             const patientFUR = getResponse("PAT_FUR");
             const indicacion = getResponse("PAT_IND");
@@ -184,7 +201,7 @@ const EncountersScreen = () => {
                 yPosition += 10;
             };
 
-            addField("Código de estudio:", patientCode);
+            addField("Identificador:", studyIdentifier);
             addField("Edad:", patientAge ? `${patientAge} años` : "");
             addField("FUR:", formatDate(patientFUR));
             addField("Centro:", hospital);
@@ -501,12 +518,10 @@ const EncountersScreen = () => {
     };
     const fetchQuestionnaire = useCallback(async () => {
         try {
-            const response = await ApiService(keycloak.token, 'GET', `/app/Encounter`, {});
+            const response = await ApiService(keycloak.token, 'GET', `/app/cases/evaluations`, {});
             if (response.status === 200) {
                 const data = await response.json();
-                if (data && data.length > 0) {
-                    setData(data);
-                }
+                setData(Array.isArray(data) ? data : []);
             } else {
                 throw new Error(`Error en la respuesta: ${response.status}`);
             }
@@ -533,20 +548,24 @@ const EncountersScreen = () => {
     // Filtrado de datos basado en la búsqueda
     const filteredData = data.filter((item) =>
         [
-            item.practitionerName,
+            item.observerInitials,
             item.risk,
             item.histology,
+            getIdentifier(item),
             getStudyCode(item),
+            getCodeStatus(item),
             getCenter(item),
             getLaterality(item),
-            new Date(item.encounterPeriodStart).toLocaleString()
+            new Date(item.createdAt).toLocaleString()
         ].join(" ").toLowerCase().includes(search.toLowerCase())
     );
 
     // Ordenación de datos
     const sortedData = filteredData.sort((a, b) => {
         const getSortValue = (item, property) => {
+            if (property === "identifier") return getIdentifier(item);
             if (property === "studyCode") return getStudyCode(item);
+            if (property === "codeStatus") return getCodeStatus(item);
             if (property === "center") return getCenter(item);
             if (property === "laterality") return getLaterality(item);
             return item[property] || "";
@@ -560,10 +579,19 @@ const EncountersScreen = () => {
         }
     });
     // Función para abrir el modal con el detalle del cuestionario
-    const handleRowClick = (questionnaireResponse, observations, practitionerName, includeProbability) => {
-        setSelectedQuestionnaire(JSON.parse(questionnaireResponse));
-        handlePrintButtonClick(includeProbability, JSON.parse(questionnaireResponse), JSON.parse(observations),practitionerName);
-        //  setOpenModal(true);
+    const handleRowClick = async (item, includeProbability) => {
+        try {
+            const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(item.questionnaireResponseFhirId);
+            if (!questionnaireResponse) {
+                return;
+            }
+
+            setSelectedQuestionnaire(questionnaireResponse);
+            const observations = item.histology ? [{ text: item.histology }] : [];
+            handlePrintButtonClick(includeProbability, [questionnaireResponse], observations, item.observerInitials, item);
+        } catch (error) {
+            console.error("Error al obtener el cuestionario:", error);
+        }
     };
     // Abrir modal de edición
     const handleEdit = (row) => {
@@ -583,9 +611,12 @@ const EncountersScreen = () => {
         const code = histologyData.code;
         const display = histologyData.display;
         const obsId = generateId();
-        const encId = selectedRow.encounterId;
-        const quesRId = JSON.parse(selectedRow.questionnaireResponse).id;
-        const patientId = selectedRow.patientId;
+        const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(selectedRow.questionnaireResponseFhirId);
+        const encounterReference = questionnaireResponse?.partOf?.[0]?.reference || questionnaireResponse?.encounter?.reference || '';
+        const patientReference = questionnaireResponse?.subject?.reference || '';
+        const encId = encounterReference.replace('Encounter/', '');
+        const quesRId = questionnaireResponse?.id || selectedRow.questionnaireResponseFhirId;
+        const patientId = patientReference.replace('Patient/', '');
         const text = histology;
         const note = pathologyReport;
         const Observation = generateObservation(obsId, encId, quesRId, patientId, code, display, text, note);
@@ -609,7 +640,7 @@ const EncountersScreen = () => {
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
-                label="Buscar por código, centro, lateralidad o ecografista"
+                label="Buscar por identificador, centro, lateralidad o ecografista"
                 variant="outlined"
                 fullWidth
                 sx={{ mt: 5 }}
@@ -624,6 +655,24 @@ const EncountersScreen = () => {
                 <Table>
                     <TableHead>
                         <TableRow className="table-header2">
+	                            <TableCell>
+	                                <TableSortLabel
+	                                    active={orderBy === 'identifier'}
+	                                    direction={orderDirection}
+	                                    onClick={() => handleSortRequest('identifier')}
+	                                >
+	                                    Caso / Evaluación
+	                                </TableSortLabel>
+	                            </TableCell>
+	                            <TableCell>
+	                                <TableSortLabel
+	                                    active={orderBy === 'codeStatus'}
+	                                    direction={orderDirection}
+	                                    onClick={() => handleSortRequest('codeStatus')}
+	                                >
+	                                    Estado código
+	                                </TableSortLabel>
+	                            </TableCell>
 	                            <TableCell>
 	                                <TableSortLabel
 	                                    active={orderBy === 'studyCode'}
@@ -663,18 +712,18 @@ const EncountersScreen = () => {
 
                             <TableCell>
                                 <TableSortLabel
-                                    active={orderBy === 'encounterText'}
+                                    active={orderBy === 'observerInitials'}
                                     direction={orderDirection}
-                                    onClick={() => handleSortRequest('encounterText')}
+                                    onClick={() => handleSortRequest('observerInitials')}
                                 >
                                     Ecografista
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell>
                                 <TableSortLabel
-                                    active={orderBy === 'encounterPeriodStart'}
+                                    active={orderBy === 'createdAt'}
                                     direction={orderDirection}
-                                    onClick={() => handleSortRequest('encounterPeriodStart')}
+                                    onClick={() => handleSortRequest('createdAt')}
                                 >
                                     Fecha de la cita
                                 </TableSortLabel>
@@ -685,12 +734,6 @@ const EncountersScreen = () => {
                     <TableBody>
                         {paginatedData.map((item, index) => {
                             //const questionnaireResponse = JSON.parse(item.questionnaireResponse);
-	                            const observation = item.observation && item.observation !== ""
-                                ? JSON.parse(item.observation)
-                                : null;
-
-                            const massAnswer = getQuestionnaireValue(item.questionnaireResponse, "PAT_MA");
-                            const hasMass = massAnswer === "Sí" || massAnswer === "1";
                             return (
                                 <TableRow
                                     className="table-row"
@@ -699,70 +742,42 @@ const EncountersScreen = () => {
 
                                     style={{ cursor: 'pointer' }}
                                 >
+	                                    <TableCell>{getIdentifier(item)}</TableCell>
+	                                    <TableCell>{getCodeStatus(item)}</TableCell>
 	                                    <TableCell>{getStudyCode(item)}</TableCell>
 	                                    <TableCell>{getCenter(item)}</TableCell>
 	                                    <TableCell>{getLaterality(item)}</TableCell>
                                     <TableCell>
                                         {(() => {
-                                            let parsed = [];
-                                            try {
-                                                if (!item.risk || item.risk === "" || item.risk === "{}") {
-                                                    return "No procede";
-                                                }
-
-                                                const riskData = typeof item.risk === 'string' ? JSON.parse(item.risk) : item.risk;
-                                                parsed = Array.isArray(riskData) ? riskData : [riskData];
-                                            } catch (e) {
-                                                console.error("Error al parsear item.risk:", e);
-                                                return "No procede";
-                                            }
-
-                                            const probabilities = parsed
-                                                .map(r => parseFloat(r?.prediction?.[0]?.probabilityDecimal))
-                                                .filter(p => !isNaN(p));
-
-                                            return probabilities.length > 0
-                                                ? probabilities.map(p => (p * 100).toFixed(2) + '%').join(' - ')
+                                            return !isNaN(parseFloat(item.risk))
+                                                ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
                                                 : "No procede";
                                         })()}
                                     </TableCell>
-                                    <TableCell>{item.practitionerName || '—'}</TableCell>
-                                    <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
+                                    <TableCell>{item.observerInitials || '—'}</TableCell>
+                                    <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleString() : '—'}</TableCell>
                                     <TableCell style={{ textAlign: 'right' }}>
-                                        {hasMass && observation === null && (
-                                            <Tooltip title="Editar">
-                                                <IconButton
-                                                    color="secondary"
-                                                    onClick={() => handleEdit(item)}
-                                                >
-                                                    <EditIcon></EditIcon>
-                                                </IconButton>
-                                            </Tooltip>
-                                        )}
                                         <Tooltip title="Imprimir informe">
                                             <IconButton
                                                 color="primary"
+                                                aria-label="Imprimir informe"
                                                 // Abrir modal para dar posibilidad de incluir probabilidad en el informe
-                                                onClick={() => {
-                                                    const parsedResponse = parseQuestionnaireResponses(item.questionnaireResponse)[0];
-                                                    const patMaItem = parsedResponse?.item?.find((r) => r.linkId === 'PAT_MA');
-                                                    let hasMass = false;
-                                                    if (patMaItem?.answer?.[0]) {
-                                                        const answer = patMaItem.answer[0];
-                                                        hasMass = 
-                                                            (answer.valueCoding?.display === "Sí") ||
-                                                            (answer.valueString === "1") ||
-                                                            (answer.valueCoding?.code === "1");
-                                                    }
+                                                onClick={async () => {
+                                                    const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(item.questionnaireResponseFhirId);
+                                                    const patMaItem = findItemByLinkId(questionnaireResponse?.item, 'PAT_MA');
+                                                    const answer = patMaItem?.answer?.[0];
+                                                    const hasMass =
+                                                        answer?.valueCoding?.display === "Sí" ||
+                                                        answer?.valueString === "1" ||
+                                                        answer?.valueCoding?.code === "1";
+
 	                                                    if (hasMass) {
                                                         setPendingPrintData({
-                                                            responses: item.questionnaireResponse,
-                                                            observations: item.observation,
-                                                            practitionerName: item.practitionerName
+                                                            rowItem: item,
                                                         });
                                                         setIsModalOpen(true);
                                                     } else {
-                                                        handleRowClick(item.questionnaireResponse, item.observation, item.practitionerName, false);
+                                                        handleRowClick(item, false);
                                                     }
                                                 }}
                                             >
@@ -893,12 +908,7 @@ const EncountersScreen = () => {
                     variant="contained"
                     color="primary"
                     onClick={() => {
-                    handleRowClick(
-                        pendingPrintData.responses,
-                        pendingPrintData.observations,
-                        pendingPrintData.practitionerName,
-                        true
-                    );
+                    handleRowClick(pendingPrintData.rowItem, true);
                     setPendingPrintData(null);
                     setIsModalOpen(false);
                     }}
@@ -910,12 +920,7 @@ const EncountersScreen = () => {
                     variant="outlined"
                     color="secondary"
                     onClick={() => {
-                    handleRowClick(
-                        pendingPrintData.responses,
-                        pendingPrintData.observations,
-                        pendingPrintData.practitionerName,
-                        false
-                    );
+                    handleRowClick(pendingPrintData.rowItem, false);
                     setPendingPrintData(null);
                     setIsModalOpen(false);
                     }}

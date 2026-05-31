@@ -22,6 +22,7 @@ import ApiService from '../services/ApiService';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useObservationHistologyTemplate } from '../hooks/useObservationHistologyTemplate';
 import { v4 as uuidv4 } from "uuid";
+import { formatCodeStatusLabel, resolveDisplayStudyIdentifier, resolveStudyCodeDisplay } from '../utils/caseMetadata';
 // Datos de ejemplo (pueden ser obtenidos de una API)
     const tipoMap = {
     'sólida': 'sólido',
@@ -35,7 +36,7 @@ const ResponsesScreen = () => {
     // eslint-disable-next-line no-unused-vars
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
-    const [orderBy, setOrderBy] = useState('encounterPeriodStart');
+    const [orderBy, setOrderBy] = useState('createdAt');
     const [orderDirection, setOrderDirection] = useState('desc');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -117,9 +118,23 @@ const ResponsesScreen = () => {
         return "";
     };
 
-    const getStudyCode = (item) => item.studyCode || item.patientCode || getQuestionnaireValue(item.questionnaireResponse, "PAT_CODIGO") || "—";
-    const getCenter = (item) => item.center || item.centerName || getQuestionnaireValue(item.questionnaireResponse, "HOSPITAL_REF") || "—";
-    const getLaterality = (item) => item.laterality || getQuestionnaireValue(item.questionnaireResponse, "MA_LADO") || "—";
+    const getIdentifier = (item) => resolveDisplayStudyIdentifier(item);
+    const getStudyCode = (item) => resolveStudyCodeDisplay(item);
+    const getCodeStatus = (item) => formatCodeStatusLabel(item.codeStatus);
+    const getCenter = (item) => item.centerId || item.center || item.centerName || getQuestionnaireValue(item.questionnaireResponse, "HOSPITAL_REF") || "—";
+    const getLaterality = (item) => item.lateralityDisplay || item.laterality || getQuestionnaireValue(item.questionnaireResponse, "MA_LADO") || "—";
+
+    const fetchQuestionnaireResponseByFhirId = useCallback(async (questionnaireResponseFhirId) => {
+        if (!questionnaireResponseFhirId) {
+            return null;
+        }
+
+        const response = await ApiService(keycloak.token, 'GET', `/app/QuestionnaireResponse/${questionnaireResponseFhirId}`, {});
+        if (response.status !== 200) {
+            throw new Error(`Error en la respuesta: ${response.status}`);
+        }
+        return response.json();
+    }, [keycloak.token]);
 
     const generateReport = () => {
         const getValue = (id) => {
@@ -308,12 +323,10 @@ const ResponsesScreen = () => {
       };
     const fetchQuestionnaire = useCallback(async () => {
         try {
-            const response = await ApiService(keycloak.token, 'GET', `/app/QuestionnaireResponse`, {});
+            const response = await ApiService(keycloak.token, 'GET', `/app/cases/evaluations`, {});
             if (response.status === 200) {
                 const data = await response.json();
-                if (data && data.length > 0) {
-                    setData(data);
-                }
+                setData(Array.isArray(data) ? data : []);
             } else {
                 throw new Error(`Error en la respuesta: ${response.status}`);
             }
@@ -340,20 +353,24 @@ const ResponsesScreen = () => {
     // Filtrado de datos basado en la búsqueda
     const filteredData = data.filter((item) =>
         [
-            item.practitionerName,
+            item.observerInitials,
             item.risk,
             item.histology,
+            getIdentifier(item),
             getStudyCode(item),
+            getCodeStatus(item),
             getCenter(item),
             getLaterality(item),
-            new Date(item.encounterPeriodStart).toLocaleString()
+            new Date(item.createdAt).toLocaleString()
         ].join(" ").toLowerCase().includes(search.toLowerCase())
     );
 
     // Ordenación de datos
     const sortedData = filteredData.sort((a, b) => {
         const getSortValue = (item, property) => {
+            if (property === "identifier") return getIdentifier(item);
             if (property === "studyCode") return getStudyCode(item);
+            if (property === "codeStatus") return getCodeStatus(item);
             if (property === "center") return getCenter(item);
             if (property === "laterality") return getLaterality(item);
             return item[property] || "";
@@ -367,10 +384,14 @@ const ResponsesScreen = () => {
         }
     });
     // Función para abrir el modal con el detalle del cuestionario
-    const handleRowClick = (questionnaireResponse) => {
-
-        setSelectedQuestionnaire(JSON.parse(questionnaireResponse));
-        setOpenModal(true);
+    const handleRowClick = async (item) => {
+        try {
+            const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(item.questionnaireResponseFhirId);
+            setSelectedQuestionnaire(questionnaireResponse);
+            setOpenModal(true);
+        } catch (error) {
+            console.error("Error al obtener el cuestionario:", error);
+        }
     };
     // Abrir modal de edición
     const handleEdit = (row) => {
@@ -391,9 +412,12 @@ const ResponsesScreen = () => {
         const code = histologyData.code;
         const display = histologyData.display;
         const obsId = generateId();
-        const encId = selectedRow.encounterId;
-        const quesRId = JSON.parse(selectedRow.questionnaireResponse).id;
-        const patientId = selectedRow.patientId;
+        const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(selectedRow.questionnaireResponseFhirId);
+        const encounterReference = questionnaireResponse?.partOf?.[0]?.reference || questionnaireResponse?.encounter?.reference || '';
+        const patientReference = questionnaireResponse?.subject?.reference || '';
+        const encId = encounterReference.replace('Encounter/', '');
+        const quesRId = questionnaireResponse?.id || selectedRow.questionnaireResponseFhirId;
+        const patientId = patientReference.replace('Patient/', '');
         const text = histology;
         const note = pathologyReport;
         const Observation = generateObservation(obsId, encId, quesRId, patientId, code, display, text, note);
@@ -417,7 +441,7 @@ const ResponsesScreen = () => {
             </Typography>
             {/* Campo de búsqueda */}
             <TextField
-                label="Buscar por código, centro, lateralidad o ecografista"
+                label="Buscar por identificador, centro, lateralidad o ecografista"
                 variant="outlined"
                 fullWidth
                 sx={{ mt: 5 }}
@@ -432,6 +456,24 @@ const ResponsesScreen = () => {
                 <Table>
                     <TableHead>
                         <TableRow className="table-header">
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'identifier'}
+                                    direction={orderDirection}
+                                    onClick={() => handleSortRequest('identifier')}
+                                >
+                                    Caso / Evaluación
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'codeStatus'}
+                                    direction={orderDirection}
+                                    onClick={() => handleSortRequest('codeStatus')}
+                                >
+                                    Estado código
+                                </TableSortLabel>
+                            </TableCell>
                             <TableCell>
                                 <TableSortLabel
                                     active={orderBy === 'studyCode'}
@@ -470,27 +512,27 @@ const ResponsesScreen = () => {
                             </TableCell>
                             <TableCell>
                                 <TableSortLabel
-                                    active={orderBy === 'questionnaireResponse'}
+                                    active={orderBy === 'histology'}
                                     direction={orderDirection}
-                                    onClick={() => handleSortRequest('questionnaireResponse')}
+                                    onClick={() => handleSortRequest('histology')}
                                 >
                                     Histologia
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell>
                                 <TableSortLabel
-                                    active={orderBy === 'encounterText'}
+                                    active={orderBy === 'observerInitials'}
                                     direction={orderDirection}
-                                    onClick={() => handleSortRequest('encounterText')}
+                                    onClick={() => handleSortRequest('observerInitials')}
                                 >
                                     Ecografista
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell>
                                 <TableSortLabel
-                                    active={orderBy === 'encounterPeriodStart'}
+                                    active={orderBy === 'createdAt'}
                                     direction={orderDirection}
-                                    onClick={() => handleSortRequest('encounterPeriodStart')}
+                                    onClick={() => handleSortRequest('createdAt')}
                                 >
                                     Fecha de la cita
                                 </TableSortLabel>
@@ -501,19 +543,6 @@ const ResponsesScreen = () => {
                     <TableBody>
                         {paginatedData.map((item, index) => {
 
-                            const observation = item.observation && item.observation !== ""
-                                ? JSON.parse(item.observation)
-                                : null;
-
-                            //Función para obtener el valor de la respuesta de acuerdo al linkId
-                            const getAnswerByLinkId = (questionnaireResponse, linkId) => {
-                                const responses = JSON.parse(questionnaireResponse)
-                                if (!responses || !Array.isArray(responses.item)) return null;
-                                const qItem = responses.item.find(i => i.linkId === linkId);
-                                if (!qItem || !Array.isArray(qItem.answer) || qItem.answer.length === 0) return null;
-                                return getAnswerValue(qItem.answer[0]);
-                            };
-                            const hasMass = getAnswerByLinkId(item.questionnaireResponse, "PAT_MA") === "1";
                             return (
                                 <TableRow
                                     className="table-row"
@@ -522,6 +551,8 @@ const ResponsesScreen = () => {
 
                                     style={{ cursor: 'pointer' }}
                                 >
+                                    <TableCell>{getIdentifier(item)}</TableCell>
+                                    <TableCell>{getCodeStatus(item)}</TableCell>
                                     <TableCell>{getStudyCode(item)}</TableCell>
                                     <TableCell>{getCenter(item)}</TableCell>
                                     <TableCell>{getLaterality(item)}</TableCell>
@@ -529,13 +560,11 @@ const ResponsesScreen = () => {
                                                 ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
                                                 : 'No procede'}
                                     </TableCell>
-                                    <TableCell>{
-                                        !hasMass ? '—' : observation !== null ? observation.valueCodeableConcept.text : "Pendiente"
-                                    }</TableCell>
-                                    <TableCell>{item.practitionerName || '—' }</TableCell>
-                                    <TableCell>{new Date(item.encounterPeriodStart).toLocaleString()}</TableCell>
+                                    <TableCell>{item.histology || 'Pendiente'}</TableCell>
+                                    <TableCell>{item.observerInitials || '—' }</TableCell>
+                                    <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleString() : '—'}</TableCell>
                                     <TableCell style={{ textAlign: 'right' }}>
-                                    {hasMass && observation === null && (
+                                    {!item.histology && item.questionnaireResponseFhirId && (
                                             <Tooltip title="Editar">
                                                 <IconButton
                                                     color="secondary"
@@ -548,7 +577,7 @@ const ResponsesScreen = () => {
                                         <Tooltip title="Ver Detalles">
                                             <IconButton
                                                 color="primary"
-                                                onClick={() => handleRowClick(item.questionnaireResponse)}
+                                                onClick={() => handleRowClick(item)}
                                             >
                                                 <VisibilityIcon />
                                             </IconButton>

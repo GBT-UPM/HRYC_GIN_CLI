@@ -9,6 +9,9 @@ import {
   mapCenterToCode,
   normalizeAnatomicalStructure,
   normalizeLaterality,
+  formatCodeStatusLabel,
+  resolveDisplayStudyIdentifier,
+  resolveStudyCodeDisplay,
   validateCaseMetadata,
 } from "./caseMetadata";
 
@@ -78,6 +81,23 @@ describe("case metadata", () => {
     });
   });
 
+  it("does not require PAT_CODIGO to validate case metadata", () => {
+    const { item, ...rest } = questionnaireResponse;
+    const withoutLegacyStudyCode = {
+      ...rest,
+      item: item.filter((entry) => entry.linkId !== "PAT_CODIGO"),
+    };
+
+    expect(validateCaseMetadata(withoutLegacyStudyCode)).toMatchObject({
+      centerId: "HURYC",
+      lateralityCode: "RIGHT",
+      anatomicalStructureCode: "OVARY",
+      studyCode: "",
+      isValid: true,
+      errors: [],
+    });
+  });
+
   it("returns validation errors for unknown center and missing laterality/structure", () => {
     const result = validateCaseMetadata({
       item: [{ linkId: "HOSPITAL_REF", answer: [{ valueString: "Centro no mapeado" }] }],
@@ -112,5 +132,57 @@ describe("case metadata", () => {
     expect(summary).toContain("2 evaluaciones");
     expect(summary).not.toContain("123");
     expect(summary).not.toContain("secret");
+  });
+
+  it("prefers case and evaluation ids over PAT_CODIGO in display identifiers", () => {
+    expect(
+      resolveDisplayStudyIdentifier({
+        caseId: 7,
+        evaluationId: 3,
+        patientCode: "LEGACY-1",
+        questionnaireResponse,
+      })
+    ).toBe("Caso 7 · Evaluación 3");
+  });
+
+  it("prefers evaluationDisplayId and caseDisplayId for operational identifiers", () => {
+    expect(
+      resolveDisplayStudyIdentifier({
+        evaluationDisplayId: "HURYC-C000001-E000003",
+        caseDisplayId: "HURYC-C000001",
+        questionnaireResponse,
+      })
+    ).toBe("HURYC-C000001-E000003");
+
+    expect(
+      resolveDisplayStudyIdentifier({
+        caseDisplayId: "HURYC-C000001",
+        questionnaireResponse,
+      })
+    ).toBe("HURYC-C000001");
+  });
+
+  it("keeps PAT_CODIGO only as a legacy fallback", () => {
+    expect(
+      resolveDisplayStudyIdentifier({
+        questionnaireResponse,
+      })
+    ).toBe("STUDY-1");
+  });
+
+  it("returns a safe placeholder when no display identifier is available", () => {
+    expect(resolveDisplayStudyIdentifier({ questionnaireResponse: { item: [] } })).toBe("—");
+  });
+
+  it("formats code status labels for safe UI display", () => {
+    expect(formatCodeStatusLabel("PENDING_CODE")).toBe("Código pendiente");
+    expect(formatCodeStatusLabel("CODE_ASSIGNED")).toBe("Código asignado");
+    expect(formatCodeStatusLabel("CODE_CONFLICT")).toBe("Conflicto de código");
+    expect(formatCodeStatusLabel(undefined)).toBe("—");
+  });
+
+  it("shows study code or pending placeholder without exposing pseudonyms", () => {
+    expect(resolveStudyCodeDisplay({ studyPatientCode: "SP-100" })).toBe("SP-100");
+    expect(resolveStudyCodeDisplay({ studyPatientCode: null, patientPseudonym: "secret" })).toBe("Pendiente");
   });
 });

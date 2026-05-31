@@ -68,6 +68,7 @@ describe("caseService", () => {
     const payload = ApiService.mock.calls[0][3];
     expect(ApiService.mock.calls[0][2]).toBe("/app/cases");
     expect(payload).toMatchObject({
+      nhc: "transient",
       laterality: "RIGHT",
       anatomicalStructure: "OVARY",
       lateralityCode: "RIGHT",
@@ -77,6 +78,8 @@ describe("caseService", () => {
     });
     expect(JSON.stringify(payload.questionnaireResponse)).not.toContain("PAT_NHC");
     expect(JSON.stringify(payload.questionnaireResponse)).not.toContain("PAT_NOMBRE");
+    expect(JSON.stringify(payload.questionnaireResponse)).not.toContain("PAT_CODIGO");
+    expect(payload.nhc).not.toBe("STUDY-1");
   });
 
   it("calls add secondary evaluation endpoint", async () => {
@@ -85,9 +88,16 @@ describe("caseService", () => {
     await addSecondaryEvaluation("token", 1, {
       encounterId: "enc-1",
       observerInitials: "ABC",
-      questionnaireResponse: { item: [{ linkId: "PAT_CODIGO", answer: [{ valueString: "STUDY-1" }] }] },
+      questionnaireResponse: {
+        item: [
+          { linkId: "PAT_CODIGO", answer: [{ valueString: "STUDY-1" }] },
+          { linkId: "PAT_NHC", answer: [{ valueString: "123" }] },
+        ],
+      },
     });
 
     expect(ApiService.mock.calls[0][2]).toBe("/app/cases/1/evaluations");
+    expect(JSON.stringify(ApiService.mock.calls[0][3].questionnaireResponse)).not.toContain("PAT_CODIGO");
+    expect(JSON.stringify(ApiService.mock.calls[0][3].questionnaireResponse)).not.toContain("PAT_NHC");
   });
 });
