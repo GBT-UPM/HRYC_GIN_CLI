@@ -6,15 +6,19 @@ import '../assets/css/Sidebar.css';
 import React from 'react';
 import HomeIcon from '@mui/icons-material/Home';
 import DownloadIcon from '@mui/icons-material/Download';
-const Sidebar = ({ sidebarOpen, toggleSidebar, download }) => {
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import { isSiteCoordinator } from '../utils/auth';
+
+const Sidebar = ({ sidebarOpen, toggleSidebar, download, keycloak }) => {
+    const canManageStudyParticipants = isSiteCoordinator(keycloak);
 
     return (
         <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
             <button className="close-sidebar-btn" onClick={toggleSidebar}>
                 <FontAwesomeIcon icon={sidebarOpen ? faTimes : faBars} />
             </button>
-            <img src={LogoETSIT} alt="LogoEscuela" class="logoEscuela" />
-            <img src={LogoGBT} alt="LogoGbt" class="logoEscuela" />
+            <img src={LogoETSIT} alt="LogoEscuela" className="logoEscuela" />
+            <img src={LogoGBT} alt="LogoGbt" className="logoEscuela" />
             <div className="sections">
                 <div className="sidebar-section">
                     <ul>
@@ -37,6 +41,18 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, download }) => {
                         </li>
                     </ul>
                 </div>
+                {canManageStudyParticipants && (
+                    <div className="sidebar-section">
+                        <ul>
+                            <li>
+                                <a href="/study-participants/pending">
+                                    <AssignmentTurnedInIcon sx={{ fontSize: 18, verticalAlign: 'middle', marginRight: 1 }} />
+                                    Participantes pendientes
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                )}
                 {/* <div className="sidebar-section">
                     <button className="section-toggle-btn" onClick={() => toggleSection('historico')}>
                         Histórico <FontAwesomeIcon icon={sections.historico ? faChevronUp : faChevronDown} />

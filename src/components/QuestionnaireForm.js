@@ -2,13 +2,36 @@ import React, { useState } from "react";
 import '../assets/css/QuestionnaireForm.css';
 
 import Modal from "./Modal";
+import { mapCenterToCode } from "../utils/caseMetadata";
+import {
+  validateStudyPatientCode,
+  STUDY_PARTICIPANT_ERROR_MESSAGES,
+} from "../services/studyParticipantService";
+import { CARE_SETTING_OPTIONS, normalizeCareSetting } from "../utils/careSetting";
 
 export const HIDDEN_LINK_IDS = new Set(["PAT_CODIGO", "PAT_NHC", "PAT_NOMBRE"]);
 export const isHiddenQuestionnaireItem = (linkId) => HIDDEN_LINK_IDS.has(linkId);
+export const NHC_REQUIRED_MESSAGE = "Debe introducir el NHC para continuar.";
 
-const QuestionnaireForm = ({ questionnaire,event,eventContinue, transientNhc, onTransientNhcChange }) => {
+const QuestionnaireForm = ({
+  questionnaire,
+  event,
+  eventContinue,
+  token = "",
+  transientNhc,
+  onTransientNhcChange,
+  studyPatientCode = "",
+  onStudyPatientCodeChange = () => {},
+  canEnterStudyPatientCode = false,
+  careSettingCode = "UNKNOWN",
+  onCareSettingChange = () => {},
+  onDirtyChange = () => {},
+}) => {
   const [answers, setAnswers] = useState([]);
   const [error, setError] = useState("");
+  const [nhcError, setNhcError] = useState("");
+  const [studyCodeError, setStudyCodeError] = useState("");
+  const [validatingStudyCode, setValidatingStudyCode] = useState(false);
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -44,6 +67,7 @@ function getEnabledLinkIds(items, currentAnswers) {
 }
 
   const handleInputChange = (questionText,linkId, type, value,display) => {
+    onDirtyChange(true);
     setAnswers((prevAnswers) => {
       const existingAnswerIndex = prevAnswers.findIndex(
         (answer) => answer.linkId === linkId
@@ -145,6 +169,19 @@ function checkEnableWhen(enableWhen, currentAnswers) {
     }
   });
 }
+
+const getAnswerDisplayValue = (linkId) => {
+  const answer = answers.find((a) => a.linkId === linkId)?.answer?.[0];
+  return (
+    answer?.valueCoding?.display ||
+    answer?.valueCoding?.code ||
+    answer?.valueString ||
+    answer?.valueInteger?.toString() ||
+    answer?.valueDecimal?.toString() ||
+    answer?.valueDate ||
+    ""
+  );
+};
   
 /**
    * Ajustado para que reciba también 'answers'.
@@ -446,12 +483,14 @@ const renderInput = (item) => {
    /**
    * Valida los campos requeridos que estén habilitados.
    */
-	   const validate = () => {
+	   const validateRequiredFields = () => {
 	    const requiredItems = getRequiredItems(questionnaire.item);
       if (!String(transientNhc || "").trim()) {
-        setError("Debe introducir el NHC.");
+        setNhcError(NHC_REQUIRED_MESSAGE);
+        setError(NHC_REQUIRED_MESSAGE);
         return false;
       }
+      setNhcError("");
 
 	    // Solo se requieren los ítems que verdaderamente estén habilitados
     const missingAnswers = requiredItems.filter((item) => {
@@ -470,6 +509,69 @@ const renderInput = (item) => {
       return true;
     }
   };
+
+  const validateStudyCodeIfNeeded = async () => {
+    const trimmedStudyCode = String(studyPatientCode || "").trim();
+
+    if (!canEnterStudyPatientCode || !trimmedStudyCode) {
+      setStudyCodeError("");
+      return true;
+    }
+
+    const centerId = mapCenterToCode(getAnswerDisplayValue("HOSPITAL_REF"));
+    if (!centerId) {
+      const message = "No se pudo identificar el centro participante.";
+      setStudyCodeError(message);
+      setError(message);
+      return false;
+    }
+
+    try {
+      setValidatingStudyCode(true);
+      setStudyCodeError("");
+      const result = await validateStudyPatientCode(token, {
+        centerId,
+        nhc: String(transientNhc || "").trim(),
+        studyPatientCode: trimmedStudyCode,
+      });
+
+      if (result.valid === false && result.reason === "CODE_ASSIGNED_TO_ANOTHER_PARTICIPANT") {
+        setStudyCodeError(STUDY_PARTICIPANT_ERROR_MESSAGES.conflict);
+        setError(STUDY_PARTICIPANT_ERROR_MESSAGES.conflict);
+        return false;
+      }
+
+      if (result.valid === false) {
+        setStudyCodeError(STUDY_PARTICIPANT_ERROR_MESSAGES.validateGeneric);
+        setError(STUDY_PARTICIPANT_ERROR_MESSAGES.validateGeneric);
+        return false;
+      }
+
+      return true;
+    } catch (validationError) {
+      const message = validationError.message || STUDY_PARTICIPANT_ERROR_MESSAGES.validateGeneric;
+      setStudyCodeError(message);
+      setError(message);
+      return false;
+    } finally {
+      setValidatingStudyCode(false);
+    }
+  };
+
+  const validate = async () => {
+    if (!validateRequiredFields()) {
+      return false;
+    }
+
+    return validateStudyCodeIfNeeded();
+  };
+
+  const handleNextClick = async () => {
+    if (await validate()) {
+      setIsModalOpen(true);
+    }
+  };
+
    const handleReset = () => {
     const preservedLinkIds = [
       "PAT_EDAD", // Edad
@@ -553,13 +655,85 @@ const renderInput = (item) => {
             id="transient-nhc"
             type="text"
             value={transientNhc}
-            onChange={(event) => onTransientNhcChange(event.target.value)}
+            onChange={(event) => {
+              onTransientNhcChange(event.target.value);
+              onDirtyChange(true);
+              if (event.target.value.trim()) {
+                setNhcError("");
+                if (error === NHC_REQUIRED_MESSAGE) {
+                  setError("");
+                }
+              }
+            }}
             autoComplete="off"
+            aria-invalid={Boolean(nhcError)}
+            aria-describedby={nhcError ? "transient-nhc-error" : undefined}
           />
+          {nhcError && (
+            <p id="transient-nhc-error" className="error-message">
+              {nhcError}
+            </p>
+          )}
           <small>
             El NHC se utilizará únicamente para comprobar si ya existe un caso registrado para esta paciente y lateralidad. No se almacenará en el recurso FHIR ni se incluirá en las exportaciones del estudio.
           </small>
-        </div>
+	        </div>
+	        <div className="questionnaire-item">
+	          <label htmlFor="care-setting">
+	            Ámbito asistencial
+	            <span className="required-asterisk">*</span>
+	          </label>
+	          <select
+	            id="care-setting"
+	            value={normalizeCareSetting(careSettingCode).code}
+	            onChange={(event) => {
+	              const selected = normalizeCareSetting(event.target.value);
+	              onCareSettingChange(selected);
+	              onDirtyChange(true);
+	            }}
+	            required
+	          >
+	            {CARE_SETTING_OPTIONS.map((option) => (
+	              <option key={option.code} value={option.code}>
+	                {option.display}
+	              </option>
+	            ))}
+	          </select>
+	        </div>
+	        {canEnterStudyPatientCode && (
+          <div className="questionnaire-item">
+            <label htmlFor="study-patient-code">Código de estudio</label>
+            <input
+              id="study-patient-code"
+              type="text"
+              value={studyPatientCode}
+              onChange={(event) => {
+                onStudyPatientCodeChange(event.target.value);
+                onDirtyChange(true);
+                setStudyCodeError("");
+                if (error === STUDY_PARTICIPANT_ERROR_MESSAGES.conflict) {
+                  setError("");
+                }
+              }}
+              autoComplete="off"
+              aria-invalid={Boolean(studyCodeError)}
+              aria-describedby={studyCodeError ? "study-patient-code-error" : undefined}
+            />
+            {studyCodeError && (
+              <p id="study-patient-code-error" className="error-message">
+                {studyCodeError}
+              </p>
+            )}
+            <small>
+              Si dispone del código de estudio, puede introducirlo ahora. Si se deja vacío, el caso quedará pendiente de asignación de código.
+            </small>
+            {studyCodeError && (
+              <small>
+                Puede dejar el código vacío y el caso quedará pendiente de asignación.
+              </small>
+            )}
+          </div>
+        )}
 	        {questionnaire.item.map((item) => {
           // Si no está habilitado, no lo mostramos
           if (!isItemEnabled(item) || HIDDEN_LINK_IDS.has(item.linkId)) return null;
@@ -591,7 +765,9 @@ const renderInput = (item) => {
           }
         })}
       </div>
-      <button className="save-btn" onClick={() => { validate(); setIsModalOpen(true) } }>Siguiente</button>
+      <button className="save-btn" onClick={handleNextClick} disabled={validatingStudyCode}>
+        {validatingStudyCode ? "Validando..." : "Siguiente"}
+      </button>
       {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h2>Confirmación</h2>
@@ -609,10 +785,10 @@ const renderInput = (item) => {
           <>
             <p>Pulse <b>continuar</b> para elaborar el informe.</p>
             <p><b>Si continúa no podrá volver a este cuestionario.</b></p>
-            <button className="save" onClick={() => { if (validate()) { event(answers); setIsModalOpen(false); } }}>Continuar</button>
+            <button className="save" onClick={() => { event(answers); setIsModalOpen(false); }}>Continuar</button>
             {/* Mostrar solo si hay masa anexial */}
             {hasMass && (
-              <button className="continue" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); setIsModalOpen(false)} } }>Añadir masa anexial</button>)}
+              <button className="continue" onClick={() => { eventContinue(answers); handleReset(); setIsModalOpen(false)} }>Añadir masa anexial</button>)}
               <button className="cancel" onClick={() => setIsModalOpen(false)}>Cancelar</button>
           </>
         )}

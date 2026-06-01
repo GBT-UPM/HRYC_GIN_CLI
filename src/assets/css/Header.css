@@ -1,27 +1,77 @@
 .header {
     background-color: #f8f9fa;
-    padding: 10px 20px;
+    padding: 12px 24px;
     border-bottom: 1px solid #dee2e6;
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
     align-items: center;
+    gap: 20px;
+  }
+
+  .logo-section {
+    flex: 1 1 auto;
+    min-width: 280px;
   }
   
   .user-section {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex: 0 0 auto;
+    min-width: 360px;
   }
   
   .user-avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    margin-right: 10px;
   }
   
   .user-name {
     margin-right: 20px;
     font-weight: bold;
+  }
+
+  .session-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    min-width: 0;
+    max-width: 360px;
+    color: #343a40;
+    font-size: 0.92rem;
+    line-height: 1.2;
+  }
+
+  .session-info-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    white-space: nowrap;
+  }
+
+  .session-info-main {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .session-info-separator {
+    color: #6c757d;
+  }
+
+  .session-info-warning {
+    color: #b45309;
+    font-weight: 700;
+  }
+
+  .session-info-centers {
+    color: #495057;
+    font-size: 0.86rem;
+    font-weight: 600;
   }
   
   .logout-btn {
@@ -35,4 +85,39 @@
   
   .logout-btn:hover {
     background-color: #0056b3;
+  }
+
+  @media (max-width: 1100px) {
+    .header {
+      align-items: flex-start;
+    }
+
+    .user-section {
+      min-width: 320px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .header {
+      padding: 12px 16px;
+    }
+
+    .logo-section {
+      min-width: 100%;
+    }
+
+    .user-section {
+      width: 100%;
+      min-width: 0;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .session-info {
+      max-width: calc(100% - 52px);
+    }
+
+    .logout-btn {
+      margin-left: 52px;
+    }
   }

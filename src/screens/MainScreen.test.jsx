@@ -71,7 +71,13 @@ describe('MainScreen', () => {
 
     render(
       <MainScreen
-        keycloak={{ token: 'token' }}
+        keycloak={{
+          token: 'token',
+          tokenParsed: {
+            realm_access: { roles: ['ROLE_SITE_COORDINATOR'] },
+            allowed_centers: ['HURYC'],
+          },
+        }}
         practitionerName="Dra. Test"
         isAdmin
       />
@@ -84,5 +90,69 @@ describe('MainScreen', () => {
     expectCardCount('Citas Cursadas', 3);
     expectCardCount('Cuestionarios Realizados', 3);
     expectCardCount('Masas Anexiales', 2);
+    expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/cases/evaluations?centerId=HURYC', {});
+  });
+
+  it('uses global evaluations endpoint for study coordinators', async () => {
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ([]),
+    });
+
+    render(
+      <MainScreen
+        keycloak={{
+          token: 'token',
+          tokenParsed: {
+            realm_access: { roles: ['ROLE_STUDY_COORDINATOR'] },
+          },
+        }}
+        practitionerName="Dra. Test"
+        isAdmin
+      />
+    );
+
+    await waitFor(() => {
+      expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/cases/evaluations', {});
+    });
+  });
+
+  it('shows missing center message and does not query global endpoint', async () => {
+    render(
+      <MainScreen
+        keycloak={{
+          token: 'token',
+          tokenParsed: {
+            realm_access: { roles: ['ROLE_SITE_COORDINATOR'] },
+            allowed_centers: [],
+          },
+        }}
+        practitionerName="Dra. Test"
+        isAdmin
+      />
+    );
+
+    expect(await screen.findByText('Usuario sin centro asignado.')).toBeInTheDocument();
+    expect(ApiService).not.toHaveBeenCalled();
+  });
+
+  it('shows permissions message on 403', async () => {
+    ApiService.mockResolvedValueOnce({ status: 403 });
+
+    render(
+      <MainScreen
+        keycloak={{
+          token: 'token',
+          tokenParsed: {
+            realm_access: { roles: ['ROLE_SITE_COORDINATOR'] },
+            allowed_centers: ['HURYC'],
+          },
+        }}
+        practitionerName="Dra. Test"
+        isAdmin
+      />
+    );
+
+    expect(await screen.findByText('No tiene permisos para consultar datos de este centro.')).toBeInTheDocument();
   });
 });

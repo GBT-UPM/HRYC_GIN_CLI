@@ -3,7 +3,14 @@ import LogoHRYC from "../assets/images/LogoHRYC.jpg";
 import LogoUser from "../assets/images/user.png";
 import LogoIrycis from "../assets/images/logo-irycis.png";
 import LogoMIA from "../assets/images/logo-mia.png";
+import { getCentersDisplayLabel, getPreferredUsername, getPrimaryRoleLabel } from "../utils/auth";
+
 const Header = (props) => {
+  const username = getPreferredUsername(props.keycloak) || props.name || "Usuario";
+  const roleLabel = getPrimaryRoleLabel(props.keycloak);
+  const centersLabel = getCentersDisplayLabel(props.keycloak);
+  const hasMissingCenter = centersLabel === "Sin centro asignado";
+
   return (
 <header className="header">
   <div className="logo-section">
@@ -14,7 +21,16 @@ const Header = (props) => {
 
   <div className="user-section">
     <img src={LogoUser} alt="Avatar" className="user-avatar" />
-    <span className="user-name">{props.name}</span>
+    <div className="session-info" aria-label="Información de sesión">
+      <div className="session-info-row">
+        <span className="session-info-main">{username}</span>
+        <span className="session-info-separator">·</span>
+        <span>{roleLabel}</span>
+      </div>
+      <div className={hasMissingCenter ? "session-info-warning" : "session-info-centers"}>
+        {centersLabel}
+      </div>
+    </div>
     <button onClick={props.closeSession} className="logout-btn">
       Cerrar Sesión
     </button>

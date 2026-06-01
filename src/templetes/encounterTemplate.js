@@ -30,9 +30,6 @@ export const EncounterTemplate = {
             text: "Examen ginecológico de rutina realizado",
         },
     ],
-    serviceProvider: {
-        reference: "Organization/hrc"
-    },
     location: [
         {
             location: {

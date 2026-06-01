@@ -13,12 +13,14 @@ import ResponsesScreen from "./screens/ResponsesScreen";
 import ApiService from "./services/ApiService";
 import DownloadScreen from "./screens/DownloadScreen";
 import EncountersScreen from "./screens/EncountersScreen";
+import PendingParticipantsScreen from "./screens/PendingParticipantsScreen";
 
 
 
 function App() {
   const { keycloak, initialized } = useKeycloak();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [keycloakInitTimedOut, setKeycloakInitTimedOut] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [practitioner, setPractitioner] = useState("");
   const [practitionerName, setPractitionerName] = useState("");
@@ -91,7 +93,38 @@ function App() {
   const closeSession = async () => {
     keycloak.logout();
   }
+
   useEffect(() => {
+    if (initialized) {
+      setKeycloakInitTimedOut(false);
+      return undefined;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setKeycloakInitTimedOut(true);
+    }, 8000);
+
+    return () => clearTimeout(timeoutId);
+  }, [initialized]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      const keycloakState = {
+        initialized,
+        authenticated: keycloak?.authenticated,
+        hasToken: Boolean(keycloak?.token),
+        keycloakRealm: process.env.REACT_APP_KEYCLOAK_REALM,
+        keycloakClientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID,
+        issuer: keycloak?.tokenParsed?.iss,
+        audience: keycloak?.tokenParsed?.aud,
+        authorizedParty: keycloak?.tokenParsed?.azp,
+        realmRoles: keycloak?.tokenParsed?.realm_access?.roles || [],
+        allowedCenters: keycloak?.tokenParsed?.allowed_centers,
+      };
+      console.log("[App] keycloak state", keycloakState);
+      console.log("[App] keycloak state json", JSON.stringify(keycloakState));
+    }
+
     if (initialized && keycloak.authenticated) {
       const realmRoles = keycloak.tokenParsed?.realm_access?.roles || [];
       const configuredClientId = process.env.REACT_APP_KEYCLOAK_CLIENT_ID || 'my-api-client';
@@ -113,6 +146,33 @@ function App() {
     }
   }, [initialized, keycloak, setIsAdmin, setPractitioner, setPractitionerName]);
 
+  if (!initialized) {
+    const keycloakUrl = process.env.REACT_APP_KEYCLOAK_URL || "https://emma.gbt.tfo.upm.es/auth";
+    const realm = process.env.REACT_APP_KEYCLOAK_REALM || "TFT";
+    const discoveryUrl = `${keycloakUrl.replace(/\/$/, "")}/realms/${realm}/.well-known/openid-configuration`;
+
+    return (
+      <div style={{ padding: "2rem", textAlign: "center" }}>
+        Inicializando sesión...
+        {keycloakInitTimedOut && (
+          <div style={{ marginTop: "1rem", textAlign: "left", display: "inline-block", maxWidth: 760 }}>
+            <p>No se ha podido completar la inicialización de Keycloak.</p>
+            <p><strong>Discovery URL:</strong> {discoveryUrl}</p>
+            <p>Comprueba en el navegador si esa URL responde JSON y revisa la consola para los eventos de Keycloak.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (!keycloak?.authenticated) {
+    return (
+      <div style={{ padding: "2rem", textAlign: "center" }}>
+        No autenticado.
+      </div>
+    );
+  }
+
   return (
     <>{/*<Notification />*/}
       {/* <Routes>
@@ -120,7 +180,7 @@ function App() {
     </Routes>*/}
       <Routes>
         {/* Ruta que utiliza Layout como contenedor */}
-        <Route path="/" element={<Layout sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} handleDownload={handleDownload} closeSession={closeSession} preferred_username={practitionerName} isAdmin={isAdmin} />}>
+        <Route path="/" element={<Layout sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} handleDownload={handleDownload} closeSession={closeSession} preferred_username={practitionerName} isAdmin={isAdmin} keycloak={keycloak} />}>
 
           {/* Rutas hijas dentro de Layout */}
           <Route index element={
@@ -134,6 +194,7 @@ function App() {
           <Route path="/responses" element={<ResponsesScreen />} />
           <Route path="/download" element={<DownloadScreen />} />
           <Route path="/encounters" element={<EncountersScreen />} />
+          <Route path="/study-participants/pending" element={<PendingParticipantsScreen />} />
         </Route>
 
         {/* Otras rutas que no usen Layout, si deseas */}

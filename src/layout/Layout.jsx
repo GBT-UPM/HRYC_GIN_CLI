@@ -4,7 +4,7 @@ import Sidebar from "../components/Sidebar";
 import { Container } from "react-bootstrap";
 
 
-const Layout = ({ children, sidebarOpen,toggleSidebar,handleDownload,closeSession,preferred_username,isAdmin}) => {
+const Layout = ({ children, sidebarOpen,toggleSidebar,handleDownload,closeSession,preferred_username,isAdmin,keycloak}) => {
   return (
     // <><div style={{ display: "flex", minHeight: "100vh" }}>
     //   {/* Menú lateral o Header */}
@@ -27,9 +27,9 @@ const Layout = ({ children, sidebarOpen,toggleSidebar,handleDownload,closeSessio
     // </div>
     <Container className="App">
         {/*} <Header name={keycloak.tokenParsed.preferred_username} />{*/}
-        <Sidebar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} download={handleDownload} />
+        <Sidebar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} download={handleDownload} keycloak={keycloak} />
         <div className="main-content">
-          <Header name={preferred_username} closeSession={closeSession} />
+          <Header name={preferred_username} closeSession={closeSession} keycloak={keycloak} />
           <Outlet />
           {/* <Footer/> */}
         </div>

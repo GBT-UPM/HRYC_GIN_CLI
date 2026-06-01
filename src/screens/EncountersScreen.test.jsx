@@ -3,9 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import EncountersScreen from './EncountersScreen';
 import ApiService from '../services/ApiService';
 
+let mockKeycloak;
+
 jest.mock('@react-keycloak/web', () => ({
   useKeycloak: () => ({
-    keycloak: { token: 'token' },
+    keycloak: mockKeycloak,
     initialized: true,
   }),
 }));
@@ -31,6 +33,13 @@ jest.mock('jspdf', () => jest.fn().mockImplementation(() => ({
 describe('EncountersScreen', () => {
   beforeEach(() => {
     ApiService.mockReset();
+    mockKeycloak = {
+      token: 'token',
+      tokenParsed: {
+        realm_access: { roles: ['ROLE_SITE_COORDINATOR'] },
+        allowed_centers: ['HURYC'],
+      },
+    };
   });
 
   it('shows evaluationDisplayId and assigned code safely', async () => {
@@ -46,6 +55,8 @@ describe('EncountersScreen', () => {
           codeStatus: 'CODE_ASSIGNED',
           studyPatientCode: 'SP-200',
           lateralityDisplay: 'Izquierdo',
+          careSettingCode: 'INPATIENT',
+          careSettingDisplay: 'Hospitalización',
           risk: null,
           histology: 'Benigno',
           observerInitials: 'XYZ',
@@ -63,9 +74,19 @@ describe('EncountersScreen', () => {
 
     expect(screen.getByText('Código asignado')).toBeInTheDocument();
     expect(screen.getByText('SP-200')).toBeInTheDocument();
+    expect(screen.getByText('Hospitalización')).toBeInTheDocument();
     expect(screen.getByLabelText('Imprimir informe')).toBeInTheDocument();
     expect(screen.queryByTestId('EditIcon')).not.toBeInTheDocument();
     expect(screen.queryByText('patientPseudonym')).not.toBeInTheDocument();
     expect(screen.queryByText('123456')).not.toBeInTheDocument();
+    expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/cases/evaluations?centerId=HURYC', {});
+  });
+
+  it('shows permissions message on 403 instead of a silent empty table', async () => {
+    ApiService.mockResolvedValueOnce({ status: 403 });
+
+    render(<EncountersScreen />);
+
+    expect(await screen.findByText('No tiene permisos para consultar datos de este centro.')).toBeInTheDocument();
   });
 });

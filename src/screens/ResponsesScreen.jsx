@@ -11,7 +11,8 @@ import {
     FormControl,
     InputLabel,
     Select,
-    MenuItem
+    MenuItem,
+    Alert
 } from '@mui/material';
 
 import SearchIcon from '@mui/icons-material/Search';
@@ -23,6 +24,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useObservationHistologyTemplate } from '../hooks/useObservationHistologyTemplate';
 import { v4 as uuidv4 } from "uuid";
 import { formatCodeStatusLabel, resolveDisplayStudyIdentifier, resolveStudyCodeDisplay } from '../utils/caseMetadata';
+import { canUseGlobalView, getAllowedCenters, getDefaultCenter } from '../utils/auth';
+import { getCaseEvaluations } from '../services/caseEvaluationService';
 // Datos de ejemplo (pueden ser obtenidos de una API)
     const tipoMap = {
     'sólida': 'sólido',
@@ -32,6 +35,10 @@ import { formatCodeStatusLabel, resolveDisplayStudyIdentifier, resolveStudyCodeD
 
 const ResponsesScreen = () => {
     const { keycloak, initialized } = useKeycloak();
+    const allowedCenters = getAllowedCenters(keycloak);
+    const isGlobalView = canUseGlobalView(keycloak);
+    const shouldSelectCenter = !isGlobalView && allowedCenters.length > 1;
+    const [selectedCenter, setSelectedCenter] = useState(getDefaultCenter(keycloak));
     const [data, setData] = useState([]);
     // eslint-disable-next-line no-unused-vars
     const [error, setError] = useState(null);
@@ -123,6 +130,7 @@ const ResponsesScreen = () => {
     const getCodeStatus = (item) => formatCodeStatusLabel(item.codeStatus);
     const getCenter = (item) => item.centerId || item.center || item.centerName || getQuestionnaireValue(item.questionnaireResponse, "HOSPITAL_REF") || "—";
     const getLaterality = (item) => item.lateralityDisplay || item.laterality || getQuestionnaireValue(item.questionnaireResponse, "MA_LADO") || "—";
+    const getCareSetting = (item) => item.careSettingDisplay || "No especificado";
 
     const fetchQuestionnaireResponseByFhirId = useCallback(async (questionnaireResponseFhirId) => {
         if (!questionnaireResponseFhirId) {
@@ -322,19 +330,31 @@ const ResponsesScreen = () => {
         return 1 / (1 + Math.exp(-logit));
       };
     const fetchQuestionnaire = useCallback(async () => {
+        if (!keycloak.token) {
+            return;
+        }
+
+        if (shouldSelectCenter && !selectedCenter) {
+            setData([]);
+            setError(null);
+            return;
+        }
+
         try {
-            const response = await ApiService(keycloak.token, 'GET', `/app/cases/evaluations`, {});
-            if (response.status === 200) {
-                const data = await response.json();
-                setData(Array.isArray(data) ? data : []);
-            } else {
-                throw new Error(`Error en la respuesta: ${response.status}`);
-            }
+            setError(null);
+            const data = await getCaseEvaluations(
+                keycloak.token,
+                keycloak,
+                selectedCenter,
+                "No se pudieron cargar los cuestionarios."
+            );
+            setData(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error("Error al obtener los datos del paciente:", error);
-            setError("Error al obtener los datos del paciente.");
+            setData([]);
+            setError(error.message || "No se pudieron cargar los cuestionarios.");
         }
-    }, [keycloak.token, setData, setError]);
+    }, [keycloak, selectedCenter, setData, setError, shouldSelectCenter]);
     // Simula la carga de datos desde una API (reemplazar con fetch/axios en entorno real)
     useEffect(() => {
         if (initialized) {
@@ -439,6 +459,32 @@ const ResponsesScreen = () => {
             <Typography variant="h4" gutterBottom>
                 📋 Lista de Cuestionarios
             </Typography>
+            {shouldSelectCenter && (
+                <FormControl sx={{ minWidth: 220, mt: 2 }}>
+                    <InputLabel id="responses-center-label">Centro</InputLabel>
+                    <Select
+                        labelId="responses-center-label"
+                        label="Centro"
+                        value={selectedCenter}
+                        onChange={(event) => setSelectedCenter(event.target.value)}
+                    >
+                        <MenuItem value="" disabled>Seleccione centro</MenuItem>
+                        {allowedCenters.map((center) => (
+                            <MenuItem key={center} value={center}>{center}</MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+            )}
+            {isGlobalView && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Vista global
+                </Typography>
+            )}
+            {error && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                    {error}
+                </Alert>
+            )}
             {/* Campo de búsqueda */}
             <TextField
                 label="Buscar por identificador, centro, lateralidad o ecografista"
@@ -503,6 +549,15 @@ const ResponsesScreen = () => {
                             </TableCell>
                             <TableCell>
                                 <TableSortLabel
+                                    active={orderBy === 'careSettingDisplay'}
+                                    direction={orderDirection}
+                                    onClick={() => handleSortRequest('careSettingDisplay')}
+                                >
+                                    Ámbito asistencial
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
                                     active={orderBy === 'risk'}
                                     direction={orderDirection}
                                     onClick={() => handleSortRequest('risk')}
@@ -556,6 +611,7 @@ const ResponsesScreen = () => {
                                     <TableCell>{getStudyCode(item)}</TableCell>
                                     <TableCell>{getCenter(item)}</TableCell>
                                     <TableCell>{getLaterality(item)}</TableCell>
+                                    <TableCell>{getCareSetting(item)}</TableCell>
                                     <TableCell>{!isNaN(parseFloat(item.risk))
                                                 ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
                                                 : 'No procede'}

@@ -18,12 +18,14 @@ import { generateId } from '../screens/QuestionnaireScreen';
 import { generatePeriod } from '../screens/QuestionnaireScreen';
 import { useRiskAssessmentTemplate } from '../hooks/useRiskAssessmentTemplate';
 import { usePatientTemplate } from '../hooks/usePatientTemplate';
-import { sanitizeQuestionnaireResponse } from '../utils/privacy';
+import { maskNhc, sanitizeQuestionnaireResponse } from '../utils/privacy';
 import { formatDuplicateCaseSummary, validateCaseMetadata } from '../utils/caseMetadata';
+import { DEFAULT_CARE_SETTING, normalizeCareSetting } from '../utils/careSetting';
 import {
   addSecondaryEvaluation,
   checkDuplicateCase,
   createCase,
+  CASE_ERROR_MESSAGES,
 } from '../services/caseService';
 
   const tipoMap = {
@@ -57,7 +59,29 @@ const getDuplicateMatches = (duplicateResult) => {
   return [];
 };
 
-const ResponsesProbability = ({ responses, event, transientNhc, onClearTransientNhc }) => {
+const getSafeSaveErrorMessage = (error) => {
+  if (
+    error?.message === CASE_ERROR_MESSAGES.forbidden ||
+    error?.message === CASE_ERROR_MESSAGES.studyCodeConflict ||
+    error?.message === CASE_ERROR_MESSAGES.unauthorized
+  ) {
+    return error.message;
+  }
+
+  return CASE_ERROR_MESSAGES.network;
+};
+
+const ResponsesProbability = ({
+  responses,
+  event,
+  transientNhc,
+  onClearTransientNhc,
+  studyPatientCode = "",
+  canUseStudyPatientCode = false,
+  careSetting = DEFAULT_CARE_SETTING,
+  onCaseSaved = () => {},
+}) => {
+  const normalizedCareSetting = normalizeCareSetting(careSetting?.code || careSetting);
   const [reports, setReports] = useState([]);
   const [observations, setObservations] = useState([]);
   //nuevo
@@ -75,6 +99,13 @@ const ResponsesProbability = ({ responses, event, transientNhc, onClearTransient
   const [duplicateMatches, setDuplicateMatches] = useState([]);
   const [selectedDuplicateCaseId, setSelectedDuplicateCaseId] = useState("");
   const [saveInProgress, setSaveInProgress] = useState(false);
+  const [isSaveConfirmationOpen, setIsSaveConfirmationOpen] = useState(false);
+  const [pendingSaveRequest, setPendingSaveRequest] = useState(null);
+  const [isStudyCodeConflictOpen, setIsStudyCodeConflictOpen] = useState(false);
+  const [studyCodeConflictRequest, setStudyCodeConflictRequest] = useState(null);
+  const [correctedStudyPatientCode, setCorrectedStudyPatientCode] = useState("");
+  const [studyCodeConflictError, setStudyCodeConflictError] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
 
   const { keycloak } = useKeycloak();
   // eslint-disable-next-line no-unused-vars
@@ -340,6 +371,17 @@ const ResponsesProbability = ({ responses, event, transientNhc, onClearTransient
     setDuplicateMatches([]);
     setSelectedDuplicateCaseId("");
     setIsDuplicateModalOpen(false);
+    setStudyCodeConflictRequest(null);
+    setCorrectedStudyPatientCode("");
+    setStudyCodeConflictError("");
+    setIsStudyCodeConflictOpen(false);
+  };
+
+  const clearDuplicateModalState = () => {
+    setPendingDuplicate(null);
+    setDuplicateMatches([]);
+    setSelectedDuplicateCaseId("");
+    setIsDuplicateModalOpen(false);
   };
 
   const buildPreparedQuestionnaireResponses = () => {
@@ -356,6 +398,68 @@ const ResponsesProbability = ({ responses, event, transientNhc, onClearTransient
         metadata,
       };
     });
+  };
+
+  const createPersistenceContext = async (centerId, careSettingCode) => {
+    try {
+      const body = {
+        action: "SAVE_QUESTIONNAIRE",
+        details: "Usuario guarda cuestionario",
+        durationMs: 0
+      }
+      const res = await ApiService(keycloak.token, 'POST', `/audit/register`, body);
+      if (process.env.NODE_ENV === "development") {
+        console.debug("Audit status:", res.status);
+      }
+    } catch (error) {
+      console.error("Error al auditar el inicio de cuestionario:", error);
+    }
+
+    const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
+
+    const patientId = generateId();
+    const Patient = generatePatient(patientId);
+    const patient = await ApiService(keycloak.token, 'POST', `/fhir/Patient/check-or-create`, Patient);
+    if (!patient.ok) {
+      throw new Error(`Error en patient: ${patient.status}`);
+    }
+
+    const encId = generateId();
+    const imgStuId = generateId();
+    const serieId = generateId();
+    setEncounterId(encId);
+    const Encounter = generateEncounter({
+      encId,
+      patientId,
+      period: generatePeriod(),
+      centerId,
+      careSettingCode,
+    });
+    const ImageStudy = generateImagingStudy(imgStuId, encId, patientId, serieId);
+
+    const encounter = await ApiService(keycloak.token, 'POST', `/fhir/Encounter`, Encounter);
+    if (encounter.status !== 200) {
+      throw new Error(`Error en el encounter: ${encounter.status}`);
+    }
+
+    const imageStudy = await ApiService(keycloak.token, 'POST', `/fhir/ImagingStudy`, ImageStudy);
+    if (process.env.NODE_ENV === "development") {
+      console.debug("ImageStudy status:", imageStudy.status);
+    }
+
+    return {
+      hasMassInReports,
+      patientId,
+      encId,
+      imgStuId,
+    };
+  };
+
+  const openStudyCodeConflictModal = (request, failedCode = "") => {
+    setStudyCodeConflictRequest(request);
+    setCorrectedStudyPatientCode(failedCode);
+    setStudyCodeConflictError("");
+    setIsStudyCodeConflictOpen(true);
   };
 
   const runDuplicateChecks = async ({ nhc, options, preparedResponses, decisions = {}, startIndex = 0 }) => {
@@ -392,21 +496,35 @@ const ResponsesProbability = ({ responses, event, transientNhc, onClearTransient
   const beginCaseSave = async (options) => {
     const nhc = transientNhc.trim();
     if (!nhc) {
-      setError("Debe introducir el NHC para comprobar duplicados.");
+      setError("Debe introducir el NHC para continuar.");
       return;
     }
 
     try {
-      setSaveInProgress(true);
       setError(null);
       const preparedResponses = buildPreparedQuestionnaireResponses();
-      await runDuplicateChecks({
+      setPendingSaveRequest({
         nhc,
         options: options || { shouldPrint: false, includeProbability: false },
         preparedResponses,
       });
+      setIsSaveConfirmationOpen(true);
     } catch (error) {
       setError(error.message || "Error al preparar el guardado del caso.");
+    }
+  };
+
+  const confirmCaseSave = async () => {
+    if (!pendingSaveRequest) return;
+
+    try {
+      setSaveInProgress(true);
+      setError(null);
+      setIsSaveConfirmationOpen(false);
+      await runDuplicateChecks(pendingSaveRequest);
+      setPendingSaveRequest(null);
+    } catch (error) {
+      setError(error.message || CASE_ERROR_MESSAGES.network);
     } finally {
       setSaveInProgress(false);
     }
@@ -442,135 +560,168 @@ const ResponsesProbability = ({ responses, event, transientNhc, onClearTransient
       await runDuplicateChecks(nextRequest);
     } catch (error) {
       setError(error.message || "Error al resolver duplicados.");
-      clearTransientCaseState();
+      clearDuplicateModalState();
     } finally {
       setSaveInProgress(false);
     }
   };
 
-  const persistCaseFlow = async ({ nhc, options, preparedResponses, decisions }) => {
-        try {
-            const body = {
-              action: "SAVE_QUESTIONNAIRE",
-              details: "Usuario guarda cuestionario",
-              durationMs: 0
-            }
-            const  res = await ApiService(keycloak.token, 'POST', `/audit/register`, body);
-            if (process.env.NODE_ENV === "development") {
-              console.debug("Audit status:", res.status);
-            }
-        } catch (error) {
-            console.error("Error al auditar el inicio de cuestionario:", error);
-        }
+  const cancelStudyCodeConflictModal = () => {
+    setIsStudyCodeConflictOpen(false);
+    setStudyCodeConflictError("");
+  };
 
+  const retrySaveWithCorrectedStudyCode = async () => {
+    if (!studyCodeConflictRequest) return;
+
+    try {
+      setSaveInProgress(true);
+      setError(null);
+      setStudyCodeConflictError("");
+      await persistCaseFlow({
+        ...studyCodeConflictRequest,
+        studyPatientCodeOverride: correctedStudyPatientCode,
+      });
+    } catch (error) {
+      setStudyCodeConflictError(getSafeSaveErrorMessage(error));
+    } finally {
+      setSaveInProgress(false);
+    }
+  };
+
+  const saveWithoutStudyCode = async () => {
+    if (!studyCodeConflictRequest) return;
+
+    try {
+      setSaveInProgress(true);
+      setError(null);
+      setStudyCodeConflictError("");
+      await persistCaseFlow({
+        ...studyCodeConflictRequest,
+        studyPatientCodeOverride: null,
+        successMessage: "El caso se ha guardado como pendiente de código de estudio.",
+      });
+    } catch (error) {
+      setStudyCodeConflictError(getSafeSaveErrorMessage(error));
+    } finally {
+      setSaveInProgress(false);
+    }
+  };
+
+  const persistCaseFlow = async ({
+    nhc,
+    options,
+    preparedResponses,
+    decisions,
+    startIndex = 0,
+    persistenceContext = null,
+    studyPatientCodeOverride,
+    successMessage = "",
+  }) => {
     try {
       setProbality(true);
 
-      const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
+      const contextCenterId = preparedResponses[startIndex]?.metadata?.centerId || preparedResponses[0]?.metadata?.centerId;
+      const context = persistenceContext || await createPersistenceContext(contextCenterId, normalizedCareSetting.code);
+      const { hasMassInReports, patientId, encId, imgStuId } = context;
+      const effectiveStudyPatientCode =
+        canUseStudyPatientCode && studyPatientCodeOverride !== null
+          ? String((studyPatientCodeOverride ?? studyPatientCode) || "").trim()
+          : "";
 
-      let patientId = generateId();
-      const Patient = generatePatient(patientId);
-      // response = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_IND".toLowerCase());
-      // const observationImagen = response?.answer?.[0]?.valueString || '';
-      const patient = await ApiService(keycloak.token, 'POST', `/fhir/Patient/check-or-create`, Patient);
-      if (patient.ok) {
+      for (let index = startIndex; index < preparedResponses.length; index++) {
+        const preparedResponse = preparedResponses[index];
+        try {
+          const sanitizedQuestionnaireResponse = sanitizeQuestionnaireResponse({
+            ...preparedResponse.questionnaireResponse,
+            partOf: [
+              {
+                reference: `Encounter/${encId}`
+              }
+            ],
+            subject: {
+              reference: `Patient/${patientId}`
+            },
+            encounter: {
+              reference: `Encounter/${encId}`
+            },
+          });
 
-        //patientId = pat.id;
-        const encId = generateId();
-
-        const imgStuId = generateId();
-        const serieId = generateId();
-        setEncounterId(encId);
-        const practitioner = sessionStorage.getItem('practitioner');
-        const practitionerName = sessionStorage.getItem('practitionerName');
-        const Encounter = generateEncounter(encId, patientId, practitioner, practitionerName, generatePeriod());
-        //const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observationImagen);
-        const ImageStudy = generateImagingStudy(imgStuId, encId, patientId, serieId);
-
-        const encounter = await ApiService(keycloak.token, 'POST', `/fhir/Encounter`, Encounter);
-        if (encounter.status === 200) {
-
-          const imageStudy = await ApiService(keycloak.token, 'POST', `/fhir/ImagingStudy`, ImageStudy);
-          if (process.env.NODE_ENV === "development") {
-            console.debug("ImageStudy status:", imageStudy.status);
-          }
-
-
-          let index = 0
-          for (const preparedResponse of preparedResponses) {
-            // Aquí puedes añador la lógica para enviar las respuestas a un servidor o guardarlas localmente 
-            try {
-              const sanitizedQuestionnaireResponse = sanitizeQuestionnaireResponse({
-                ...preparedResponse.questionnaireResponse,
-                partOf: [
-                  {
-                    reference: `Encounter/${encId}`
-                  }
-                ],
-                subject: {
-                  reference: `Patient/${patientId}`
-                },
-                encounter: {
-                  reference: `Encounter/${encId}`
-                },
+          const decision = decisions[index];
+          const caseResponse = decision?.type === "secondary"
+            ? await addSecondaryEvaluation(keycloak.token, decision.caseId, {
+                questionnaireResponse: sanitizedQuestionnaireResponse,
+                encounterId: encId,
+                observerInitials: preparedResponse.metadata.observerInitials,
+                careSettingCode: normalizedCareSetting.code,
+                careSettingDisplay: normalizedCareSetting.display,
+              })
+            : await createCase(keycloak.token, {
+                centerId: preparedResponse.metadata.centerId,
+                nhc,
+                lateralityCode: preparedResponse.metadata.lateralityCode,
+                lateralityDisplay: preparedResponse.metadata.lateralityDisplay,
+                anatomicalStructureCode: preparedResponse.metadata.anatomicalStructureCode,
+                anatomicalStructureDisplay: preparedResponse.metadata.anatomicalStructureDisplay,
+                questionnaireResponse: sanitizedQuestionnaireResponse,
+                encounterId: encId,
+                observerInitials: preparedResponse.metadata.observerInitials,
+                studyPatientCode: effectiveStudyPatientCode || undefined,
+                careSettingCode: normalizedCareSetting.code,
+                careSettingDisplay: normalizedCareSetting.display,
               });
 
-              const decision = decisions[index];
-              const caseResponse = decision?.type === "secondary"
-                ? await addSecondaryEvaluation(keycloak.token, decision.caseId, {
-                    questionnaireResponse: sanitizedQuestionnaireResponse,
-                    encounterId: encId,
-                    observerInitials: preparedResponse.metadata.observerInitials,
-                  })
-                : await createCase(keycloak.token, {
-                    centerId: preparedResponse.metadata.centerId,
-                    nhc,
-                    lateralityCode: preparedResponse.metadata.lateralityCode,
-                    lateralityDisplay: preparedResponse.metadata.lateralityDisplay,
-                    anatomicalStructureCode: preparedResponse.metadata.anatomicalStructureCode,
-                    anatomicalStructureDisplay: preparedResponse.metadata.anatomicalStructureDisplay,
-                    questionnaireResponse: sanitizedQuestionnaireResponse,
-                    encounterId: encId,
-                    observerInitials: preparedResponse.metadata.observerInitials,
-                  });
-
-              const questionnaireResponseId = caseResponse.questionnaireResponseFhirId;
-              if (!questionnaireResponseId) {
-                throw new Error("El backend no devolvió questionnaireResponseFhirId.");
-              }
-
-              const obsId = generateId();
-              const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
-              await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
-              if (hasMassInReports) {
-                const riskId = generateId();
-                const RiskAssessment = generateRiskAssessment(riskId, encId, patientId, practitioner, reports[index].score, "", questionnaireResponseId)
-                await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
-              }
-              index++;
-
-            } catch (error) {
-              console.error("Error al guardar la respuesta:", error);
-              setError("Error al guardar la respuesta.");
-              throw error;
-            }
+          const questionnaireResponseId = caseResponse.questionnaireResponseFhirId;
+          if (!questionnaireResponseId) {
+            throw new Error("El backend no devolvió questionnaireResponseFhirId.");
           }
-          index = 0
-          if (options?.shouldPrint) {
-            generatePdf(options.includeProbability);
+
+          const obsId = generateId();
+          const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
+          await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
+          if (hasMassInReports) {
+            const riskId = generateId();
+            const RiskAssessment = generateRiskAssessment(riskId, encId, patientId, null, reports[index].score, "", questionnaireResponseId)
+            await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
           }
-          clearTransientCaseState();
-          event();
-        } else {
-          throw new Error(`Error en el encounter: ${encounter.status}`);
+        } catch (error) {
+          if (error.message === CASE_ERROR_MESSAGES.studyCodeConflict) {
+            openStudyCodeConflictModal(
+              {
+                nhc,
+                options,
+                preparedResponses,
+                decisions,
+                startIndex: index,
+                persistenceContext: context,
+              },
+              effectiveStudyPatientCode
+            );
+            return;
+          }
+
+          console.error("Error al guardar la respuesta:", error);
+          setError(getSafeSaveErrorMessage(error));
+          throw error;
         }
-
       }
 
+      if (options?.shouldPrint) {
+        generatePdf(options.includeProbability);
+      }
+      if (successMessage) {
+        setSaveMessage(successMessage);
+      }
+      clearTransientCaseState();
+      onCaseSaved();
+      event();
     } catch (error) {
       console.error("Error al guardar el encounter:", error);
-      setError("Error al guardar el encounter.");
-      clearTransientCaseState();
+      const safeMessage = getSafeSaveErrorMessage(error);
+      setError(safeMessage);
+      if (studyCodeConflictRequest) {
+        setStudyCodeConflictError(safeMessage);
+      }
     }
   };
 
@@ -842,6 +993,7 @@ const ResponsesProbability = ({ responses, event, transientNhc, onClearTransient
 	      <button className="save-btn" onClick={event}>
 	        Volver al cuestionario
 	      </button>*/}
+      {saveMessage && <p className="success-message">{saveMessage}</p>}
       {error && <p className="error-message">{error}</p>}
 	      <button
         className="save-btn"
@@ -876,7 +1028,41 @@ const ResponsesProbability = ({ responses, event, transientNhc, onClearTransient
       }}>No
       </button>
     </Modal>
-      <Modal isOpen={isDuplicateModalOpen} onClose={clearTransientCaseState}>
+      <Modal isOpen={isSaveConfirmationOpen} onClose={() => setIsSaveConfirmationOpen(false)}>
+        <h2>Confirmar guardado</h2>
+        {(() => {
+          const metadata = pendingSaveRequest?.preparedResponses?.[0]?.metadata || {};
+          const codeLabel =
+            canUseStudyPatientCode && String(studyPatientCode || "").trim()
+              ? String(studyPatientCode).trim()
+              : "Pendiente";
+
+          return (
+            <>
+              <p>
+                Al guardar, se comprobará si existe un caso previo para esta paciente, lateralidad y estructura. El NHC no se almacenará en el recurso FHIR ni se incluirá en las exportaciones del estudio.
+              </p>
+              <ul>
+                <li><b>Centro:</b> {metadata.centerId || "No disponible"}</li>
+                <li><b>NHC:</b> {maskNhc(pendingSaveRequest?.nhc)}</li>
+	                <li><b>Código de estudio:</b> {codeLabel}</li>
+	                <li><b>Ámbito asistencial:</b> {normalizedCareSetting.display}</li>
+	                <li><b>Lateralidad:</b> {metadata.lateralityDisplay || "No disponible"}</li>
+                <li><b>Estructura anatómica:</b> {metadata.anatomicalStructureDisplay || "No disponible"}</li>
+                <li><b>Siglas ecografista:</b> {metadata.observerInitials || "No disponible"}</li>
+                <li><b>Número de masas:</b> {pendingSaveRequest?.preparedResponses?.length || 0}</li>
+              </ul>
+              <button className="cancel" onClick={() => setIsSaveConfirmationOpen(false)} disabled={saveInProgress}>
+                Cancelar
+              </button>
+              <button className="save" onClick={confirmCaseSave} disabled={saveInProgress}>
+                Guardar
+              </button>
+            </>
+          );
+        })()}
+      </Modal>
+      <Modal isOpen={isDuplicateModalOpen} onClose={clearDuplicateModalState}>
         <h2>Posible caso ya registrado</h2>
         <p>
           Ya existe un caso registrado para esta paciente con la misma lateralidad y estructura anatómica. Indique si esta exploración corresponde a una nueva evaluación del caso existente o a un caso independiente.
@@ -908,7 +1094,42 @@ const ResponsesProbability = ({ responses, event, transientNhc, onClearTransient
         <button className="continue" onClick={() => handleDuplicateDecision("independent")} disabled={saveInProgress}>
           Crear caso independiente
         </button>
-        <button className="cancel" onClick={clearTransientCaseState} disabled={saveInProgress}>
+        <button className="cancel" onClick={clearDuplicateModalState} disabled={saveInProgress}>
+          Cancelar
+        </button>
+      </Modal>
+      <Modal isOpen={isStudyCodeConflictOpen} onClose={cancelStudyCodeConflictModal}>
+        <h2>Conflicto de código de estudio</h2>
+        <p>{CASE_ERROR_MESSAGES.studyCodeConflict}</p>
+        <p>
+          El código de estudio es un dato administrativo. Puede corregirlo sin volver al cuestionario o guardar el caso como pendiente de código.
+        </p>
+        {studyCodeConflictError && <p className="error-message">{studyCodeConflictError}</p>}
+        <button
+          className="save"
+          onClick={() => setStudyCodeConflictError("")}
+          disabled={saveInProgress}
+        >
+          Corregir código de estudio
+        </button>
+        <div className="parts">
+          <div className="tlabel">Nuevo código de estudio:</div>
+          <div className="text">
+            <input
+              aria-label="Nuevo código de estudio"
+              value={correctedStudyPatientCode}
+              onChange={(event) => setCorrectedStudyPatientCode(event.target.value)}
+              autoComplete="off"
+            />
+          </div>
+        </div>
+        <button className="save" onClick={retrySaveWithCorrectedStudyCode} disabled={saveInProgress}>
+          Reintentar guardado
+        </button>
+        <button className="continue" onClick={saveWithoutStudyCode} disabled={saveInProgress}>
+          Guardar sin código y dejar pendiente
+        </button>
+        <button className="cancel" onClick={cancelStudyCodeConflictModal} disabled={saveInProgress}>
           Cancelar
         </button>
       </Modal>
@@ -919,13 +1140,23 @@ const ResponsesProbability = ({ responses, event, transientNhc, onClearTransient
 ResponsesProbability.propTypes = {
   responses: PropTypes.arrayOf(
     PropTypes.shape({
-      linkId: PropTypes.string.isRequired,
-      answer: PropTypes.arrayOf(PropTypes.object).isRequired,
+      resourceType: PropTypes.string,
+      item: PropTypes.arrayOf(PropTypes.object).isRequired,
     })
   ).isRequired,
   event: PropTypes.func.isRequired,
   transientNhc: PropTypes.string.isRequired,
   onClearTransientNhc: PropTypes.func.isRequired,
+  studyPatientCode: PropTypes.string,
+  canUseStudyPatientCode: PropTypes.bool,
+  careSetting: PropTypes.oneOfType([
+    PropTypes.string,
+    PropTypes.shape({
+      code: PropTypes.string,
+      display: PropTypes.string,
+    }),
+  ]),
+  onCaseSaved: PropTypes.func,
 };
 
 export default ResponsesProbability;

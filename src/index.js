@@ -11,10 +11,50 @@ import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
 import keycloak from './keycloak';
 import { ReactKeycloakProvider } from '@react-keycloak/web';
 const root = ReactDOM.createRoot(document.getElementById('root'));
+
+if (process.env.NODE_ENV === "development") {
+  console.log("[index.js] mounting ReactKeycloakProvider", {
+    keycloakUrl: process.env.REACT_APP_KEYCLOAK_URL,
+    keycloakRealm: process.env.REACT_APP_KEYCLOAK_REALM,
+    keycloakClientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID,
+    discoveryUrl: `${(process.env.REACT_APP_KEYCLOAK_URL || "").replace(/\/$/, "")}/realms/${process.env.REACT_APP_KEYCLOAK_REALM}/.well-known/openid-configuration`,
+  });
+}
+
 root.render(
   <ReactKeycloakProvider
   authClient={keycloak}
-  initOptions={{ onLoad: 'login-required' }} // 'login-required' redirige automáticamente para autenticación
+  initOptions={{ onLoad: 'login-required', checkLoginIframe: false }} // 'login-required' redirige automáticamente para autenticación
+  onEvent={(event, error) => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[ReactKeycloakProvider] event", {
+        event,
+        error: error ? String(error) : null,
+        authenticated: keycloak.authenticated,
+        hasToken: Boolean(keycloak.token),
+        tokenParsed: keycloak.tokenParsed
+          ? {
+              iss: keycloak.tokenParsed.iss,
+              aud: keycloak.tokenParsed.aud,
+              azp: keycloak.tokenParsed.azp,
+              preferred_username: keycloak.tokenParsed.preferred_username,
+              realmRoles: keycloak.tokenParsed.realm_access?.roles || [],
+              allowedCenters: keycloak.tokenParsed.allowed_centers,
+            }
+          : null,
+      });
+    }
+  }}
+  onTokens={(tokens) => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[ReactKeycloakProvider] tokens", {
+        hasToken: Boolean(tokens?.token),
+        hasRefreshToken: Boolean(tokens?.refreshToken),
+        hasIdToken: Boolean(tokens?.idToken),
+        tokenPrefix: tokens?.token ? tokens.token.slice(0, 12) : "",
+      });
+    }
+  }}
 >
     <BrowserRouter>
       <App />

@@ -1,5 +1,11 @@
 const SENSITIVE_LINK_IDS = new Set(["PAT_NHC", "PAT_NOMBRE", "PAT_CODIGO"]);
 
+export const maskNhc = (nhc) => {
+  const value = String(nhc || "").trim();
+  if (!value) return "No informado";
+  return "NHC informado";
+};
+
 export const removeSensitiveQuestionnaireItems = (items = []) => {
   if (!Array.isArray(items)) return [];
 

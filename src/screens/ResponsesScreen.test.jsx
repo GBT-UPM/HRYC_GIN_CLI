@@ -3,9 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import ResponsesScreen from './ResponsesScreen';
 import ApiService from '../services/ApiService';
 
+let mockKeycloak;
+
 jest.mock('@react-keycloak/web', () => ({
   useKeycloak: () => ({
-    keycloak: { token: 'token' },
+    keycloak: mockKeycloak,
     initialized: true,
   }),
 }));
@@ -20,6 +22,13 @@ jest.mock('../hooks/useObservationHistologyTemplate', () => ({
 describe('ResponsesScreen', () => {
   beforeEach(() => {
     ApiService.mockReset();
+    mockKeycloak = {
+      token: 'token',
+      tokenParsed: {
+        realm_access: { roles: ['ROLE_SITE_COORDINATOR'] },
+        allowed_centers: ['HURYC'],
+      },
+    };
   });
 
   it('shows evaluationDisplayId and pending code without sensitive fields', async () => {
@@ -35,6 +44,8 @@ describe('ResponsesScreen', () => {
           codeStatus: 'PENDING_CODE',
           studyPatientCode: null,
           lateralityDisplay: 'Derecho',
+          careSettingCode: 'OUTPATIENT',
+          careSettingDisplay: 'Consulta externa',
           risk: '0.12',
           histology: null,
           observerInitials: 'ABC',
@@ -51,8 +62,18 @@ describe('ResponsesScreen', () => {
     });
 
     expect(screen.getByText('Código pendiente')).toBeInTheDocument();
+    expect(screen.getByText('Consulta externa')).toBeInTheDocument();
     expect(screen.getAllByText('Pendiente').length).toBeGreaterThan(0);
     expect(screen.queryByText('123456')).not.toBeInTheDocument();
     expect(screen.queryByText('secret-pseudonym')).not.toBeInTheDocument();
+    expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/cases/evaluations?centerId=HURYC', {});
+  });
+
+  it('shows permissions message on 403 instead of a silent empty table', async () => {
+    ApiService.mockResolvedValueOnce({ status: 403 });
+
+    render(<ResponsesScreen />);
+
+    expect(await screen.findByText('No tiene permisos para consultar datos de este centro.')).toBeInTheDocument();
   });
 });

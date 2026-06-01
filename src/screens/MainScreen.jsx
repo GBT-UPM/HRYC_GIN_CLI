@@ -1,9 +1,11 @@
 import { People, CalendarMonth, MedicalInformation, LocalHospital } from "@mui/icons-material";
-import { Box, Button, Grid2, Paper, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, FormControl, Grid2, InputLabel, MenuItem, Paper, Select, Tooltip, Typography } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ApiService from "../services/ApiService";
 import doctora from "../assets/images/doctora.png";
+import { canUseGlobalView, getAllowedCenters, getDefaultCenter } from "../utils/auth";
+import { CASE_EVALUATION_ERROR_MESSAGES, getCaseEvaluations } from "../services/caseEvaluationService";
 
 const getUniqueCount = (items, selector) => {
   const values = new Set();
@@ -37,6 +39,9 @@ export const buildDashboardCounts = (evaluations = []) => {
 
 const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
   const token = keycloak?.token;
+  const allowedCenters = getAllowedCenters(keycloak);
+  const isGlobalView = canUseGlobalView(keycloak);
+  const shouldSelectCenter = !isGlobalView && allowedCenters.length > 1;
 
   const [counts, setCounts] = useState({
     Patient: 0,
@@ -44,8 +49,8 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
     QuestionnaireResponse: 0,
     RiskAssessment: 0,
   });
-
-  console.log("[MainScreen] rendering with counts:", counts);
+  const [selectedCenter, setSelectedCenter] = useState(getDefaultCenter(keycloak));
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!token) {
@@ -54,31 +59,51 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
     }
 
     const fetchCounts = async () => {
-      try {
-        const response = await ApiService(token, 'GET', `/app/cases/evaluations`, {});
+      if (!isGlobalView && allowedCenters.length === 0) {
+        setError(CASE_EVALUATION_ERROR_MESSAGES.missingCenter);
+        return;
+      }
 
-        if (response.status === 200) {
-          const data = await response.json();
-          const nextCounts = buildDashboardCounts(data);
-          console.log("[MainScreen] /app/cases/evaluations response:", data);
-          console.log("[MainScreen] calculated dashboard counts:", nextCounts);
-          setCounts(nextCounts);
-        } else {
-          console.warn("Error al obtener conteos:", response.status);
-        }
+      if (shouldSelectCenter && !selectedCenter) {
+        setError("");
+        return;
+      }
+
+      try {
+        setError("");
+        const data = await getCaseEvaluations(
+          token,
+          keycloak,
+          selectedCenter,
+          "No se pudieron cargar los datos del panel."
+        );
+        const nextCounts = buildDashboardCounts(data);
+        setCounts(nextCounts);
       } catch (error) {
         console.error("Error al llamar al backend:", error);
+        setError(error.message || "No se pudieron cargar los datos del panel.");
       }
     };
 
     fetchCounts();
-  }, [token, keycloak]);
+  }, [token, keycloak, selectedCenter, isGlobalView, allowedCenters.length, shouldSelectCenter]);
 
 
   const navigate = useNavigate();
 
   const handleNewPatientClick = async () => {
     console.log("Iniciar nuevo cuestionario");
+    if (!token) {
+      console.warn("[MainScreen] No se puede iniciar cuestionario: token no disponible", {
+        initialized: Boolean(keycloak),
+        authenticated: keycloak?.authenticated,
+        hasToken: Boolean(token),
+        keycloakRealm: process.env.REACT_APP_KEYCLOAK_REALM,
+        keycloakClientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID,
+      });
+      return;
+    }
+
        try {
             const body = {
               action: "START_QUESTIONNAIRE",
@@ -111,6 +136,35 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
     >
       Panel de Control - Revisión Ginecológica
     </Typography>
+
+      {shouldSelectCenter && (
+        <FormControl sx={{ minWidth: 220, mb: 2 }}>
+          <InputLabel id="dashboard-center-label">Centro</InputLabel>
+          <Select
+            labelId="dashboard-center-label"
+            label="Centro"
+            value={selectedCenter}
+            onChange={(event) => setSelectedCenter(event.target.value)}
+          >
+            <MenuItem value="" disabled>Seleccione centro</MenuItem>
+            {allowedCenters.map((center) => (
+              <MenuItem key={center} value={center}>{center}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
+
+      {isGlobalView && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Vista global
+        </Typography>
+      )}
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
       {/* Contenedor de estadísticas con separación */}
 
@@ -211,6 +265,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
           onClick={handleNewPatientClick}
           variant="contained"
           color="primary"
+          disabled={!token}
           fullWidth={false}
           sx={{ width: { xs: '100%', sm: '80%', md: '65%' } }}
         >
