@@ -12,20 +12,21 @@ import {
     InputLabel,
     Select,
     MenuItem,
-    Alert
+    Alert,
+    Chip
 } from '@mui/material';
 
 import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
 import '../assets/css/ResponsesScreen.css';
 import { useKeycloak } from '@react-keycloak/web';
 import ApiService from '../services/ApiService';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { useObservationHistologyTemplate } from '../hooks/useObservationHistologyTemplate';
-import { v4 as uuidv4 } from "uuid";
 import { formatCodeStatusLabel, resolveDisplayStudyIdentifier, resolveStudyCodeDisplay } from '../utils/caseMetadata';
-import { canUseGlobalView, getAllowedCenters, getDefaultCenter } from '../utils/auth';
+import { formatCaseStatusLabel, formatEvaluationStatusLabel } from '../utils/caseStatus';
+import { formatEvaluationTypeLabel } from '../utils/evaluationType';
+import { canUseGlobalView, getAllowedCenters, getDefaultCenter, isSiteCoordinator } from '../utils/auth';
 import { getCaseEvaluations } from '../services/caseEvaluationService';
+import { upsertHistopathology } from '../services/histopathologyService';
 // Datos de ejemplo (pueden ser obtenidos de una API)
     const tipoMap = {
     'sólida': 'sólido',
@@ -50,39 +51,20 @@ const ResponsesScreen = () => {
     const [selectedQuestionnaire, setSelectedQuestionnaire] = useState(null);
     
     const [openModal, setOpenModal] = useState(false);
-    const [openModalHisto, setOpenHistoModal] = useState(false);
-    const [pathologyReport, setPathologyReport] = useState('');
-    const [histology, setHistology] = useState('');
-    const [selectedRow, setSelectedRow] = useState(null);
-    const { generateObservation } = useObservationHistologyTemplate();
-    /*    const histologyOptions = {
-            "Benigno": { code: "37310001", display: "Benign neoplasm (disorder)" },
-            "Maligno": { code: "363346000", display: "Malignant neoplastic disease (disorder)" },
-            "Desconocido / Incierto": { code: "70852002", display: "Neoplasm of uncertain or unknown behaviour (disorder)" }
-        }; */
-    const histologyOptions = {
-    "Benigno": {
-        code: "37310001",
-        display: "Benigno"
-    },
-    "Borderline": {
-        code: "448829000",
-        display: "Tumor borderline"
-    },
-    "Maligno": {
-        code: "363346000",
-        display: "Maligno"
-    },
-    "Tumor no anexial": {
-        code: "128241005",
-        display: "Tumor no anexial"
-    },
-    "Desconocido / Incierto": {
-        code: "70852002",
-        display: "Desconocido / Incierto"
-    }
-    };
-
+    const [histologyModalOpen, setHistologyModalOpen] = useState(false);
+    const [selectedHistologyCase, setSelectedHistologyCase] = useState(null);
+    const [histologyForm, setHistologyForm] = useState({
+        status: 'PENDING',
+        diagnosis: '',
+        benignMalignant: '',
+        tumorType: '',
+        surgeryDate: '',
+        pathologyDate: '',
+        source: '',
+        notes: '',
+    });
+    const [histologySaving, setHistologySaving] = useState(false);
+    const [histologyError, setHistologyError] = useState('');
     const parseQuestionnaireResponses = (questionnaireResponse) => {
         try {
             const parsed = typeof questionnaireResponse === 'string'
@@ -128,9 +110,77 @@ const ResponsesScreen = () => {
     const getIdentifier = (item) => resolveDisplayStudyIdentifier(item);
     const getStudyCode = (item) => resolveStudyCodeDisplay(item);
     const getCodeStatus = (item) => formatCodeStatusLabel(item.codeStatus);
+    const getCaseStatus = (item) => formatCaseStatusLabel(item.caseStatus);
+    const getEvaluationStatus = (item) => formatEvaluationStatusLabel(item.evaluationStatus);
+    const getEvaluationType = (item) => formatEvaluationTypeLabel(item.evaluationType, item.primaryEvaluation, item.evaluationId);
     const getCenter = (item) => item.centerId || item.center || item.centerName || getQuestionnaireValue(item.questionnaireResponse, "HOSPITAL_REF") || "—";
     const getLaterality = (item) => item.lateralityDisplay || item.laterality || getQuestionnaireValue(item.questionnaireResponse, "MA_LADO") || "—";
     const getCareSetting = (item) => item.careSettingDisplay || "No especificado";
+    const canManageHistopathology = (item) => (
+        isSiteCoordinator(keycloak) &&
+        allowedCenters.includes(String(item.centerId || '').trim().toUpperCase())
+    );
+    const hasStructuredHistology = (item) => Boolean(item.histologyStatus);
+    const getHistopathologyActionLabel = (item) => (
+        hasStructuredHistology(item) ? 'Actualizar histopatología del caso' : 'Registrar histopatología del caso'
+    );
+    const getRowActionKey = (item) => `${item.caseId || 'case'}:${item.evaluationId || 'legacy'}`;
+
+    const openHistologyModal = (item) => {
+        setSelectedHistologyCase(item);
+        setHistologyForm({
+            status: item.histologyStatus || 'PENDING',
+            diagnosis: item.histologyDiagnosis || '',
+            benignMalignant: item.benignMalignant || '',
+            tumorType: item.tumorType || '',
+            surgeryDate: item.surgeryDate || '',
+            pathologyDate: item.pathologyDate || '',
+            source: item.histologySource || '',
+            notes: '',
+        });
+        setHistologyError('');
+        setHistologyModalOpen(true);
+    };
+
+    const closeHistologyModal = () => {
+        setHistologyModalOpen(false);
+        setSelectedHistologyCase(null);
+        setHistologyError('');
+    };
+
+    const handleHistologyFieldChange = (field) => (event) => {
+        setHistologyForm((current) => ({
+            ...current,
+            [field]: event.target.value,
+        }));
+    };
+
+    const handleSaveHistology = async () => {
+        if (!selectedHistologyCase?.caseId) {
+            return;
+        }
+
+        try {
+            setHistologySaving(true);
+            setHistologyError('');
+            await upsertHistopathology(keycloak.token, selectedHistologyCase.caseId, {
+                status: histologyForm.status,
+                diagnosis: histologyForm.diagnosis,
+                benignMalignant: histologyForm.benignMalignant || undefined,
+                tumorType: histologyForm.tumorType,
+                surgeryDate: histologyForm.surgeryDate || null,
+                pathologyDate: histologyForm.pathologyDate || null,
+                source: histologyForm.source,
+                notes: histologyForm.notes,
+            });
+            closeHistologyModal();
+            await fetchQuestionnaire();
+        } catch (error) {
+            setHistologyError(error.message || 'No se pudo registrar la histopatología.');
+        } finally {
+            setHistologySaving(false);
+        }
+    };
 
     const fetchQuestionnaireResponseByFhirId = useCallback(async (questionnaireResponseFhirId) => {
         if (!questionnaireResponseFhirId) {
@@ -376,11 +426,27 @@ const ResponsesScreen = () => {
             item.observerInitials,
             item.risk,
             item.histology,
+            item.histologyStatus,
+            item.histologyDiagnosis,
+            item.benignMalignant,
+            item.tumorType,
+            item.histologySource,
+            item.caseDisplayId,
+            item.evaluationDisplayId,
+            item.studyPatientCode,
+            item.careSettingDisplay,
+            item.caseStatus,
+            item.evaluationStatus,
+            item.evaluationType,
+            getEvaluationType(item),
             getIdentifier(item),
             getStudyCode(item),
             getCodeStatus(item),
+            getCaseStatus(item),
+            getEvaluationStatus(item),
             getCenter(item),
             getLaterality(item),
+            getCareSetting(item),
             new Date(item.createdAt).toLocaleString()
         ].join(" ").toLowerCase().includes(search.toLowerCase())
     );
@@ -391,6 +457,9 @@ const ResponsesScreen = () => {
             if (property === "identifier") return getIdentifier(item);
             if (property === "studyCode") return getStudyCode(item);
             if (property === "codeStatus") return getCodeStatus(item);
+            if (property === "caseStatus") return getCaseStatus(item);
+            if (property === "evaluationStatus") return getEvaluationStatus(item);
+            if (property === "evaluationType") return getEvaluationType(item);
             if (property === "center") return getCenter(item);
             if (property === "laterality") return getLaterality(item);
             return item[property] || "";
@@ -403,6 +472,25 @@ const ResponsesScreen = () => {
             return firstValue > secondValue ? -1 : 1;
         }
     });
+    const histopathologyActionRowsByCase = new Map();
+    sortedData.forEach((item) => {
+        if (!item.caseId) return;
+        const current = histopathologyActionRowsByCase.get(item.caseId);
+        if (!current || item.primaryEvaluation === true) {
+            histopathologyActionRowsByCase.set(item.caseId, getRowActionKey(item));
+        }
+    });
+    const shouldShowHistopathologyAction = (item) => (
+        canManageHistopathology(item) &&
+        item.caseId &&
+        histopathologyActionRowsByCase.get(item.caseId) === getRowActionKey(item)
+    );
+    const shouldShowSharedHistologyText = (item) => (
+        canManageHistopathology(item) &&
+        item.caseId &&
+        histopathologyActionRowsByCase.has(item.caseId) &&
+        histopathologyActionRowsByCase.get(item.caseId) !== getRowActionKey(item)
+    );
     // Función para abrir el modal con el detalle del cuestionario
     const handleRowClick = async (item) => {
         try {
@@ -413,51 +501,13 @@ const ResponsesScreen = () => {
             console.error("Error al obtener el cuestionario:", error);
         }
     };
-    // Abrir modal de edición
-    const handleEdit = (row) => {
-        setSelectedRow(row);
-        setHistology(row.histology || '');  // Cargar valor actual
-        setPathologyReport(row.pathologyReport || '');
-        setOpenHistoModal(true);
-    };
     // Paginación de datos
     const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-    const generateId = () => {
-        return uuidv4(); // Genera un UUID único
-    };
-    // Guardar cambios y cerrar modal
-    const handleSaveChanges = async () => {
-
-        const histologyData = histologyOptions[histology];
-        const code = histologyData.code;
-        const display = histologyData.display;
-        const obsId = generateId();
-        const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(selectedRow.questionnaireResponseFhirId);
-        const encounterReference = questionnaireResponse?.partOf?.[0]?.reference || questionnaireResponse?.encounter?.reference || '';
-        const patientReference = questionnaireResponse?.subject?.reference || '';
-        const encId = encounterReference.replace('Encounter/', '');
-        const quesRId = questionnaireResponse?.id || selectedRow.questionnaireResponseFhirId;
-        const patientId = patientReference.replace('Patient/', '');
-        const text = histology;
-        const note = pathologyReport;
-        const Observation = generateObservation(obsId, encId, quesRId, patientId, code, display, text, note);
-        //    const Observation= generateObservation(generateId(), selectedRow.encounterId, selectedRow.questionnaireResponse.id,selectedRow.patientId, code, display, histology, pathologyReport)
-        try {
-            const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, Observation);
-
-            if (observation.status === 200) {
-                await fetchQuestionnaire();
-            }
-            setOpenHistoModal(false);
-        } catch (error) {
-            console.error("Error al guardar la observación:", error);
-        }
-    };
     return (
         <Container className="container">
 
             <Typography variant="h4" gutterBottom>
-                📋 Lista de Cuestionarios
+                📋 Casos y evaluaciones
             </Typography>
             {shouldSelectCenter && (
                 <FormControl sx={{ minWidth: 220, mt: 2 }}>
@@ -487,7 +537,7 @@ const ResponsesScreen = () => {
             )}
             {/* Campo de búsqueda */}
             <TextField
-                label="Buscar por identificador, centro, lateralidad o ecografista"
+                label="Buscar por caso, evaluación, código de estudio, centro, lateralidad, ámbito, tipo o ecografista"
                 variant="outlined"
                 fullWidth
                 sx={{ mt: 5 }}
@@ -518,6 +568,33 @@ const ResponsesScreen = () => {
                                     onClick={() => handleSortRequest('codeStatus')}
                                 >
                                     Estado código
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'evaluationType'}
+                                    direction={orderDirection}
+                                    onClick={() => handleSortRequest('evaluationType')}
+                                >
+                                    Tipo
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'caseStatus'}
+                                    direction={orderDirection}
+                                    onClick={() => handleSortRequest('caseStatus')}
+                                >
+                                    Estado caso
+                                </TableSortLabel>
+                            </TableCell>
+                            <TableCell>
+                                <TableSortLabel
+                                    active={orderBy === 'evaluationStatus'}
+                                    direction={orderDirection}
+                                    onClick={() => handleSortRequest('evaluationStatus')}
+                                >
+                                    Estado evaluación
                                 </TableSortLabel>
                             </TableCell>
                             <TableCell>
@@ -608,6 +685,21 @@ const ResponsesScreen = () => {
                                 >
                                     <TableCell>{getIdentifier(item)}</TableCell>
                                     <TableCell>{getCodeStatus(item)}</TableCell>
+                                    <TableCell>
+                                        <Chip
+                                            label={getEvaluationType(item)}
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{
+                                                borderColor: '#9bb7d7',
+                                                color: '#315f86',
+                                                backgroundColor: '#f3f8fc',
+                                                fontWeight: 500,
+                                            }}
+                                        />
+                                    </TableCell>
+                                    <TableCell>{getCaseStatus(item)}</TableCell>
+                                    <TableCell>{getEvaluationStatus(item)}</TableCell>
                                     <TableCell>{getStudyCode(item)}</TableCell>
                                     <TableCell>{getCenter(item)}</TableCell>
                                     <TableCell>{getLaterality(item)}</TableCell>
@@ -616,21 +708,25 @@ const ResponsesScreen = () => {
                                                 ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
                                                 : 'No procede'}
                                     </TableCell>
-                                    <TableCell>{item.histology || 'Pendiente'}</TableCell>
-                                    <TableCell>{item.observerInitials || '—' }</TableCell>
-                                    <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleString() : '—'}</TableCell>
-                                    <TableCell style={{ textAlign: 'right' }}>
-                                    {!item.histology && item.questionnaireResponseFhirId && (
-                                            <Tooltip title="Editar">
-                                                <IconButton
-                                                    color="secondary"
-                                                    onClick={() => handleEdit(item)}
-                                                >
-                                                    <EditIcon></EditIcon>
-                                                </IconButton>
-                                            </Tooltip>
-                                        )}
-                                        <Tooltip title="Ver Detalles">
+	                                    <TableCell>{item.histology || 'Pendiente'}</TableCell>
+	                                    <TableCell>{item.observerInitials || '—' }</TableCell>
+	                                    <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleString() : '—'}</TableCell>
+	                                    <TableCell style={{ textAlign: 'right' }}>
+		                                        {shouldShowHistopathologyAction(item) && (
+		                                            <Button
+		                                                size="small"
+		                                                variant="outlined"
+		                                                onClick={() => openHistologyModal(item)}
+		                                            >
+		                                                {getHistopathologyActionLabel(item)}
+		                                            </Button>
+		                                        )}
+	                                        {shouldShowSharedHistologyText(item) && (
+	                                            <Typography variant="caption" color="text.secondary">
+	                                                Histología compartida con el caso
+	                                            </Typography>
+	                                        )}
+	                                        <Tooltip title="Ver Detalles">
                                             <IconButton
                                                 color="primary"
                                                 onClick={() => handleRowClick(item)}
@@ -703,53 +799,106 @@ const ResponsesScreen = () => {
                     </Button>
                 </Box>
             </Modal>
-            {/* Modal para editar la histología */}
-            <Modal open={openModalHisto} onClose={() => setOpenHistoModal(false)}>
+            <Modal open={histologyModalOpen} onClose={closeHistologyModal}>
                 <Box className="modal-box">
                     <Typography variant="h6" gutterBottom>
-                        Editar Histología
+                        {hasStructuredHistology(selectedHistologyCase || {}) ? 'Actualizar histopatología del caso' : 'Registrar histopatología del caso'}
                     </Typography>
-                    <FormControl fullWidth sx={{ mb: 3 }}>
-                        <InputLabel>Resultado Histológico</InputLabel>
+                    {histologyError && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {histologyError}
+                        </Alert>
+                    )}
+                    <FormControl fullWidth sx={{ mb: 2 }}>
+                        <InputLabel id="histology-status-label">Estado histopatología</InputLabel>
                         <Select
-                            value={histology}
-                            onChange={(e) => setHistology(e.target.value)}
+                            labelId="histology-status-label"
+                            label="Estado histopatología"
+                            value={histologyForm.status}
+                            onChange={handleHistologyFieldChange('status')}
                         >
-                            {Object.keys(histologyOptions).map((key) => (
-                                <MenuItem key={key} value={key}>
-                                    {histologyOptions[key].display}
-                                </MenuItem>
-                            ))}
+                            <MenuItem value="PENDING">Pendiente</MenuItem>
+                            <MenuItem value="AVAILABLE">Disponible</MenuItem>
+                            <MenuItem value="NOT_APPLICABLE">No aplicable</MenuItem>
+                            <MenuItem value="UNKNOWN">Desconocido</MenuItem>
                         </Select>
                     </FormControl>
                     <TextField
-                        label="Anatomía Patológica Definitiva"
-                        multiline
-                        rows={4}
+                        label="Diagnóstico"
                         fullWidth
-                        variant="outlined"
-                        value={pathologyReport}
-                        onChange={(e) => setPathologyReport(e.target.value)}
+                        sx={{ mb: 2 }}
+                        value={histologyForm.diagnosis}
+                        onChange={handleHistologyFieldChange('diagnosis')}
                     />
-                    <Typography
-                        variant="body2"
-                        color="error"
-                        sx={{ mt: 1 }}
-                    >
-                        Una vez guardado, no será posible editar este campo.
-                    </Typography>
+                    <FormControl fullWidth sx={{ mb: 2 }}>
+                        <InputLabel id="benign-malignant-label">Benigno / borderline / maligno</InputLabel>
+                        <Select
+                            labelId="benign-malignant-label"
+                            label="Benigno / borderline / maligno"
+                            value={histologyForm.benignMalignant}
+                            onChange={handleHistologyFieldChange('benignMalignant')}
+                        >
+                            <MenuItem value="">No especificado</MenuItem>
+                            <MenuItem value="BENIGN">Benigno</MenuItem>
+                            <MenuItem value="BORDERLINE">Borderline</MenuItem>
+                            <MenuItem value="MALIGNANT">Maligno</MenuItem>
+                            <MenuItem value="UNKNOWN">Desconocido</MenuItem>
+                            <MenuItem value="NOT_APPLICABLE">No aplicable</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <TextField
+                        label="Tipo tumoral"
+                        fullWidth
+                        sx={{ mb: 2 }}
+                        value={histologyForm.tumorType}
+                        onChange={handleHistologyFieldChange('tumorType')}
+                    />
+                    <TextField
+                        label="Fecha cirugía"
+                        type="date"
+                        fullWidth
+                        sx={{ mb: 2 }}
+                        InputLabelProps={{ shrink: true }}
+                        value={histologyForm.surgeryDate}
+                        onChange={handleHistologyFieldChange('surgeryDate')}
+                    />
+                    <TextField
+                        label="Fecha anatomía patológica"
+                        type="date"
+                        fullWidth
+                        sx={{ mb: 2 }}
+                        InputLabelProps={{ shrink: true }}
+                        value={histologyForm.pathologyDate}
+                        onChange={handleHistologyFieldChange('pathologyDate')}
+                    />
+                    <TextField
+                        label="Fuente"
+                        fullWidth
+                        sx={{ mb: 2 }}
+                        value={histologyForm.source}
+                        onChange={handleHistologyFieldChange('source')}
+                    />
+                    <TextField
+                        label="Notas"
+                        multiline
+                        rows={3}
+                        fullWidth
+                        sx={{ mb: 2 }}
+                        value={histologyForm.notes}
+                        onChange={handleHistologyFieldChange('notes')}
+                    />
                     <Button
                         variant="contained"
-                        sx={{ mt: 2 }}
-                        color="primary"
-                        onClick={handleSaveChanges}
+                        onClick={handleSaveHistology}
+                        disabled={histologySaving}
                     >
-                        Guardar Cambios
+                        Guardar
                     </Button>
                     <Button
                         variant="outlined"
-                        sx={{ mt: 2, ml: 2 }}
-                        onClick={() => setOpenHistoModal(false)}
+                        sx={{ ml: 2 }}
+                        onClick={closeHistologyModal}
+                        disabled={histologySaving}
                     >
                         Cancelar
                     </Button>

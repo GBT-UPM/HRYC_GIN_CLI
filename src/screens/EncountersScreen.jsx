@@ -12,7 +12,8 @@ import {
     InputLabel,
     Select,
     MenuItem,
-    Alert
+    Alert,
+    Chip
 } from '@mui/material';
 
 import SearchIcon from '@mui/icons-material/Search';
@@ -21,12 +22,12 @@ import { useKeycloak } from '@react-keycloak/web';
 import ApiService from '../services/ApiService';
 
 import LocalPrintshopIcon from '@mui/icons-material/LocalPrintshop';
-import { useObservationHistologyTemplate } from '../hooks/useObservationHistologyTemplate';
-import { v4 as uuidv4 } from "uuid";
 import jsPDF from 'jspdf';
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
 import Logo12oct from "../assets/images/Logo12oct.jpg";
 import { formatCodeStatusLabel, resolveDisplayStudyIdentifier, resolveStudyCodeDisplay } from '../utils/caseMetadata';
+import { formatCaseStatusLabel, formatEvaluationStatusLabel } from '../utils/caseStatus';
+import { formatEvaluationTypeLabel } from '../utils/evaluationType';
 // Datos de ejemplo (pueden ser obtenidos de una API)
 import CloseIcon from "@mui/icons-material/Close";
 import { canUseGlobalView, getAllowedCenters, getDefaultCenter } from '../utils/auth';
@@ -55,23 +56,8 @@ const EncountersScreen = () => {
     // eslint-disable-next-line no-unused-vars
     const [selectedQuestionnaire, setSelectedQuestionnaire] = useState(null);
     const [openModal, setOpenModal] = useState(false);
-    const [openModalHisto, setOpenHistoModal] = useState(false);
-    const [pathologyReport, setPathologyReport] = useState('');
-    const [histology, setHistology] = useState('');
-    const [selectedRow, setSelectedRow] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [pendingPrintData, setPendingPrintData] = useState(null);
-    const { generateObservation } = useObservationHistologyTemplate();
-    /*    const histologyOptions = {
-            "Benigno": { code: "37310001", display: "Benign neoplasm (disorder)" },
-            "Maligno": { code: "363346000", display: "Malignant neoplastic disease (disorder)" },
-            "Desconocido / Incierto": { code: "70852002", display: "Neoplasm of uncertain or unknown behaviour (disorder)" }
-        }; */
-    const histologyOptions = {
-        "Benigno": { code: "37310001", display: "Benigno" },
-        "Maligno": { code: "363346000", display: "Maligno" },
-        "Desconocido / Incierto": { code: "70852002", display: "Desconocido / Incierto" }
-    };
 
     const parseQuestionnaireResponses = (questionnaireResponse) => {
         try {
@@ -118,6 +104,9 @@ const EncountersScreen = () => {
     const getIdentifier = (item) => resolveDisplayStudyIdentifier(item);
     const getStudyCode = (item) => resolveStudyCodeDisplay(item);
     const getCodeStatus = (item) => formatCodeStatusLabel(item.codeStatus);
+    const getCaseStatus = (item) => formatCaseStatusLabel(item.caseStatus);
+    const getEvaluationStatus = (item) => formatEvaluationStatusLabel(item.evaluationStatus);
+    const getEvaluationType = (item) => formatEvaluationTypeLabel(item.evaluationType, item.primaryEvaluation, item.evaluationId);
     const getCenter = (item) => item.centerId || item.center || item.centerName || getQuestionnaireValue(item.questionnaireResponse, "HOSPITAL_REF") || "—";
     const getLaterality = (item) => item.lateralityDisplay || item.laterality || getQuestionnaireValue(item.questionnaireResponse, "MA_LADO") || "—";
     const getCareSetting = (item) => item.careSettingDisplay || "No especificado";
@@ -571,11 +560,22 @@ const EncountersScreen = () => {
             item.observerInitials,
             item.risk,
             item.histology,
+            item.caseDisplayId,
+            item.evaluationDisplayId,
+            item.studyPatientCode,
+            item.careSettingDisplay,
+            item.caseStatus,
+            item.evaluationStatus,
+            item.evaluationType,
+            getEvaluationType(item),
             getIdentifier(item),
             getStudyCode(item),
             getCodeStatus(item),
+            getCaseStatus(item),
+            getEvaluationStatus(item),
             getCenter(item),
             getLaterality(item),
+            getCareSetting(item),
             new Date(item.createdAt).toLocaleString()
         ].join(" ").toLowerCase().includes(search.toLowerCase())
     );
@@ -586,6 +586,9 @@ const EncountersScreen = () => {
             if (property === "identifier") return getIdentifier(item);
             if (property === "studyCode") return getStudyCode(item);
             if (property === "codeStatus") return getCodeStatus(item);
+            if (property === "caseStatus") return getCaseStatus(item);
+            if (property === "evaluationStatus") return getEvaluationStatus(item);
+            if (property === "evaluationType") return getEvaluationType(item);
             if (property === "center") return getCenter(item);
             if (property === "laterality") return getLaterality(item);
             return item[property] || "";
@@ -613,45 +616,8 @@ const EncountersScreen = () => {
             console.error("Error al obtener el cuestionario:", error);
         }
     };
-    // Abrir modal de edición
-    const handleEdit = (row) => {
-        setSelectedRow(row);
-        setHistology(row.histology || '');  // Cargar valor actual
-        setPathologyReport(row.pathologyReport || '');
-        setOpenHistoModal(true);
-    };
     // Paginación de datos
     const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-    const generateId = () => {
-        return uuidv4(); // Genera un UUID único
-    };
-    // Guardar cambios y cerrar modal
-    const handleSaveChanges = async () => {
-        const histologyData = histologyOptions[histology];
-        const code = histologyData.code;
-        const display = histologyData.display;
-        const obsId = generateId();
-        const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(selectedRow.questionnaireResponseFhirId);
-        const encounterReference = questionnaireResponse?.partOf?.[0]?.reference || questionnaireResponse?.encounter?.reference || '';
-        const patientReference = questionnaireResponse?.subject?.reference || '';
-        const encId = encounterReference.replace('Encounter/', '');
-        const quesRId = questionnaireResponse?.id || selectedRow.questionnaireResponseFhirId;
-        const patientId = patientReference.replace('Patient/', '');
-        const text = histology;
-        const note = pathologyReport;
-        const Observation = generateObservation(obsId, encId, quesRId, patientId, code, display, text, note);
-        //    const Observation= generateObservation(generateId(), selectedRow.encounterId, selectedRow.questionnaireResponse.id,selectedRow.patientId, code, display, histology, pathologyReport)
-        try {
-            const observation = await ApiService(keycloak.token, 'POST', `/fhir/Observation`, Observation);
-
-            if (observation.status === 200) {
-                await fetchQuestionnaire();
-            }
-            setOpenHistoModal(false);
-        } catch (error) {
-            console.error("Error al guardar la observación:", error);
-        }
-    };
     return (
         <Container className="container">
 
@@ -686,7 +652,7 @@ const EncountersScreen = () => {
             )}
             {/* Campo de búsqueda */}
             <TextField
-                label="Buscar por identificador, centro, lateralidad o ecografista"
+                label="Buscar por caso, evaluación, código de estudio, centro, lateralidad, ámbito, tipo o ecografista"
                 variant="outlined"
                 fullWidth
                 sx={{ mt: 5 }}
@@ -717,6 +683,33 @@ const EncountersScreen = () => {
 	                                    onClick={() => handleSortRequest('codeStatus')}
 	                                >
 	                                    Estado código
+	                                </TableSortLabel>
+	                            </TableCell>
+	                            <TableCell>
+	                                <TableSortLabel
+	                                    active={orderBy === 'evaluationType'}
+	                                    direction={orderDirection}
+	                                    onClick={() => handleSortRequest('evaluationType')}
+	                                >
+	                                    Tipo
+	                                </TableSortLabel>
+	                            </TableCell>
+	                            <TableCell>
+	                                <TableSortLabel
+	                                    active={orderBy === 'caseStatus'}
+	                                    direction={orderDirection}
+	                                    onClick={() => handleSortRequest('caseStatus')}
+	                                >
+	                                    Estado caso
+	                                </TableSortLabel>
+	                            </TableCell>
+	                            <TableCell>
+	                                <TableSortLabel
+	                                    active={orderBy === 'evaluationStatus'}
+	                                    direction={orderDirection}
+	                                    onClick={() => handleSortRequest('evaluationStatus')}
+	                                >
+	                                    Estado evaluación
 	                                </TableSortLabel>
 	                            </TableCell>
 	                            <TableCell>
@@ -799,6 +792,21 @@ const EncountersScreen = () => {
                                 >
 	                                    <TableCell>{getIdentifier(item)}</TableCell>
 	                                    <TableCell>{getCodeStatus(item)}</TableCell>
+	                                    <TableCell>
+	                                        <Chip
+	                                            label={getEvaluationType(item)}
+	                                            size="small"
+	                                            variant="outlined"
+	                                            sx={{
+	                                                borderColor: '#9bb7d7',
+	                                                color: '#315f86',
+	                                                backgroundColor: '#f3f8fc',
+	                                                fontWeight: 500,
+	                                            }}
+	                                        />
+	                                    </TableCell>
+	                                    <TableCell>{getCaseStatus(item)}</TableCell>
+	                                    <TableCell>{getEvaluationStatus(item)}</TableCell>
 		                                    <TableCell>{getStudyCode(item)}</TableCell>
 		                                    <TableCell>{getCenter(item)}</TableCell>
 		                                    <TableCell>{getLaterality(item)}</TableCell>
@@ -880,51 +888,6 @@ const EncountersScreen = () => {
 
                     <Button variant="contained" sx={{ mt: 2 }} onClick={() => setOpenModal(false)}>
                         Cerrar
-                    </Button>
-                </Box>
-            </Modal>
-            {/* Modal para editar la histología */}
-            <Modal open={openModalHisto} onClose={() => setOpenHistoModal(false)}>
-                <Box className="modal-box">
-                    <Typography variant="h6" gutterBottom>
-                        Editar Histología
-                    </Typography>
-                    <FormControl fullWidth sx={{ mb: 3 }}>
-                        <InputLabel>Estado Histológico</InputLabel>
-                        <Select
-                            value={histology}
-                            onChange={(e) => setHistology(e.target.value)}
-                        >
-                            {Object.keys(histologyOptions).map((key) => (
-                                <MenuItem key={key} value={key}>
-                                    {histologyOptions[key].display}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    <TextField
-                        label="Anatomía Patológica Definitiva"
-                        multiline
-                        rows={4}
-                        fullWidth
-                        variant="outlined"
-                        value={pathologyReport}
-                        onChange={(e) => setPathologyReport(e.target.value)}
-                    />
-                    <Button
-                        variant="contained"
-                        sx={{ mt: 2 }}
-                        color="primary"
-                        onClick={handleSaveChanges}
-                    >
-                        Guardar Cambios
-                    </Button>
-                    <Button
-                        variant="outlined"
-                        sx={{ mt: 2, ml: 2 }}
-                        onClick={() => setOpenHistoModal(false)}
-                    >
-                        Cancelar
                     </Button>
                 </Box>
             </Modal>

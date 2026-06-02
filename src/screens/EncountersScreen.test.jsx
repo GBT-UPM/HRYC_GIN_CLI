@@ -4,6 +4,7 @@ import EncountersScreen from './EncountersScreen';
 import ApiService from '../services/ApiService';
 
 let mockKeycloak;
+const searchLabel = 'Buscar por caso, evaluación, código de estudio, centro, lateralidad, ámbito, tipo o ecografista';
 
 jest.mock('@react-keycloak/web', () => ({
   useKeycloak: () => ({
@@ -13,11 +14,6 @@ jest.mock('@react-keycloak/web', () => ({
 }));
 
 jest.mock('../services/ApiService', () => jest.fn());
-jest.mock('../hooks/useObservationHistologyTemplate', () => ({
-  useObservationHistologyTemplate: () => ({
-    generateObservation: jest.fn(),
-  }),
-}));
 jest.mock('jspdf', () => jest.fn().mockImplementation(() => ({
   addImage: jest.fn(),
   setFont: jest.fn(),
@@ -51,8 +47,12 @@ describe('EncountersScreen', () => {
           evaluationId: 10,
           caseDisplayId: 'H12O-C000002',
           evaluationDisplayId: 'H12O-C000002-E000010',
+          evaluationType: 'SECONDARY',
+          primaryEvaluation: false,
           centerId: 'H12O',
           codeStatus: 'CODE_ASSIGNED',
+          caseStatus: 'OPEN',
+          evaluationStatus: 'COMPLETED',
           studyPatientCode: 'SP-200',
           lateralityDisplay: 'Izquierdo',
           careSettingCode: 'INPATIENT',
@@ -73,9 +73,17 @@ describe('EncountersScreen', () => {
     });
 
     expect(screen.getByText('Código asignado')).toBeInTheDocument();
+    expect(screen.getByText('Tipo')).toBeInTheDocument();
+    expect(screen.getByText('Secundaria')).toBeInTheDocument();
+    expect(screen.getByLabelText(searchLabel)).toBeInTheDocument();
+    expect(screen.getByText('Estado caso')).toBeInTheDocument();
+    expect(screen.getByText('Estado evaluación')).toBeInTheDocument();
+    expect(screen.getByText('Abierto')).toBeInTheDocument();
+    expect(screen.getByText('Completada')).toBeInTheDocument();
     expect(screen.getByText('SP-200')).toBeInTheDocument();
     expect(screen.getByText('Hospitalización')).toBeInTheDocument();
     expect(screen.getByLabelText('Imprimir informe')).toBeInTheDocument();
+    expect(screen.queryByText('Editar Histología')).not.toBeInTheDocument();
     expect(screen.queryByTestId('EditIcon')).not.toBeInTheDocument();
     expect(screen.queryByText('patientPseudonym')).not.toBeInTheDocument();
     expect(screen.queryByText('123456')).not.toBeInTheDocument();

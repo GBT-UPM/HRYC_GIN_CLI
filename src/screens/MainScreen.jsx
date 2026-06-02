@@ -177,7 +177,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
         {[
           { label: 'Pacientes Atendidas', icon: <People fontSize="large" color="primary" />, count: counts.Patient, tooltip: 'Número total de pacientes registrados en el sistema.' },
           { label: 'Citas Cursadas', icon: <CalendarMonth fontSize="large" color="success" />, count: counts.Encounter, tooltip: 'Total de citas clínicas realizadas.' },
-          { label: 'Cuestionarios Realizados', icon: <MedicalInformation fontSize="large" color="warning" />, count: counts.QuestionnaireResponse, tooltip: 'Informes completados durante las visitas.' },
+          { label: 'Casos y evaluaciones', icon: <MedicalInformation fontSize="large" color="warning" />, count: counts.QuestionnaireResponse, tooltip: 'Evaluaciones registradas en casos del estudio.' },
           { label: 'Masas Anexiales', icon: <LocalHospital fontSize="large" color="error" />, count: counts.RiskAssessment, tooltip: 'Casos en los que se ha evaluado riesgo de masa anexial.' },
         ].map(({ label, icon, count, tooltip }, index) => (
           <Grid2
@@ -282,7 +282,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
             width: { xs: '100%', sm: '80%', md: '65%' },
           }}
         >
-          Revisar Cuestionarios
+          Revisar casos y evaluaciones
         </Button>
 
         <Button

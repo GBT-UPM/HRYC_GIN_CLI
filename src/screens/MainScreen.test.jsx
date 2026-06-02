@@ -88,7 +88,8 @@ describe('MainScreen', () => {
     });
 
     expectCardCount('Citas Cursadas', 3);
-    expectCardCount('Cuestionarios Realizados', 3);
+    expectCardCount('Casos y evaluaciones', 3);
+    expect(screen.getByText('Revisar casos y evaluaciones')).toBeInTheDocument();
     expectCardCount('Masas Anexiales', 2);
     expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/cases/evaluations?centerId=HURYC', {});
   });
