@@ -28,13 +28,113 @@ const ANATOMICAL_STRUCTURE_OPTIONS = ["", "OVARY", "FALLOPIAN_TUBE", "PARAOVARY"
 const HISTOLOGY_STATUS_OPTIONS = ["", "PENDING", "AVAILABLE", "NOT_AVAILABLE", "UNKNOWN"];
 const BENIGN_MALIGNANT_OPTIONS = ["", "BENIGN", "BORDERLINE", "MALIGNANT", "UNKNOWN"];
 
+const AdvancedSection = ({ id, title, open, onToggle, children }) => (
+    <Box sx={{ border: '1px solid #d8e1e8', borderRadius: 1 }}>
+        <Button
+            type="button"
+            fullWidth
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-controls={id}
+            sx={{
+                justifyContent: 'space-between',
+                px: 2,
+                py: 1.25,
+                textTransform: 'none',
+                color: 'text.primary',
+                fontWeight: 600,
+            }}
+        >
+            <span>{title}</span>
+            <span aria-hidden="true">{open ? 'Cerrar' : 'Abrir'}</span>
+        </Button>
+        {open ? (
+            <Box id={id} sx={{ px: 2, pb: 2 }}>
+                {children}
+            </Box>
+        ) : null}
+    </Box>
+);
+
+const isRealFilterValue = (value) => {
+    if (value === null || value === undefined) {
+        return false;
+    }
+
+    const normalizedValue = String(value).trim();
+    return normalizedValue !== ""
+        && normalizedValue.toUpperCase() !== "ALL"
+        && normalizedValue.toUpperCase() !== "GLOBAL"
+        && normalizedValue.toUpperCase() !== "TODOS"
+        && normalizedValue.toUpperCase() !== "TODAS";
+};
+
+export const buildScientificExportEndpoint = ({
+    path,
+    filters,
+    allowedCenters,
+    studyCoordinator,
+    siteCoordinator,
+}) => {
+    const params = new URLSearchParams();
+    const currentFilters = filters || {};
+    const currentAllowedCenters = Array.isArray(allowedCenters) ? allowedCenters : [];
+
+    const addParam = (name, value) => {
+        if (isRealFilterValue(value)) {
+            params.set(name, String(value).trim());
+        }
+    };
+
+    if (siteCoordinator && !studyCoordinator) {
+        addParam("centerId", currentFilters.centerId || currentAllowedCenters[0]);
+    } else if (studyCoordinator) {
+        addParam("centerId", currentFilters.centerId);
+    }
+
+    [
+        "fromDate",
+        "toDate",
+        "codeStatus",
+        "caseStatus",
+        "careSettingCode",
+        "lateralityCode",
+        "anatomicalStructureCode",
+        "histologyStatus",
+        "benignMalignant",
+    ].forEach((field) => addParam(field, currentFilters[field]));
+
+    if (currentFilters.includePendingCode === true) {
+        params.set("includePendingCode", "true");
+    }
+    if (currentFilters.includeExcluded === true) {
+        params.set("includeExcluded", "true");
+    }
+    if (path.includes("study-evaluations")) {
+        addParam("evaluationType", currentFilters.evaluationType);
+        addParam("evaluationStatus", currentFilters.evaluationStatus);
+    }
+    addParam("preset", currentFilters.preset);
+    if (Array.isArray(currentFilters.columns) && currentFilters.columns.length > 0) {
+        const requestedColumns = currentFilters.columns.filter(isRealFilterValue).join(",");
+        addParam("columns", requestedColumns);
+    } else {
+        addParam("columns", currentFilters.columns);
+    }
+
+    const queryString = params.toString();
+    return queryString ? `${path}?${queryString}` : path;
+};
+
 const DownloadScreen = () => {
     const { keycloak } = useKeycloak();
     const allowedCenters = useMemo(() => getAllowedCenters(keycloak), [keycloak]);
+    const studyCoordinator = isStudyCoordinator(keycloak);
+    const siteCoordinator = isSiteCoordinator(keycloak);
     const hasScientificExportAccess = isSiteCoordinator(keycloak) || isStudyCoordinator(keycloak);
     const showScientificExports = hasScientificExportAccess && !isClinician(keycloak);
     const [scientificFilters, setScientificFilters] = useState({
-        centerId: allowedCenters[0] || "",
+        centerId: "",
         fromDate: "",
         toDate: "",
         codeStatus: "",
@@ -48,33 +148,87 @@ const DownloadScreen = () => {
         benignMalignant: "",
         includePendingCode: false,
         includeExcluded: false,
+        preset: "",
+        caseColumns: [],
+        evaluationColumns: [],
     });
+    const [exportPresets, setExportPresets] = useState([]);
+    const [exportVariables, setExportVariables] = useState({ CASES: [], EVALUATIONS: [] });
+    const [defaultPresetInitialized, setDefaultPresetInitialized] = useState(false);
+    const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+    const [columnCustomizationOpen, setColumnCustomizationOpen] = useState(false);
 
     useEffect(() => {
-        if (isSiteCoordinator(keycloak) && !isStudyCoordinator(keycloak) && allowedCenters.length === 1) {
+        if (siteCoordinator && !studyCoordinator && allowedCenters.length === 1) {
             setScientificFilters((current) => ({
                 ...current,
                 centerId: allowedCenters[0],
             }));
             return;
         }
-        if (allowedCenters.length > 0 && scientificFilters.centerId && !allowedCenters.includes(scientificFilters.centerId) && !isStudyCoordinator(keycloak)) {
+        if (allowedCenters.length > 0 && scientificFilters.centerId && !allowedCenters.includes(scientificFilters.centerId) && !studyCoordinator) {
             setScientificFilters((current) => ({
                 ...current,
                 centerId: allowedCenters[0],
             }));
         }
-    }, [allowedCenters, scientificFilters.centerId, keycloak]);
+    }, [allowedCenters, scientificFilters.centerId, siteCoordinator, studyCoordinator]);
+
+    useEffect(() => {
+        if (!showScientificExports || !keycloak?.token) {
+            return;
+        }
+
+        const loadExportMetadata = async () => {
+            try {
+                const [presetsResponse, caseVariablesResponse, evaluationVariablesResponse] = await Promise.all([
+                    ApiService(keycloak.token, 'GET', '/app/exports/presets', {}),
+                    ApiService(keycloak.token, 'GET', '/app/exports/variables?exportType=CASES', {}),
+                    ApiService(keycloak.token, 'GET', '/app/exports/variables?exportType=EVALUATIONS', {}),
+                ]);
+
+                if (presetsResponse.status === 200) {
+                    setExportPresets(await presetsResponse.json());
+                }
+                if (caseVariablesResponse.status === 200) {
+                    const caseVariables = await caseVariablesResponse.json();
+                    setExportVariables((current) => ({ ...current, CASES: caseVariables }));
+                }
+                if (evaluationVariablesResponse.status === 200) {
+                    const evaluationVariables = await evaluationVariablesResponse.json();
+                    setExportVariables((current) => ({ ...current, EVALUATIONS: evaluationVariables }));
+                }
+            } catch (error) {
+                console.error("Error al cargar metadatos de exportación científica:", error);
+            }
+        };
+
+        loadExportMetadata();
+    }, [keycloak?.token, showScientificExports]);
+
+    useEffect(() => {
+        if (defaultPresetInitialized || exportPresets.length === 0) {
+            return;
+        }
+        const mainStudyPreset = exportPresets.find((preset) => preset.code === "MAIN_STUDY");
+        if (mainStudyPreset) {
+            setScientificFilters((current) => ({
+                ...current,
+                preset: current.preset || mainStudyPreset.code,
+            }));
+        }
+        setDefaultPresetInitialized(true);
+    }, [defaultPresetInitialized, exportPresets]);
 
     const centerOptions = useMemo(() => {
-        if (isStudyCoordinator(keycloak)) {
+        if (studyCoordinator) {
             return SCIENTIFIC_EXPORT_CENTERS;
         }
         if (allowedCenters.length === 1) {
             return allowedCenters;
         }
         return ["", ...allowedCenters];
-    }, [allowedCenters, keycloak]);
+    }, [allowedCenters, studyCoordinator]);
 
     const updateScientificFilter = (field, value) => {
         setScientificFilters((current) => ({
@@ -83,46 +237,20 @@ const DownloadScreen = () => {
         }));
     };
 
-    const buildScientificEndpoint = (path) => {
-        const params = new URLSearchParams();
-        const effectiveCenterId = isStudyCoordinator(keycloak)
-            ? scientificFilters.centerId
-            : (scientificFilters.centerId || allowedCenters[0] || "");
-
-        if (effectiveCenterId) {
-            params.set("centerId", effectiveCenterId);
-        }
-        [
-            "fromDate",
-            "toDate",
-            "codeStatus",
-            "caseStatus",
-            "careSettingCode",
-            "lateralityCode",
-            "anatomicalStructureCode",
-            "histologyStatus",
-            "benignMalignant",
-        ].forEach((field) => {
-            if (scientificFilters[field]) {
-                params.set(field, scientificFilters[field]);
-            }
+    const buildScientificEndpoint = (path, exportType) => {
+        const selectedColumns = exportType === "CASES"
+            ? scientificFilters.caseColumns
+            : scientificFilters.evaluationColumns;
+        return buildScientificExportEndpoint({
+            path,
+            filters: {
+                ...scientificFilters,
+                columns: scientificFilters.preset ? [] : selectedColumns,
+            },
+            allowedCenters,
+            studyCoordinator,
+            siteCoordinator,
         });
-        if (scientificFilters.includePendingCode) {
-            params.set("includePendingCode", "true");
-        }
-        if (scientificFilters.includeExcluded) {
-            params.set("includeExcluded", "true");
-        }
-        if (path.includes("study-evaluations.csv")) {
-            if (scientificFilters.evaluationType) {
-                params.set("evaluationType", scientificFilters.evaluationType);
-            }
-            if (scientificFilters.evaluationStatus) {
-                params.set("evaluationStatus", scientificFilters.evaluationStatus);
-            }
-        }
-        const queryString = params.toString();
-        return queryString ? `${path}?${queryString}` : path;
     };
 
     const downloadEndpoint = async (endpoint, fallbackFilename) => {
@@ -158,16 +286,27 @@ const DownloadScreen = () => {
         }
     };
 
-    const handleScientificDownload = (resource) => {
+    const handleScientificDownload = (resource, format = 'xlsx') => {
+        const extension = format === 'csv' ? 'csv' : 'xlsx';
         const endpoint = resource === 'cases'
-            ? buildScientificEndpoint('/app/exports/study-cases.csv')
-            : buildScientificEndpoint('/app/exports/study-evaluations.csv');
+            ? buildScientificEndpoint(`/app/exports/study-cases.${extension}`, 'CASES')
+            : buildScientificEndpoint(`/app/exports/study-evaluations.${extension}`, 'EVALUATIONS');
         const fallbackFilename = resource === 'cases'
-            ? 'study-cases.csv'
-            : 'study-evaluations.csv';
+            ? `study-cases.${extension}`
+            : `study-evaluations.${extension}`;
 
         return downloadEndpoint(endpoint, fallbackFilename);
     };
+
+    const updateSelectedColumns = (field, selectedOptions) => {
+        updateScientificFilter(field, Array.from(selectedOptions).map((option) => option.value));
+    };
+
+    const selectedPreset = exportPresets.find((preset) => preset.code === scientificFilters.preset);
+    const presetAllowsExportType = (exportType) =>
+        !selectedPreset || selectedPreset.allowedExportTypes?.includes(exportType);
+    const centerScopedExportDisabled = siteCoordinator && !studyCoordinator && !(scientificFilters.centerId || allowedCenters[0]);
+    const advancedModeActive = !scientificFilters.preset || columnCustomizationOpen;
 
     return (
         <Box sx={{ px: 4, py: 3 }}>
@@ -184,15 +323,11 @@ const DownloadScreen = () => {
                                 <Chip label={isStudyCoordinator(keycloak) ? 'Global' : 'Centro'} size="small" color="primary" variant="outlined" />
                             </Stack>
                             <Typography variant="body2" color="text.secondary">
-                                Dataset controlado del estudio basado en CaseRecord, CaseEvaluation e HistopathologyResult.
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                La exportación científica no incluye NHC, nombres, pseudónimos internos ni QuestionnaireResponse completo.
+                                Esta sección permite descargar los datos del estudio en formato Excel o CSV para análisis. La exportación no incluye NHC, nombres, pseudónimos internos ni el QuestionnaireResponse completo.
                             </Typography>
                         </Box>
 
                         <Box>
-                            <Typography variant="h6" sx={{ mb: 2 }}>Filtros de exportación científica</Typography>
                             <Grid2 container spacing={2}>
                                 <Grid2 size={{ xs: 12, md: 3 }}>
                                     <label htmlFor="scientific-center">Centro</label>
@@ -205,7 +340,7 @@ const DownloadScreen = () => {
                                     >
                                         {centerOptions.map((center) => (
                                             <option key={center || "global"} value={center}>
-                                                {center || "Global"}
+                                                {center || "Todos los centros"}
                                             </option>
                                         ))}
                                     </select>
@@ -230,6 +365,89 @@ const DownloadScreen = () => {
                                         style={{ width: "100%", padding: "8px", marginTop: "4px" }}
                                     />
                                 </Grid2>
+                                <Grid2 size={{ xs: 12, md: 3 }}>
+                                    <label htmlFor="scientific-preset">Preset de columnas</label>
+                                    <select
+                                        id="scientific-preset"
+                                        value={scientificFilters.preset}
+                                        onChange={(event) => updateScientificFilter("preset", event.target.value)}
+                                        style={{ width: "100%", padding: "8px", marginTop: "4px" }}
+                                    >
+                                        <option value="">Sin preset / columnas por defecto</option>
+                                        {exportPresets.map((preset) => (
+                                            <option key={preset.code} value={preset.code}>
+                                                {preset.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
+                                        Para el análisis habitual se recomienda Dataset principal del estudio. Use otras opciones solo si necesita análisis específicos.
+                                    </Typography>
+                                    {advancedModeActive ? (
+                                        <Alert severity="info" sx={{ mt: 1 }}>
+                                            Modo avanzado activo: revise los filtros y columnas antes de descargar.
+                                        </Alert>
+                                    ) : null}
+                                </Grid2>
+                            </Grid2>
+                        </Box>
+
+                        <Grid2 container spacing={2}>
+                            <Grid2 size={{ xs: 12, md: 6 }}>
+                                <Stack spacing={1}>
+                                    <Button
+                                        variant="contained"
+                                        fullWidth
+                                        disabled={centerScopedExportDisabled || !presetAllowsExportType("CASES")}
+                                        onClick={() => handleScientificDownload('cases', 'xlsx')}
+                                    >
+                                        Descargar Excel por casos
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        fullWidth
+                                        disabled={centerScopedExportDisabled || !presetAllowsExportType("CASES")}
+                                        onClick={() => handleScientificDownload('cases', 'csv')}
+                                    >
+                                        Descargar CSV por casos
+                                    </Button>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Una fila por masa/caso. Recomendado para el análisis principal del estudio.
+                                    </Typography>
+                                </Stack>
+                            </Grid2>
+                            <Grid2 size={{ xs: 12, md: 6 }}>
+                                <Stack spacing={1}>
+                                    <Button
+                                        variant="contained"
+                                        fullWidth
+                                        disabled={centerScopedExportDisabled || !presetAllowsExportType("EVALUATIONS")}
+                                        onClick={() => handleScientificDownload('evaluations', 'xlsx')}
+                                    >
+                                        Descargar Excel por evaluaciones/interobservador
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        fullWidth
+                                        disabled={centerScopedExportDisabled || !presetAllowsExportType("EVALUATIONS")}
+                                        onClick={() => handleScientificDownload('evaluations', 'csv')}
+                                    >
+                                        Descargar CSV por evaluaciones/interobservador
+                                    </Button>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Una fila por evaluación ecográfica. Útil para análisis interobservador.
+                                    </Typography>
+                                </Stack>
+                            </Grid2>
+                        </Grid2>
+
+                        <AdvancedSection
+                            id="scientific-advanced-filters"
+                            title="Filtros avanzados"
+                            open={advancedFiltersOpen}
+                            onToggle={() => setAdvancedFiltersOpen((current) => !current)}
+                        >
+                            <Grid2 container spacing={2}>
                                 <Grid2 size={{ xs: 12, md: 3 }}>
                                     <label htmlFor="scientific-code-status">Estado del código</label>
                                     <select
@@ -388,30 +606,61 @@ const DownloadScreen = () => {
                                     />
                                 </Grid2>
                             </Grid2>
-                        </Box>
+                        </AdvancedSection>
 
-                        <Grid2 container spacing={2}>
-                            <Grid2 size={{ xs: 12, md: 6 }}>
-                                <Button
-                                    variant="contained"
-                                    fullWidth
-                                    disabled={isSiteCoordinator(keycloak) && !isStudyCoordinator(keycloak) && !(scientificFilters.centerId || allowedCenters[0])}
-                                    onClick={() => handleScientificDownload('cases')}
-                                >
-                                    Descargar dataset por casos
-                                </Button>
-                            </Grid2>
-                            <Grid2 size={{ xs: 12, md: 6 }}>
-                                <Button
-                                    variant="contained"
-                                    fullWidth
-                                    disabled={isSiteCoordinator(keycloak) && !isStudyCoordinator(keycloak) && !(scientificFilters.centerId || allowedCenters[0])}
-                                    onClick={() => handleScientificDownload('evaluations')}
-                                >
-                                    Descargar dataset por evaluaciones
-                                </Button>
-                            </Grid2>
-                        </Grid2>
+                        <AdvancedSection
+                            id="scientific-column-customization"
+                            title="Personalizar columnas"
+                            open={columnCustomizationOpen}
+                            onToggle={() => setColumnCustomizationOpen((current) => !current)}
+                        >
+                            <Stack spacing={2}>
+                                <Typography variant="body2" color="text.secondary">
+                                    Opción avanzada. Solo se muestran variables aprobadas como exportables. No se pueden seleccionar NHC, nombres, pseudónimos internos ni campos sensibles.
+                                </Typography>
+                                {!scientificFilters.preset ? (
+                                    <Alert severity="info">
+                                        Modo avanzado activo: se usarán las columnas seleccionadas o las columnas por defecto si no selecciona ninguna.
+                                    </Alert>
+                                ) : null}
+                                <Grid2 container spacing={2}>
+                                    <Grid2 size={{ xs: 12, md: 6 }}>
+                                    <label htmlFor="scientific-case-columns">Columnas dataset por casos</label>
+                                    <select
+                                        id="scientific-case-columns"
+                                        multiple
+                                        value={scientificFilters.caseColumns}
+                                        onChange={(event) => updateSelectedColumns("caseColumns", event.target.selectedOptions)}
+                                        disabled={Boolean(scientificFilters.preset)}
+                                        style={{ width: "100%", minHeight: "120px", padding: "8px", marginTop: "4px" }}
+                                    >
+                                        {exportVariables.CASES.map((variable) => (
+                                            <option key={variable.columnName} value={variable.columnName}>
+                                                {variable.label || variable.columnName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    </Grid2>
+                                    <Grid2 size={{ xs: 12, md: 6 }}>
+                                    <label htmlFor="scientific-evaluation-columns">Columnas dataset por evaluaciones</label>
+                                    <select
+                                        id="scientific-evaluation-columns"
+                                        multiple
+                                        value={scientificFilters.evaluationColumns}
+                                        onChange={(event) => updateSelectedColumns("evaluationColumns", event.target.selectedOptions)}
+                                        disabled={Boolean(scientificFilters.preset)}
+                                        style={{ width: "100%", minHeight: "120px", padding: "8px", marginTop: "4px" }}
+                                    >
+                                        {exportVariables.EVALUATIONS.map((variable) => (
+                                            <option key={variable.columnName} value={variable.columnName}>
+                                                {variable.label || variable.columnName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    </Grid2>
+                                </Grid2>
+                            </Stack>
+                        </AdvancedSection>
                     </Stack>
                 </Paper>
             ) : (
