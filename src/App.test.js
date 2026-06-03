@@ -38,5 +38,5 @@ test('renders app layout for authenticated users', () => {
   );
 
   expect(screen.getByText('Panel de prueba')).toBeInTheDocument();
-  expect(screen.getByText('Participantes pendientes')).toBeInTheDocument();
+  expect(screen.getByText('Pendientes')).toBeInTheDocument();
 });

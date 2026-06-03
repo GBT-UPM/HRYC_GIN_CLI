@@ -4,7 +4,7 @@ import ResponsesScreen from './ResponsesScreen';
 import ApiService from '../services/ApiService';
 
 let mockKeycloak;
-const searchLabel = 'Buscar por caso, evaluación, código de estudio, centro, lateralidad, ámbito, tipo o ecografista';
+const searchLabel = 'Búsqueda';
 
 jest.mock('@react-keycloak/web', () => ({
   useKeycloak: () => ({
@@ -64,10 +64,8 @@ describe('ResponsesScreen', () => {
     expect(screen.getByText('Código pendiente')).toBeInTheDocument();
     expect(screen.getByText('Tipo')).toBeInTheDocument();
     expect(screen.getByText('Primaria')).toBeInTheDocument();
-    expect(screen.getByText('📋 Casos y evaluaciones')).toBeInTheDocument();
+    expect(screen.getByText('Casos y evaluaciones')).toBeInTheDocument();
     expect(screen.getByLabelText(searchLabel)).toBeInTheDocument();
-    expect(screen.getByText('Estado caso')).toBeInTheDocument();
-    expect(screen.getByText('Estado evaluación')).toBeInTheDocument();
     expect(screen.getByText('Abierto')).toBeInTheDocument();
     expect(screen.getByText('Completada')).toBeInTheDocument();
     expect(screen.getByText('Consulta externa')).toBeInTheDocument();

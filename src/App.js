@@ -10,7 +10,6 @@ import Layout from "./layout/Layout";
 import { useEffect, useState } from "react";
 import { useKeycloak } from "@react-keycloak/web";
 import ResponsesScreen from "./screens/ResponsesScreen";
-import ApiService from "./services/ApiService";
 import DownloadScreen from "./screens/DownloadScreen";
 import EncountersScreen from "./screens/EncountersScreen";
 import PendingParticipantsScreen from "./screens/PendingParticipantsScreen";
@@ -24,72 +23,6 @@ function App() {
   // eslint-disable-next-line no-unused-vars
   const [practitioner, setPractitioner] = useState("");
   const [practitionerName, setPractitionerName] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-  const handleDownload = async () => {
-    try {
-      const response = await ApiService(keycloak.token, 'GET', `/downloadcsv`, {});
-      if (response.status === 200) {
-
-        const contentDisposition = response.headers.get("Content-Disposition");
-          const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/);
-          const filename = filenameMatch ? filenameMatch[1] : "questionnaire.csv";
-      
-          const blob = await response.blob();
-    
-           // Crear un enlace temporal para descargar
-          const url = window.URL.createObjectURL(blob);
-           const link = document.createElement("a");
-          link.href = url;
-           link.download = filename;
-           document.body.appendChild(link);
-           link.click();
-           link.remove();
-          window.URL.revokeObjectURL(url);
-
-
-
-      } else {
-        throw new Error(`Error en la respuesta: ${response.status}`);
-      }
-    } catch (error) {
-      console.error("Error al obtener los datos del paciente:", error);
-
-    }
-    // try {
-    //   const response = await fetch("http://localhost:8080/downloadcsv", { 
-    //     method: "GET",
-    //     headers: {
-    //       Authorization: `Bearer ${keycloak.token}` // si usas Keycloak
-    //     }
-    //   });
-  
-    //   if (!response.ok) {
-    //     throw new Error(`Error al descargar: ${response.statusText}`);
-    //   }
-  
-    //   // Extraer el nombre del archivo del header si está disponible
-    //   const contentDisposition = response.headers.get("Content-Disposition");
-    //   const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/);
-    //   const filename = filenameMatch ? filenameMatch[1] : "questionnaire.csv";
-  
-    //   const blob = await response.blob();
-  
-    //   // Crear un enlace temporal para descargar
-    //   const url = window.URL.createObjectURL(blob);
-    //   const link = document.createElement("a");
-    //   link.href = url;
-    //   link.download = filename;
-    //   document.body.appendChild(link);
-    //   link.click();
-    //   link.remove();
-    //   window.URL.revokeObjectURL(url);
-    // } catch (error) {
-    //   console.error("Error al descargar el CSV:", error);
-    // }
-  };
   const closeSession = async () => {
     keycloak.logout();
   }
@@ -180,7 +113,7 @@ function App() {
     </Routes>*/}
       <Routes>
         {/* Ruta que utiliza Layout como contenedor */}
-        <Route path="/" element={<Layout sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} handleDownload={handleDownload} closeSession={closeSession} preferred_username={practitionerName} isAdmin={isAdmin} keycloak={keycloak} />}>
+        <Route path="/" element={<Layout closeSession={closeSession} preferred_username={practitionerName} isAdmin={isAdmin} keycloak={keycloak} />}>
 
           {/* Rutas hijas dentro de Layout */}
           <Route index element={

@@ -1,221 +1,280 @@
-/* Estilos generales */
+:root {
+  --mia-primary: #1E3A5F;
+  --mia-secondary: #2F5D7C;
+  --mia-background: #F5F7FA;
+  --mia-paper: #FFFFFF;
+  --mia-text-primary: #1F2933;
+  --mia-text-secondary: #52616B;
+  --mia-border: #D9E2EC;
+}
+
 * {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
 }
 
-/* Cabecera principal */
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  padding: 12px 24px;
-  background-color: #ffffff;
-  border-bottom: 1px solid #ddd;
-  flex-wrap: wrap;
+body {
+  margin: 0;
+  background: var(--mia-background);
+  color: var(--mia-text-primary);
 }
 
-/* Sección de logo */
-.logo-section {
+.App {
+  min-height: 100vh;
+  background: var(--mia-background);
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 1100;
+  background: var(--mia-primary);
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.16);
+}
+
+.header-inner {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) minmax(240px, 0.8fr) minmax(320px, 1fr);
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  padding: 10px 32px;
+}
+
+.brand-section {
   display: flex;
   align-items: center;
   gap: 18px;
-  flex: 1 1 auto;
-  flex-wrap: nowrap;
-  min-width: 420px;
+  min-width: 0;
 }
 
+.brand-title {
+  font-size: 1.7rem;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0;
+}
 
-.logo {
-  /* width: 25%;
-  height: 100%;
-  margin-right: 10px; */
-  height: 42px;
-  max-width: 220px;
-  object-fit: contain;
+.brand-subtitle {
+  margin-top: 3px;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.78);
+  white-space: nowrap;
 }
-.logo-mia {
-    width: 160px;              /* ajusta según tu cabecera */
-    height: 56px;             /* menos alto → más rectangular */
-    object-fit: contain;         /* recorta sobrante */
-    object-position: center;   /* centra el recorte */
+
+.study-subtitle {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.9rem;
+  line-height: 1.25;
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  padding-left: 18px;
 }
+
+.institution-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.institution-section span {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 6px 8px;
+}
+
 .user-section {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
-  flex: 0 0 auto;
-  min-width: 360px;
+  gap: 14px;
+  min-width: 0;
 }
 
-
-.app-name {
-  font-size: 24px;
-  font-weight: bold;
-  color: #333;
+.session-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.86rem;
+  line-height: 1.2;
 }
 
-/* Sección de usuario */
-.user-section {
+.session-info-row {
   display: flex;
   align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  white-space: nowrap;
 }
 
-.user-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+.session-label {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
-.user-name {
+.session-info-main {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 700;
+}
+
+.session-info-warning {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #FBBF24;
+  font-weight: 700;
+}
+
+.session-info-centers {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.82rem;
   font-weight: 600;
-  font-size: 16px;
-  color: #333;
 }
-
 
 .logout-btn {
-  background-color: #e74c3c;
-  color: white;
-  border: none;
-  padding: 8px 14px;
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  padding: 8px 13px;
   border-radius: 6px;
   cursor: pointer;
-  transition: background 0.3s ease;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .logout-btn:hover {
-  background-color: #e60000;
+  background: rgba(255, 255, 255, 0.12);
 }
 
-.save-btn {
-  background-color: #2e88cb;
-  border: none;
-  color: white;
-  padding: 10px 20px;
-  font-size: 14px;
-  cursor: pointer;
-  border-radius: 5px;
-  transition: background-color 0.3s ease;
-  margin-left: 20px;
+.top-navigation {
+  position: sticky;
+  top: 68px;
+  z-index: 1000;
+  background: #fff;
+  border-bottom: 1px solid var(--mia-border);
 }
 
-.save-btn:hover {
-  background-color: #5380a2;
+.top-navigation-inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 0 32px;
 }
-/* Media Queries: Estilos para pantallas más pequeñas */
-@media (max-width: 768px) {
-  /* Reducir el tamaño del logo y la fuente */
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 15px;
-  }
-.logo {
-  /* width: 25%;
-  height: 100%;
-  margin-right: 10px; */
-  height: 45px;
-  max-width: 100px;
-  object-fit: contain;
+
+.top-navigation-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 48px;
+  padding: 0 14px;
+  color: var(--mia-text-secondary);
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  font-size: 0.92rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
-  .logo-section {
-    justify-content: flex-start;
-    width: 100%;
-    min-width: 0;
-    flex-wrap: wrap;
-    margin-bottom: 10px;
-  }
 
-  .user-section {
-    justify-content: flex-start;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .user-name {
-    font-size: 14px;
-  }
-
-  .logout-btn {
-    padding: 6px 10px;
-    font-size: 14px;
-  }
-  .logo {
-    width: 45%;
-    height: 100%;
-  }
-  
-  .app-name {
-    font-size: 20px;
-  }
-
-  .user-avatar {
-    width: 35px;
-    height: 35px;
-  }
-  
-  .user-name {
-    font-size: 14px;
-  }
-
-  .logout-btn {
-    padding: 8px 16px;
-    font-size: 12px;
-  }
-  .save-btn {
-    background-color: #56b0dc;
-    border: none;
-    color: white;
-    padding: 10px 20px;
-    font-size: 14px;
-    cursor: pointer;
-    border-radius: 5px;
-    transition: background-color 0.3s ease;
-    margin-left: 20px;
-  }
+.top-navigation-link:hover {
+  color: var(--mia-primary);
+  background: #F8FAFC;
+  text-decoration: none;
 }
-.main-content{
-  padding-bottom: 30px;
-  max-width: 85%;
-}
-@media (max-width: 480px) {
-  /* Cambiar a layout en columna en pantallas muy pequeñas */
-  .main-content{
-  padding-bottom: 30px;
-  max-width: 100%;
-}
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 
-  .logo-section {
-    margin-bottom: 10px;
-  }
-
-  .user-section {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .user-name {
-    display: none; /* Ocultar el nombre del usuario en pantallas muy pequeñas */
-  }
-  
-  .logout-btn {
-    margin-left: auto; /* Alinear el botón de cerrar sesión a la derecha */
-  }
+.top-navigation-link.active {
+  color: var(--mia-primary);
+  border-bottom-color: var(--mia-secondary);
 }
-.report div{
+
+.main-content {
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 24px 32px 36px;
+}
+
+.report div {
   margin-bottom: 10px;
   text-align: justify;
 }
-.App {
-  display: flex;
+
+@media (max-width: 1100px) {
+  .header-inner {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 12px 24px;
+  }
+
+  .brand-section {
+    justify-content: space-between;
+  }
+
+  .institution-section {
+    justify-content: flex-start;
+  }
+
+  .user-section {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .top-navigation {
+    top: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    position: static;
+  }
+
+  .header-inner {
+    padding: 12px 16px;
+  }
+
+  .brand-section {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .brand-subtitle {
+    white-space: normal;
+  }
+
+  .study-subtitle {
+    border-left: none;
+    padding-left: 0;
+  }
+
+  .top-navigation {
+    position: sticky;
+    top: 0;
+  }
+
+  .top-navigation-inner {
+    padding: 0 16px;
+  }
+
+  .main-content {
+    padding: 16px 16px 28px;
+  }
 }

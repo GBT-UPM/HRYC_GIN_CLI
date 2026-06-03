@@ -15,7 +15,7 @@ describe('MainScreen', () => {
   });
 
   const expectCardCount = (label, expectedCount) => {
-    const labelNode = screen.getByText(label);
+    const labelNode = screen.getAllByText(label)[0];
     expect(labelNode.nextSibling).toHaveTextContent(String(expectedCount));
   };
 
@@ -84,13 +84,15 @@ describe('MainScreen', () => {
     );
 
     await waitFor(() => {
-      expectCardCount('Pacientes Atendidas', 2);
+      expectCardCount('Pacientes incluidas', 2);
     });
 
-    expectCardCount('Citas Cursadas', 3);
+    expectCardCount('Encuentros registrados', 3);
     expectCardCount('Casos y evaluaciones', 3);
-    expect(screen.getByText('Revisar casos y evaluaciones')).toBeInTheDocument();
-    expectCardCount('Masas Anexiales', 2);
+    expect(screen.getByText('Acciones principales')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Revisar' })).toBeInTheDocument();
+    expectCardCount('Masas anexiales', 2);
+    expect(screen.getByRole('button', { name: /información del estudio/i })).toBeInTheDocument();
     expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/cases/evaluations?centerId=HURYC', {});
   });
 

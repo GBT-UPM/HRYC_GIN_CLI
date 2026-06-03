@@ -20,7 +20,7 @@ describe("Header", () => {
 
     expect(screen.getByText("clinician_huryc")).toBeInTheDocument();
     expect(screen.getByText("Clínico")).toBeInTheDocument();
-    expect(screen.getByText("HURYC")).toBeInTheDocument();
+    expect(screen.getAllByText("HURYC").length).toBeGreaterThan(0);
   });
 
   it("does not render tokens or patient pseudonym", () => {

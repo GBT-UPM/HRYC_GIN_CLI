@@ -1,8 +1,4 @@
 import React from 'react';
-import LogoHRYC from "../assets/images/LogoHRYC.jpg";
-import LogoUser from "../assets/images/user.png";
-import LogoIrycis from "../assets/images/logo-irycis.png";
-import LogoMIA from "../assets/images/logo-mia.png";
 import { getCentersDisplayLabel, getPreferredUsername, getPrimaryRoleLabel } from "../utils/auth";
 
 const Header = (props) => {
@@ -13,27 +9,41 @@ const Header = (props) => {
 
   return (
 <header className="header">
-  <div className="logo-section">
-    <img src={LogoHRYC} alt="Logo HRYC" className="logo" />
-    <img src={LogoIrycis} alt="Logo IRYCIS" className="logo" />
-    <img src={LogoMIA} alt="Logo MIA" className="logo logo-mia" />
-  </div>
-
-  <div className="user-section">
-    <img src={LogoUser} alt="Avatar" className="user-avatar" />
-    <div className="session-info" aria-label="Información de sesión">
-      <div className="session-info-row">
-        <span className="session-info-main">{username}</span>
-        <span className="session-info-separator">·</span>
-        <span>{roleLabel}</span>
+  <div className="header-inner">
+    <div className="brand-section" aria-label="MIA">
+      <div>
+        <div className="brand-title">MIA</div>
+        <div className="brand-subtitle">Masses Identification Assistant</div>
       </div>
-      <div className={hasMissingCenter ? "session-info-warning" : "session-info-centers"}>
-        {centersLabel}
-      </div>
+      <div className="study-subtitle">Validación externa multicéntrica del ECO-SCORE</div>
     </div>
-    <button onClick={props.closeSession} className="logout-btn">
-      Cerrar Sesión
-    </button>
+
+    <div className="institution-section" aria-label="Instituciones">
+      <span>HURYC</span>
+      <span>H12O</span>
+      <span>GBT/UPM</span>
+      <span>IRYCIS</span>
+    </div>
+
+    <div className="user-section">
+      <div className="session-info" aria-label="Información de sesión">
+        <div className="session-info-row">
+          <span className="session-label">Usuario</span>
+          <span className="session-info-main">{username}</span>
+        </div>
+        <div className="session-info-row">
+          <span className="session-label">Rol</span>
+          <span>{roleLabel}</span>
+        </div>
+        <div className={hasMissingCenter ? "session-info-warning" : "session-info-centers"}>
+          <span className="session-label">Centros</span>
+          <span>{centersLabel}</span>
+        </div>
+      </div>
+      <button onClick={props.closeSession} className="logout-btn">
+        Cerrar sesión
+      </button>
+    </div>
   </div>
 </header>
   );
