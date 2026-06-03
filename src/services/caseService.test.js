@@ -103,6 +103,7 @@ describe("caseService", () => {
       observerInitials: "ABC",
       careSettingCode: "INPATIENT",
       careSettingDisplay: "Hospitalización",
+      studyPatientCode: "HURYC-0001",
       questionnaireResponse: {
         item: [
           { linkId: "PAT_CODIGO", answer: [{ valueString: "STUDY-1" }] },
@@ -114,6 +115,7 @@ describe("caseService", () => {
     expect(ApiService.mock.calls[0][2]).toBe("/app/cases/1/evaluations");
     expect(ApiService.mock.calls[0][3].careSettingCode).toBe("INPATIENT");
     expect(ApiService.mock.calls[0][3].careSettingDisplay).toBe("Hospitalización");
+    expect(ApiService.mock.calls[0][3].studyPatientCode).toBe("HURYC-0001");
     expect(JSON.stringify(ApiService.mock.calls[0][3].questionnaireResponse)).not.toContain("PAT_CODIGO");
     expect(JSON.stringify(ApiService.mock.calls[0][3].questionnaireResponse)).not.toContain("PAT_NHC");
   });

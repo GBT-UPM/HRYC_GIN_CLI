@@ -91,15 +91,28 @@ export const createCase = async (
 export const addSecondaryEvaluation = async (
   token,
   caseId,
-  { questionnaireResponse, encounterId, observerInitials, careSettingCode, careSettingDisplay }
+  {
+    questionnaireResponse,
+    encounterId,
+    observerInitials,
+    careSettingCode,
+    careSettingDisplay,
+    studyPatientCode,
+  }
 ) => {
-  const response = await ApiService(token, "POST", `/app/cases/${caseId}/evaluations`, {
+  const body = {
     questionnaireResponse: sanitizeQuestionnaireResponse(questionnaireResponse),
     encounterId,
     observerInitials,
     careSettingCode,
     careSettingDisplay,
-  });
+  };
+
+  if (studyPatientCode) {
+    body.studyPatientCode = studyPatientCode;
+  }
+
+  const response = await ApiService(token, "POST", `/app/cases/${caseId}/evaluations`, body);
 
   return parseJsonResponse(response);
 };

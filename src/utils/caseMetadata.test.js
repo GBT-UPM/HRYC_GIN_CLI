@@ -122,6 +122,8 @@ describe("case metadata", () => {
       anatomicalStructureDisplay: "Ovario",
       createdAt: "2026-05-29T10:00:00Z",
       evaluationCount: 2,
+      codeStatus: "CODE_ASSIGNED",
+      studyPatientCode: "SP-100",
       nhc: "123",
       patientPseudonym: "secret",
     });
@@ -130,6 +132,7 @@ describe("case metadata", () => {
     expect(summary).toContain("Derecho");
     expect(summary).toContain("Ovario");
     expect(summary).toContain("2 evaluaciones");
+    expect(summary).toContain("Código SP-100");
     expect(summary).not.toContain("123");
     expect(summary).not.toContain("secret");
   });

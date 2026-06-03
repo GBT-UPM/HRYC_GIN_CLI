@@ -140,6 +140,40 @@ const setupApi = ({ secondCaseResponse = okResponse({ questionnaireResponseFhirI
   });
 };
 
+const setupDuplicateSecondaryApi = ({ duplicateMatch, secondaryResponse = okResponse({ questionnaireResponseFhirId: "qr-2" }) }) => {
+  ApiService.mockImplementation((token, method, endpoint) => {
+    if (endpoint === "/app/cases/check-duplicate") {
+      return Promise.resolve(okResponse({ matches: [duplicateMatch] }));
+    }
+
+    if (endpoint === "/audit/register") {
+      return Promise.resolve({ ok: true, status: 200 });
+    }
+
+    if (endpoint === "/fhir/Patient/check-or-create") {
+      return Promise.resolve({ ok: true, status: 200 });
+    }
+
+    if (endpoint === "/fhir/Encounter") {
+      return Promise.resolve({ ok: true, status: 200 });
+    }
+
+    if (endpoint === "/fhir/ImagingStudy") {
+      return Promise.resolve({ ok: true, status: 200 });
+    }
+
+    if (endpoint === "/app/cases/7/evaluations") {
+      return Promise.resolve(secondaryResponse);
+    }
+
+    if (endpoint === "/fhir/Observation" || endpoint === "/fhir/RiskAssessment") {
+      return Promise.resolve(okResponse({}));
+    }
+
+    return Promise.resolve(okResponse({}));
+  });
+};
+
 const submitInitialSave = async () => {
   await screen.findByText("Masa anexial #1");
   await userEvent.type(screen.getByRole("textbox"), "Conclusión clínica");
@@ -239,5 +273,71 @@ describe("ResponsesProbability study code conflict flow", () => {
         careSettingCode: "EMERGENCY",
       })
     );
+  });
+
+  it("includes studyPatientCode in secondary evaluation payload for site coordinators", async () => {
+    setupDuplicateSecondaryApi({
+      duplicateMatch: {
+        caseId: 7,
+        codeStatus: "PENDING_CODE",
+        studyPatientCode: null,
+        lateralityDisplay: "Derecho",
+        anatomicalStructureDisplay: "Trompa",
+      },
+    });
+    const event = jest.fn();
+    renderComponent({ event });
+
+    await submitInitialSave();
+
+    expect(await screen.findByText("Se añadirá una evaluación secundaria al caso existente y se asignará el código de estudio indicado.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Añadir como nueva evaluación" }));
+
+    await waitFor(() => expect(event).toHaveBeenCalled());
+
+    const secondaryCall = ApiService.mock.calls.find((call) => call[2] === "/app/cases/7/evaluations");
+    expect(secondaryCall[3].studyPatientCode).toBe("HURYC-0001");
+    expect(JSON.stringify(secondaryCall[3].questionnaireResponse)).not.toContain("PAT_CODIGO");
+  });
+
+  it("does not include studyPatientCode in secondary evaluation payload for clinicians", async () => {
+    setupDuplicateSecondaryApi({
+      duplicateMatch: {
+        caseId: 7,
+        codeStatus: "PENDING_CODE",
+        studyPatientCode: null,
+        lateralityDisplay: "Derecho",
+        anatomicalStructureDisplay: "Trompa",
+      },
+    });
+    const event = jest.fn();
+    renderComponent({ event, canUseStudyPatientCode: false });
+
+    await submitInitialSave();
+    expect(await screen.findByRole("button", { name: "Añadir como nueva evaluación" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Añadir como nueva evaluación" }));
+
+    await waitFor(() => expect(event).toHaveBeenCalled());
+
+    const secondaryCall = ApiService.mock.calls.find((call) => call[2] === "/app/cases/7/evaluations");
+    expect(secondaryCall[3]).not.toHaveProperty("studyPatientCode");
+  });
+
+  it("shows when the selected duplicate case already has a study code", async () => {
+    setupDuplicateSecondaryApi({
+      duplicateMatch: {
+        caseId: 7,
+        codeStatus: "CODE_ASSIGNED",
+        studyPatientCode: "SP-100",
+        lateralityDisplay: "Derecho",
+        anatomicalStructureDisplay: "Trompa",
+      },
+    });
+    renderComponent();
+
+    await submitInitialSave();
+
+    expect(await screen.findByText("El caso seleccionado ya tiene código de estudio asignado: SP-100.")).toBeInTheDocument();
+    expect(screen.getByText(/Caso 7 .* Código SP-100/)).toBeInTheDocument();
   });
 });

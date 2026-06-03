@@ -31,6 +31,7 @@ const QuestionnaireForm = ({
   const [error, setError] = useState("");
   const [nhcError, setNhcError] = useState("");
   const [studyCodeError, setStudyCodeError] = useState("");
+  const [requiredFieldsError, setRequiredFieldsError] = useState("");
   const [validatingStudyCode, setValidatingStudyCode] = useState(false);
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -122,6 +123,8 @@ function getEnabledLinkIds(items, currentAnswers) {
       return cleanedAnswers;
    
     });
+
+    setRequiredFieldsError("");
    
   };
 /**
@@ -488,6 +491,7 @@ const renderInput = (item) => {
       if (!String(transientNhc || "").trim()) {
         setNhcError(NHC_REQUIRED_MESSAGE);
         setError(NHC_REQUIRED_MESSAGE);
+        setRequiredFieldsError("");
         return false;
       }
       setNhcError("");
@@ -503,9 +507,11 @@ const renderInput = (item) => {
       const missingLabels = missingAnswers.map((item) => `- ${item.text || item.linkId}`);
       const message = `Los siguientes campos están sin rellenar:\n\n${missingLabels.join('\n')}`;
       setError(message);
+      setRequiredFieldsError(message);
       return false;
     } else {
       setError(null);
+      setRequiredFieldsError("");
       return true;
     }
   };
@@ -759,7 +765,7 @@ const renderInput = (item) => {
                   {item.text}
                   {item.required && <span className="required-asterisk">*</span>}
                 </label>
-                {renderInput(item)}
+              {renderInput(item)}
               </div>
             );
           }
@@ -768,6 +774,13 @@ const renderInput = (item) => {
       <button className="save-btn" onClick={handleNextClick} disabled={validatingStudyCode}>
         {validatingStudyCode ? "Validando..." : "Siguiente"}
       </button>
+      {requiredFieldsError && (
+        <div className="error-message">
+          {requiredFieldsError.split('\n').map((line, index) => (
+            <p key={index}>{line}</p>
+          ))}
+        </div>
+      )}
       {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h2>Confirmación</h2>

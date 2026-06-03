@@ -238,5 +238,11 @@ export const formatDuplicateCaseSummary = (match) => {
     parts.push(`${match.evaluationCount} evaluaciones`);
   }
 
+  if (match?.codeStatus === "CODE_ASSIGNED") {
+    parts.push(`Código ${resolveStudyCodeDisplay(match)}`);
+  } else if (match?.codeStatus === "PENDING_CODE") {
+    parts.push("Código pendiente");
+  }
+
   return parts.join(" · ");
 };

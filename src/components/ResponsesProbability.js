@@ -117,6 +117,36 @@ const ResponsesProbability = ({
   const { generateRiskAssessment } = useRiskAssessmentTemplate();
   const { generatePatient } = usePatientTemplate();
 
+  const effectiveStudyPatientCode = canUseStudyPatientCode
+    ? String(studyPatientCode || "").trim()
+    : "";
+
+  const selectedDuplicateMatch = duplicateMatches.find(
+    (match) => String(match?.caseId || match?.id || "") === String(selectedDuplicateCaseId || "")
+  ) || duplicateMatches[0];
+
+  const duplicateModalMessage = (() => {
+    if (!selectedDuplicateMatch) {
+      return "";
+    }
+
+    if (selectedDuplicateMatch.codeStatus === "CODE_ASSIGNED") {
+      return selectedDuplicateMatch.studyPatientCode
+        ? `El caso seleccionado ya tiene código de estudio asignado: ${selectedDuplicateMatch.studyPatientCode}.`
+        : "El caso seleccionado ya tiene código de estudio asignado.";
+    }
+
+    if (selectedDuplicateMatch.codeStatus === "PENDING_CODE" && effectiveStudyPatientCode) {
+      return "Se añadirá una evaluación secundaria al caso existente y se asignará el código de estudio indicado.";
+    }
+
+    if (selectedDuplicateMatch.codeStatus === "PENDING_CODE") {
+      return "Se añadirá una evaluación secundaria al caso existente y el caso seguirá pendiente de código de estudio.";
+    }
+
+    return "";
+  })();
+
 
   // Verifica si hay masa anexial
   // const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
@@ -624,7 +654,7 @@ const ResponsesProbability = ({
       const contextCenterId = preparedResponses[startIndex]?.metadata?.centerId || preparedResponses[0]?.metadata?.centerId;
       const context = persistenceContext || await createPersistenceContext(contextCenterId, normalizedCareSetting.code);
       const { hasMassInReports, patientId, encId, imgStuId } = context;
-      const effectiveStudyPatientCode =
+      const requestStudyPatientCode =
         canUseStudyPatientCode && studyPatientCodeOverride !== null
           ? String((studyPatientCodeOverride ?? studyPatientCode) || "").trim()
           : "";
@@ -655,6 +685,7 @@ const ResponsesProbability = ({
                 observerInitials: preparedResponse.metadata.observerInitials,
                 careSettingCode: normalizedCareSetting.code,
                 careSettingDisplay: normalizedCareSetting.display,
+                studyPatientCode: requestStudyPatientCode || undefined,
               })
             : await createCase(keycloak.token, {
                 centerId: preparedResponse.metadata.centerId,
@@ -666,7 +697,7 @@ const ResponsesProbability = ({
                 questionnaireResponse: sanitizedQuestionnaireResponse,
                 encounterId: encId,
                 observerInitials: preparedResponse.metadata.observerInitials,
-                studyPatientCode: effectiveStudyPatientCode || undefined,
+                studyPatientCode: requestStudyPatientCode || undefined,
                 careSettingCode: normalizedCareSetting.code,
                 careSettingDisplay: normalizedCareSetting.display,
               });
@@ -695,7 +726,7 @@ const ResponsesProbability = ({
                 startIndex: index,
                 persistenceContext: context,
               },
-              effectiveStudyPatientCode
+              requestStudyPatientCode
             );
             return;
           }
@@ -1067,6 +1098,7 @@ const ResponsesProbability = ({
         <p>
           Ya existe un caso registrado para esta paciente con la misma lateralidad y estructura anatómica. Indique si esta exploración corresponde a una nueva evaluación del caso existente o a un caso independiente.
         </p>
+        {duplicateModalMessage && <p>{duplicateModalMessage}</p>}
         {error && <p className="error-message">{error}</p>}
         {duplicateMatches.length > 0 && (
           <div>

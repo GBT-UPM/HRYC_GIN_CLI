@@ -66,6 +66,24 @@ describe("QuestionnaireForm visibility rules", () => {
     expect(screen.queryByText("Pulse")).not.toBeInTheDocument();
   });
 
+  it("shows the missing required field message when a mandatory questionnaire answer is empty", async () => {
+    render(
+      <QuestionnaireForm
+        questionnaire={questionnaire}
+        event={jest.fn()}
+        eventContinue={jest.fn()}
+        transientNhc="123456"
+        onTransientNhcChange={jest.fn()}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    expect(screen.getByText("Los siguientes campos están sin rellenar:")).toBeInTheDocument();
+    expect(screen.getByText("- Hospital")).toBeInTheDocument();
+    expect(screen.queryByText("Pulse")).not.toBeInTheDocument();
+  });
+
   it("shows study code field for site coordinators", () => {
     render(
       <QuestionnaireForm
