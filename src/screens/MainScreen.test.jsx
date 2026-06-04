@@ -24,49 +24,75 @@ describe('MainScreen', () => {
       {
         caseId: 1,
         studyPatientCode: 'SP-001',
+        studyParticipantId: 'PART-A',
+        encounterId: 'enc-1',
+        hasAdnexalMass: true,
         questionnaireResponseFhirId: 101,
       },
       {
         caseId: 1,
         studyPatientCode: 'SP-001',
+        studyParticipantId: 'PART-A',
+        encounterId: 'enc-1',
+        hasAdnexalMass: true,
         questionnaireResponseFhirId: 102,
       },
       {
         caseId: 2,
         studyPatientCode: 'SP-002',
+        studyParticipantId: 'PART-B',
+        encounterId: 'enc-2',
+        hasAdnexalMass: true,
         questionnaireResponseFhirId: 103,
       },
     ])).toEqual({
-      Patient: 2,
-      Encounter: 3,
-      QuestionnaireResponse: 3,
-      RiskAssessment: 2,
+      participants: 2,
+      encounters: 2,
+      ultrasoundRecords: 2,
+      adnexalMasses: 2,
+    });
+  });
+
+  it('no-mass case counts for participants/encounters/records but not adnexal masses', () => {
+    expect(buildDashboardCounts([
+      {
+        caseId: 3,
+        studyPatientCode: 'SP-003',
+        studyParticipantId: 'PART-C',
+        encounterId: 'enc-3',
+        hasAdnexalMass: false,
+        questionnaireResponseFhirId: 104,
+      },
+    ])).toEqual({
+      participants: 1,
+      encounters: 1,
+      ultrasoundRecords: 1,
+      adnexalMasses: 0,
+    });
+  });
+
+  it('counts participants uniquely by studyParticipantId regardless of case count', () => {
+    expect(buildDashboardCounts([
+      { caseId: 10, studyParticipantId: 'PART-X', encounterId: 'enc-a', hasAdnexalMass: true },
+      { caseId: 11, studyParticipantId: 'PART-X', encounterId: 'enc-a', hasAdnexalMass: true },
+      { caseId: 12, studyParticipantId: 'PART-Y', encounterId: 'enc-b', hasAdnexalMass: false },
+    ])).toMatchObject({
+      participants: 2,
+      encounters: 2,
+      ultrasoundRecords: 3,
+      adnexalMasses: 2,
     });
   });
 
   it('shows registered cases on the dashboard', async () => {
     ApiService.mockResolvedValueOnce({
       status: 200,
-      json: async () => ([
-        {
-          caseId: 1,
-          caseDisplayId: 'HURYC-C000001',
-          studyPatientCode: 'SP-001',
-          questionnaireResponseFhirId: 101,
-        },
-        {
-          caseId: 1,
-          caseDisplayId: 'HURYC-C000001',
-          studyPatientCode: 'SP-001',
-          questionnaireResponseFhirId: 102,
-        },
-        {
-          caseId: 2,
-          caseDisplayId: 'HURYC-C000002',
-          studyPatientCode: 'SP-002',
-          questionnaireResponseFhirId: 103,
-        },
-      ]),
+      json: async () => ({
+        participantsCount:      2,
+        encountersCount:        2,
+        ultrasoundRecordsCount: 2,
+        adnexalMassesCount:     2,
+      }),
     });
 
     render(
@@ -87,19 +113,19 @@ describe('MainScreen', () => {
       expectCardCount('Pacientes incluidas', 2);
     });
 
-    expectCardCount('Encuentros registrados', 3);
-    expectCardCount('Casos y evaluaciones', 3);
+    expectCardCount('Encuentros registrados', 2);
+    expectCardCount('Registros ecográficos', 2);
     expect(screen.getByText('Acciones principales')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Revisar' })).toBeInTheDocument();
-    expectCardCount('Masas anexiales', 2);
+    expectCardCount('Masas anexiales detectadas', 2);
     expect(screen.getByRole('button', { name: /información del estudio/i })).toBeInTheDocument();
-    expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/cases/evaluations?centerId=HURYC', {});
+    expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/study-dashboard/stats?centerId=HURYC', {});
   });
 
-  it('uses global evaluations endpoint for study coordinators', async () => {
+  it('uses global stats endpoint for study coordinators', async () => {
     ApiService.mockResolvedValueOnce({
       status: 200,
-      json: async () => ([]),
+      json: async () => ({ participantsCount: 0, encountersCount: 0, ultrasoundRecordsCount: 0, adnexalMassesCount: 0 }),
     });
 
     render(
@@ -116,7 +142,7 @@ describe('MainScreen', () => {
     );
 
     await waitFor(() => {
-      expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/cases/evaluations', {});
+      expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/study-dashboard/stats', {});
     });
   });
 
@@ -139,7 +165,7 @@ describe('MainScreen', () => {
     expect(ApiService).not.toHaveBeenCalled();
   });
 
-  it('shows permissions message on 403', async () => {
+  it('shows permissions message on 403 from stats endpoint', async () => {
     ApiService.mockResolvedValueOnce({ status: 403 });
 
     render(

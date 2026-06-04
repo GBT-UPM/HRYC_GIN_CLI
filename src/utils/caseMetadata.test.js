@@ -2,6 +2,7 @@ import {
   extractAnatomicalStructure,
   extractAnatomicalStructureMetadata,
   extractCenterId,
+  extractHasAdnexalMass,
   extractLaterality,
   extractLateralityMetadata,
   extractObserverInitials,
@@ -187,5 +188,60 @@ describe("case metadata", () => {
   it("shows study code or pending placeholder without exposing pseudonyms", () => {
     expect(resolveStudyCodeDisplay({ studyPatientCode: "SP-100" })).toBe("SP-100");
     expect(resolveStudyCodeDisplay({ studyPatientCode: null, patientPseudonym: "secret" })).toBe("Pendiente");
+  });
+
+  it("extractHasAdnexalMass returns false when PAT_MA is No", () => {
+    expect(extractHasAdnexalMass({ item: [{ linkId: "PAT_MA", answer: [{ valueCoding: { display: "No" } }] }] })).toBe(false);
+    expect(extractHasAdnexalMass({ item: [{ linkId: "PAT_MA", answer: [{ valueString: "no" } ] }] })).toBe(false);
+  });
+
+  it("extractHasAdnexalMass returns true when PAT_MA is Sí or absent", () => {
+    expect(extractHasAdnexalMass({ item: [{ linkId: "PAT_MA", answer: [{ valueCoding: { display: "Sí" } }] }] })).toBe(true);
+    expect(extractHasAdnexalMass({ item: [] })).toBe(true);
+    expect(extractHasAdnexalMass({ item: [{ linkId: "HOSPITAL_REF", answer: [{ valueString: "HURYC" }] }] })).toBe(true);
+  });
+
+  it("validates a no-mass questionnaire without requiring laterality or anatomical structure", () => {
+    const result = validateCaseMetadata({
+      item: [
+        { linkId: "PAT_MA", answer: [{ valueCoding: { display: "No" } }] },
+        { linkId: "HOSPITAL_REF", answer: [{ valueString: "Hospital Universitario Ramón y Cajal" }] },
+        { linkId: "ECO_EXP_SIGLAS", answer: [{ valueString: "XYZ" }] },
+      ],
+    });
+
+    expect(result.isValid).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.hasAdnexalMass).toBe(false);
+    expect(result.centerId).toBe("HURYC");
+    expect(result.lateralityCode).toBe("NOT_APPLICABLE");
+    expect(result.lateralityDisplay).toBe("No aplica");
+    expect(result.anatomicalStructureCode).toBe("NOT_APPLICABLE");
+    expect(result.anatomicalStructureDisplay).toBe("No aplica");
+    expect(result.errors).not.toContain("No se pudo identificar la lateralidad de la masa.");
+    expect(result.errors).not.toContain("No se pudo identificar la estructura anatómica de la masa.");
+  });
+
+  it("still requires laterality and anatomical structure when PAT_MA is Sí", () => {
+    const result = validateCaseMetadata({
+      item: [
+        { linkId: "PAT_MA", answer: [{ valueCoding: { display: "Sí" } }] },
+        { linkId: "HOSPITAL_REF", answer: [{ valueString: "Hospital Universitario Ramón y Cajal" }] },
+      ],
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.hasAdnexalMass).toBe(true);
+    expect(result.errors).toContain("No se pudo identificar la lateralidad de la masa.");
+    expect(result.errors).toContain("No se pudo identificar la estructura anatómica de la masa.");
+  });
+
+  it("includes hasAdnexalMass true in valid mass case metadata", () => {
+    expect(validateCaseMetadata(questionnaireResponse)).toMatchObject({
+      hasAdnexalMass: true,
+      lateralityCode: "RIGHT",
+      anatomicalStructureCode: "OVARY",
+      isValid: true,
+    });
   });
 });

@@ -12,7 +12,6 @@ import {
     IconButton,
     InputLabel,
     MenuItem,
-    Modal,
     Paper,
     Select,
     Stack,
@@ -28,15 +27,15 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
-import { Close, InfoOutlined } from '@mui/icons-material';
+import { Close } from '@mui/icons-material';
 import SearchIcon from '@mui/icons-material/Search';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import '../assets/css/ResponsesScreen.css';
 import { useKeycloak } from '@react-keycloak/web';
 import ApiService from '../services/ApiService';
 import { formatCodeStatusLabel, resolveDisplayStudyIdentifier, resolveStudyCodeDisplay } from '../utils/caseMetadata';
 import { formatCaseStatusLabel, formatEvaluationStatusLabel } from '../utils/caseStatus';
 import { formatEvaluationTypeLabel } from '../utils/evaluationType';
+import { getCareSettingDisplay } from '../utils/careSetting';
 import {
     canUseGlobalView,
     getAllowedCenters,
@@ -47,6 +46,7 @@ import {
 } from '../utils/auth';
 import { getCaseEvaluations } from '../services/caseEvaluationService';
 import { upsertHistopathology } from '../services/histopathologyService';
+import StudyPageHeader from '../components/StudyPageHeader';
 
 const tipoMap = {
     'sólida': 'sólido',
@@ -89,6 +89,70 @@ const SORT_LABEL_SX = {
     '&.Mui-active .MuiTableSortLabel-icon': { color: '#1E3A5F !important' },
 };
 
+const ACTION_BTN_SX = {
+    fontSize: '0.72rem',
+    textTransform: 'none',
+    borderColor: '#D9E2EC',
+    color: '#1E3A5F',
+    fontWeight: 600,
+    py: 0.25,
+    px: 1,
+    minWidth: 0,
+    '&:hover': { borderColor: '#2F5D7C', backgroundColor: '#F5F7FA' },
+};
+
+const DIALOG_PAPER_SX = {
+    borderRadius: '12px',
+    border: '1px solid #D6E0EA',
+    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.12)',
+};
+
+const DIALOG_TITLE_SX = {
+    fontWeight: 800,
+    color: '#1F2933',
+    fontSize: '1.05rem',
+    borderBottom: '1px solid #EEF2F6',
+    pb: 1.5,
+    pr: 6,
+};
+
+const DIALOG_CONTENT_SX = {
+    px: 3,
+    py: 2.5,
+};
+
+const DIALOG_ACTIONS_SX = {
+    px: 3,
+    py: 1.5,
+    borderTop: '1px solid #EEF2F6',
+    gap: 1,
+};
+
+const SECTION_LABEL_SX = {
+    display: 'block',
+    color: '#52616B',
+    fontWeight: 800,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    fontSize: '0.68rem',
+    mb: 1.25,
+};
+
+const PRIMARY_BTN_SX = {
+    textTransform: 'none',
+    fontWeight: 700,
+    backgroundColor: '#1E3A5F',
+    '&:hover': { backgroundColor: '#173050' },
+};
+
+const SECONDARY_BTN_SX = {
+    textTransform: 'none',
+    fontWeight: 600,
+    borderColor: '#D9E2EC',
+    color: '#1E3A5F',
+    '&:hover': { borderColor: '#2F5D7C', backgroundColor: '#F5F7FA' },
+};
+
 const ResponsesScreen = () => {
     const { keycloak, initialized } = useKeycloak();
     const allowedCenters = getAllowedCenters(keycloak);
@@ -107,6 +171,7 @@ const ResponsesScreen = () => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [selectedQuestionnaire, setSelectedQuestionnaire] = useState(null);
+    const [selectedEvaluationItem, setSelectedEvaluationItem] = useState(null);
     const [openModal, setOpenModal] = useState(false);
     const [histologyModalOpen, setHistologyModalOpen] = useState(false);
     const [selectedHistologyCase, setSelectedHistologyCase] = useState(null);
@@ -174,13 +239,40 @@ const ResponsesScreen = () => {
     const getEvaluationType = (item) => formatEvaluationTypeLabel(item.evaluationType, item.primaryEvaluation, item.evaluationId);
     const getCenter = (item) => item.centerId || item.center || item.centerName || getQuestionnaireValue(item.questionnaireResponse, "HOSPITAL_REF") || "—";
     const getLaterality = (item) => item.lateralityDisplay || item.laterality || getQuestionnaireValue(item.questionnaireResponse, "MA_LADO") || "—";
-    const getCareSetting = (item) => item.careSettingDisplay || "No especificado";
+    const getCareSetting = (item) => {
+        if (item.careSettingDisplay) {
+            return item.careSettingDisplay;
+        }
+        if (item.careSettingCode) {
+            return getCareSettingDisplay(item.careSettingCode);
+        }
+        if (item.caseCareSettingDisplay) {
+            return item.caseCareSettingDisplay;
+        }
+        if (item.caseCareSettingCode) {
+            return getCareSettingDisplay(item.caseCareSettingCode);
+        }
+        return "No especificado";
+    };
     const canManageHistopathology = (item) => (
         isSiteCoordinator(keycloak) &&
         allowedCenters.includes(String(item.centerId || '').trim().toUpperCase())
     );
     const hasStructuredHistology = (item) => Boolean(item.histologyStatus);
-    const getHistopathologyActionLabel = (item) => (
+    const isHistologyApplicable = (item) => {
+        if (item.hasAdnexalMass === false) {
+            return false;
+        }
+        if (item.lateralityCode === 'NOT_APPLICABLE') {
+            return false;
+        }
+        if (item.anatomicalStructureCode === 'NOT_APPLICABLE') {
+            return false;
+        }
+        return true;
+    };
+    const getHistopathologyActionLabel = () => 'Histología';
+    const getHistopathologyActionTooltip = (item) => (
         hasStructuredHistology(item) ? 'Actualizar histopatología del caso' : 'Registrar histopatología del caso'
     );
     const getRowActionKey = (item) => `${item.caseId || 'case'}:${item.evaluationId || 'legacy'}`;
@@ -508,20 +600,47 @@ const ResponsesScreen = () => {
     });
     const shouldShowHistopathologyAction = (item) => (
         canManageHistopathology(item) &&
+        isHistologyApplicable(item) &&
         item.caseId &&
         histopathologyActionRowsByCase.get(item.caseId) === getRowActionKey(item)
     );
     const shouldShowSharedHistologyText = (item) => (
         canManageHistopathology(item) &&
+        isHistologyApplicable(item) &&
         item.caseId &&
         histopathologyActionRowsByCase.has(item.caseId) &&
         histopathologyActionRowsByCase.get(item.caseId) !== getRowActionKey(item)
     );
+    const getHistologyChipProps = (item) => {
+        if (!isHistologyApplicable(item)) {
+            return { label: 'No procede', sx: { backgroundColor: '#f3f4f6', color: '#374151', borderColor: '#d1d5db' } };
+        }
+        if (shouldShowSharedHistologyText(item)) {
+            return { label: 'Compartida con caso', sx: { backgroundColor: '#EAF1F6', color: '#1E3A5F', borderColor: '#b4cfe0' } };
+        }
+        const s = item.histologyStatus;
+        if (s === 'AVAILABLE') {
+            return { label: 'Histología registrada', sx: { backgroundColor: '#e6f4ea', color: '#1a4726', borderColor: '#a8d5b5' } };
+        }
+        if (s === 'NOT_APPLICABLE') {
+            return { label: 'No procede', sx: { backgroundColor: '#f3f4f6', color: '#374151', borderColor: '#d1d5db' } };
+        }
+        if (s === 'UNKNOWN') {
+            return { label: 'No disponible', sx: { backgroundColor: '#f3f4f6', color: '#374151', borderColor: '#d1d5db' } };
+        }
+        return { label: 'Histología pendiente', sx: { backgroundColor: '#fff8e1', color: '#7a4800', borderColor: '#fce48a' } };
+    };
+
+    const closeEvaluationModal = () => {
+        setOpenModal(false);
+        setSelectedEvaluationItem(null);
+    };
 
     const handleRowClick = async (item) => {
         try {
             const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(item.questionnaireResponseFhirId);
             setSelectedQuestionnaire(questionnaireResponse);
+            setSelectedEvaluationItem(item);
             setOpenModal(true);
         } catch (error) {
             console.error("Error al obtener el cuestionario:", error);
@@ -539,65 +658,15 @@ const ResponsesScreen = () => {
     return (
         <Box sx={{ px: 0, py: 0 }}>
             {/* Encabezado institucional */}
-            <Paper
-                elevation={0}
-                sx={{
-                    p: { xs: 2, md: 2.5 },
-                    mb: 2,
-                    border: "1px solid #D9E2EC",
-                    borderRadius: 2,
-                    backgroundColor: "#FFFFFF",
-                }}
-            >
-                <Stack spacing={1.5}>
-                    <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
-                        <Box>
-                            <Typography
-                                variant="h5"
-                                sx={{
-                                    color: "#1F2933",
-                                    fontSize: { xs: "1.25rem", sm: "1.45rem", md: "1.6rem" },
-                                    fontWeight: 800,
-                                    letterSpacing: 0,
-                                    lineHeight: 1.2,
-                                    mb: 0.5,
-                                }}
-                            >
-                                Casos y evaluaciones
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: "#52616B", fontSize: "0.875rem", lineHeight: 1.4 }}>
-                                Consulta de casos registrados, evaluaciones primarias/secundarias, ECO-SCORE e histopatología asociada al estudio.
-                            </Typography>
-                        </Box>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<InfoOutlined sx={{ fontSize: "1rem !important" }} />}
-                            onClick={() => setInfoOpen(true)}
-                            aria-label="Información de la vista"
-                            sx={{
-                                borderColor: "#D9E2EC",
-                                color: "#52616B",
-                                textTransform: "none",
-                                fontWeight: 600,
-                                fontSize: "0.8rem",
-                                flexShrink: 0,
-                                whiteSpace: "nowrap",
-                                py: 0.5,
-                                "&:hover": { borderColor: "#2F5D7C", color: "#1E3A5F", backgroundColor: "#F5F7FA" },
-                            }}
-                        >
-                            Información de la vista
-                        </Button>
-                    </Box>
-                    <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
-                        <Chip label={visibleScopeLabel} size="small" variant="outlined" sx={{ borderColor: "#2F5D7C", color: "#1E3A5F", fontWeight: 700, fontSize: "0.75rem" }} />
-                        <Chip label={roleLabel} size="small" variant="outlined" sx={{ fontSize: "0.75rem" }} />
-                        <Chip label={`Centros: ${centersLabel}`} size="small" variant="outlined" sx={{ fontSize: "0.75rem" }} />
-                        <Chip label={`${filteredData.length} registros`} size="small" variant="outlined" sx={{ fontSize: "0.75rem" }} />
-                    </Stack>
-                </Stack>
-            </Paper>
+            <StudyPageHeader
+                title="Casos y evaluaciones"
+                subtitle="Consulta de casos registrados, evaluaciones primarias/secundarias, ECO-SCORE e histopatología asociada al estudio."
+                visibleScopeLabel={visibleScopeLabel}
+                roleLabel={roleLabel}
+                centersLabel={centersLabel}
+                recordCount={filteredData.length}
+                onInfoClick={() => setInfoOpen(true)}
+            />
 
             {/* Dialog Información de la vista */}
             <Dialog open={infoOpen} onClose={() => setInfoOpen(false)} maxWidth="sm" fullWidth>
@@ -742,7 +811,7 @@ const ResponsesScreen = () => {
                                 const riskDisplay = !isNaN(parseFloat(item.risk))
                                     ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
                                     : 'No procede';
-                                const histologyDisplay = item.histology || 'Pendiente';
+                                const histologyChip = getHistologyChipProps(item);
 
                                 return (
                                     <TableRow
@@ -841,9 +910,18 @@ const ResponsesScreen = () => {
                                             <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#1F2933', lineHeight: 1.3 }}>
                                                 {riskDisplay}
                                             </Typography>
-                                            <Typography variant="caption" sx={{ fontSize: '0.72rem', color: '#52616B', lineHeight: 1.2, display: 'block' }}>
-                                                {histologyDisplay}
-                                            </Typography>
+                                            <Chip
+                                                label={histologyChip.label}
+                                                size="small"
+                                                variant="outlined"
+                                                sx={{
+                                                    height: 20,
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 600,
+                                                    mt: 0.5,
+                                                    ...histologyChip.sx,
+                                                }}
+                                            />
                                         </TableCell>
 
                                         {/* Ecografista / Fecha */}
@@ -860,39 +938,29 @@ const ResponsesScreen = () => {
 
                                         {/* Acciones */}
                                         <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="wrap">
-                                                {shouldShowHistopathologyAction(item) && (
+                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
+                                                <Tooltip title="Ver detalle de la evaluación">
                                                     <Button
                                                         size="small"
                                                         variant="outlined"
-                                                        onClick={() => openHistologyModal(item)}
-                                                        sx={{
-                                                            fontSize: '0.72rem',
-                                                            textTransform: 'none',
-                                                            borderColor: '#D9E2EC',
-                                                            color: '#1E3A5F',
-                                                            fontWeight: 600,
-                                                            py: 0.25,
-                                                            '&:hover': { borderColor: '#2F5D7C', backgroundColor: '#F5F7FA' },
-                                                        }}
-                                                    >
-                                                        {getHistopathologyActionLabel(item)}
-                                                    </Button>
-                                                )}
-                                                {shouldShowSharedHistologyText(item) && (
-                                                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem' }}>
-                                                        Histología compartida con el caso
-                                                    </Typography>
-                                                )}
-                                                <Tooltip title="Ver Detalles">
-                                                    <IconButton
-                                                        size="small"
-                                                        sx={{ color: '#1E3A5F' }}
                                                         onClick={() => handleRowClick(item)}
+                                                        sx={ACTION_BTN_SX}
                                                     >
-                                                        <VisibilityIcon fontSize="small" />
-                                                    </IconButton>
+                                                        Ver
+                                                    </Button>
                                                 </Tooltip>
+                                                {shouldShowHistopathologyAction(item) && (
+                                                    <Tooltip title={getHistopathologyActionTooltip(item)}>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            onClick={() => openHistologyModal(item)}
+                                                            sx={ACTION_BTN_SX}
+                                                        >
+                                                            {getHistopathologyActionLabel()}
+                                                        </Button>
+                                                    </Tooltip>
+                                                )}
                                             </Stack>
                                         </TableCell>
                                     </TableRow>
@@ -919,106 +987,201 @@ const ResponsesScreen = () => {
                 </Box>
             </Paper>
 
-            {/* Modal: detalle del cuestionario (sin cambios) */}
-            <Modal open={openModal} onClose={() => setOpenModal(false)}>
-                <Box className="modal-box" sx={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: 700,
-                    bgcolor: 'background.paper',
-                    boxShadow: 24,
-                    p: 4,
-                    borderRadius: 2
-                }}>
-                    <Typography variant="h6" gutterBottom>
-                        Detalle del Cuestionario
-                    </Typography>
-                    {selectedQuestionnaire ? (
-                        <span className='report' dangerouslySetInnerHTML={{ __html: generateReport() }} />
-                    ) : (
-                        <Typography>No hay detalles disponibles</Typography>
+            {/* Dialog: resumen de evaluación ecográfica */}
+            <Dialog
+                open={openModal}
+                onClose={closeEvaluationModal}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{ sx: DIALOG_PAPER_SX }}
+            >
+                <DialogTitle sx={DIALOG_TITLE_SX}>
+                    Resumen de evaluación ecográfica
+                    <IconButton
+                        onClick={closeEvaluationModal}
+                        size="small"
+                        aria-label="Cerrar"
+                        sx={{ position: 'absolute', right: 12, top: 12, color: '#52616B' }}
+                    >
+                        <Close fontSize="small" />
+                    </IconButton>
+                    {selectedEvaluationItem && (
+                        <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
+                            {selectedEvaluationItem.caseDisplayId && (
+                                <Chip
+                                    label={`Caso ${selectedEvaluationItem.caseDisplayId}`}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ fontSize: '0.72rem', borderColor: '#D9E2EC', color: '#52616B' }}
+                                />
+                            )}
+                            {selectedEvaluationItem.evaluationDisplayId && (
+                                <Chip
+                                    label={selectedEvaluationItem.evaluationDisplayId}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ fontSize: '0.72rem', borderColor: '#D9E2EC', color: '#52616B' }}
+                                />
+                            )}
+                            {getEvaluationType(selectedEvaluationItem) && getEvaluationType(selectedEvaluationItem) !== '—' && (
+                                <Chip
+                                    label={getEvaluationType(selectedEvaluationItem)}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ fontSize: '0.72rem', borderColor: '#b4cfe0', color: '#1E3A5F', backgroundColor: '#EAF1F6' }}
+                                />
+                            )}
+                            {getCenter(selectedEvaluationItem) && getCenter(selectedEvaluationItem) !== '—' && (
+                                <Chip
+                                    label={getCenter(selectedEvaluationItem)}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ fontSize: '0.72rem', borderColor: '#D9E2EC', color: '#52616B' }}
+                                />
+                            )}
+                        </Stack>
                     )}
-                    <Button variant="contained" sx={{ mt: 2 }} onClick={() => setOpenModal(false)}>
+                </DialogTitle>
+                <DialogContent dividers sx={{ ...DIALOG_CONTENT_SX, maxHeight: '65vh', overflowY: 'auto' }}>
+                    {selectedQuestionnaire ? (
+                        <>
+                            <Typography variant="caption" sx={SECTION_LABEL_SX}>
+                                Hallazgos ecográficos
+                            </Typography>
+                            <Box sx={{ bgcolor: '#F8FAFC', borderRadius: 1, p: 2, border: '1px solid #EEF2F6' }}>
+                                <span className="report" dangerouslySetInnerHTML={{ __html: generateReport() }} />
+                            </Box>
+                        </>
+                    ) : (
+                        <Typography variant="body2" sx={{ color: '#52616B' }}>
+                            No hay detalles disponibles.
+                        </Typography>
+                    )}
+                </DialogContent>
+                <DialogActions sx={DIALOG_ACTIONS_SX}>
+                    <Button variant="outlined" onClick={closeEvaluationModal} sx={SECONDARY_BTN_SX}>
                         Cerrar
                     </Button>
-                </Box>
-            </Modal>
+                </DialogActions>
+            </Dialog>
 
-            {/* Modal: histopatología (sin cambios) */}
-            <Modal open={histologyModalOpen} onClose={closeHistologyModal}>
-                <Box className="modal-box">
-                    <Typography variant="h6" gutterBottom>
-                        {hasStructuredHistology(selectedHistologyCase || {}) ? 'Actualizar histopatología del caso' : 'Registrar histopatología del caso'}
+            {/* Dialog: histopatología */}
+            <Dialog
+                open={histologyModalOpen}
+                onClose={closeHistologyModal}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{ sx: DIALOG_PAPER_SX }}
+            >
+                <DialogTitle sx={DIALOG_TITLE_SX}>
+                    {hasStructuredHistology(selectedHistologyCase || {})
+                        ? 'Actualizar histopatología del caso'
+                        : 'Registrar histopatología del caso'}
+                    <Typography variant="body2" sx={{ color: '#52616B', fontWeight: 400, fontSize: '0.83rem', mt: 0.25 }}>
+                        Actualización del resultado anatomopatológico definitivo.
                     </Typography>
+                    {selectedHistologyCase?.caseDisplayId && (
+                        <Box sx={{ mt: 1 }}>
+                            <Chip
+                                label={`Caso ${selectedHistologyCase.caseDisplayId}`}
+                                size="small"
+                                variant="outlined"
+                                sx={{ fontSize: '0.72rem', borderColor: '#D9E2EC', color: '#52616B' }}
+                            />
+                        </Box>
+                    )}
+                    <IconButton
+                        onClick={closeHistologyModal}
+                        size="small"
+                        aria-label="Cerrar"
+                        sx={{ position: 'absolute', right: 12, top: 12, color: '#52616B' }}
+                        disabled={histologySaving}
+                    >
+                        <Close fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ ...DIALOG_CONTENT_SX, maxHeight: '70vh', overflowY: 'auto' }}>
                     {histologyError && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
+                        <Alert severity="error" sx={{ mb: 2.5 }}>
                             {histologyError}
                         </Alert>
                     )}
-                    <FormControl fullWidth sx={{ mb: 2 }}>
-                        <InputLabel id="histology-status-label">Estado histopatología</InputLabel>
-                        <Select
-                            labelId="histology-status-label"
-                            label="Estado histopatología"
-                            value={histologyForm.status}
-                            onChange={handleHistologyFieldChange('status')}
-                        >
-                            <MenuItem value="PENDING">Pendiente</MenuItem>
-                            <MenuItem value="AVAILABLE">Disponible</MenuItem>
-                            <MenuItem value="NOT_APPLICABLE">No aplicable</MenuItem>
-                            <MenuItem value="UNKNOWN">Desconocido</MenuItem>
-                        </Select>
-                    </FormControl>
-                    <TextField
-                        label="Diagnóstico"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        value={histologyForm.diagnosis}
-                        onChange={handleHistologyFieldChange('diagnosis')}
-                    />
-                    <FormControl fullWidth sx={{ mb: 2 }}>
-                        <InputLabel id="benign-malignant-label">Benigno / borderline / maligno</InputLabel>
-                        <Select
-                            labelId="benign-malignant-label"
-                            label="Benigno / borderline / maligno"
-                            value={histologyForm.benignMalignant}
-                            onChange={handleHistologyFieldChange('benignMalignant')}
-                        >
-                            <MenuItem value="">No especificado</MenuItem>
-                            <MenuItem value="BENIGN">Benigno</MenuItem>
-                            <MenuItem value="BORDERLINE">Borderline</MenuItem>
-                            <MenuItem value="MALIGNANT">Maligno</MenuItem>
-                            <MenuItem value="UNKNOWN">Desconocido</MenuItem>
-                            <MenuItem value="NOT_APPLICABLE">No aplicable</MenuItem>
-                        </Select>
-                    </FormControl>
-                    <TextField
-                        label="Tipo tumoral"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        value={histologyForm.tumorType}
-                        onChange={handleHistologyFieldChange('tumorType')}
-                    />
-                    <TextField
-                        label="Fecha cirugía"
-                        type="date"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        InputLabelProps={{ shrink: true }}
-                        value={histologyForm.surgeryDate}
-                        onChange={handleHistologyFieldChange('surgeryDate')}
-                    />
-                    <TextField
-                        label="Fecha anatomía patológica"
-                        type="date"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        InputLabelProps={{ shrink: true }}
-                        value={histologyForm.pathologyDate}
-                        onChange={handleHistologyFieldChange('pathologyDate')}
-                    />
+
+                    {/* Sección 1: Estado del resultado */}
+                    <Typography variant="caption" sx={SECTION_LABEL_SX}>Estado del resultado</Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 3 }}>
+                        <FormControl fullWidth>
+                            <InputLabel id="histology-status-label">Estado histopatología</InputLabel>
+                            <Select
+                                labelId="histology-status-label"
+                                label="Estado histopatología"
+                                value={histologyForm.status}
+                                onChange={handleHistologyFieldChange('status')}
+                            >
+                                <MenuItem value="PENDING">Pendiente</MenuItem>
+                                <MenuItem value="AVAILABLE">Disponible</MenuItem>
+                                <MenuItem value="NOT_APPLICABLE">No aplicable</MenuItem>
+                                <MenuItem value="UNKNOWN">Desconocido</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <FormControl fullWidth>
+                            <InputLabel id="benign-malignant-label">Benigno / borderline / maligno</InputLabel>
+                            <Select
+                                labelId="benign-malignant-label"
+                                label="Benigno / borderline / maligno"
+                                value={histologyForm.benignMalignant}
+                                onChange={handleHistologyFieldChange('benignMalignant')}
+                            >
+                                <MenuItem value="">No especificado</MenuItem>
+                                <MenuItem value="BENIGN">Benigno</MenuItem>
+                                <MenuItem value="BORDERLINE">Borderline</MenuItem>
+                                <MenuItem value="MALIGNANT">Maligno</MenuItem>
+                                <MenuItem value="UNKNOWN">Desconocido</MenuItem>
+                                <MenuItem value="NOT_APPLICABLE">No aplicable</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Box>
+
+                    {/* Sección 2: Diagnóstico anatomopatológico */}
+                    <Typography variant="caption" sx={SECTION_LABEL_SX}>Diagnóstico anatomopatológico</Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 3 }}>
+                        <TextField
+                            label="Diagnóstico"
+                            fullWidth
+                            value={histologyForm.diagnosis}
+                            onChange={handleHistologyFieldChange('diagnosis')}
+                        />
+                        <TextField
+                            label="Tipo tumoral"
+                            fullWidth
+                            value={histologyForm.tumorType}
+                            onChange={handleHistologyFieldChange('tumorType')}
+                        />
+                    </Box>
+
+                    {/* Sección 3: Fechas */}
+                    <Typography variant="caption" sx={SECTION_LABEL_SX}>Fechas</Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 3 }}>
+                        <TextField
+                            label="Fecha cirugía"
+                            type="date"
+                            fullWidth
+                            InputLabelProps={{ shrink: true }}
+                            value={histologyForm.surgeryDate}
+                            onChange={handleHistologyFieldChange('surgeryDate')}
+                        />
+                        <TextField
+                            label="Fecha anatomía patológica"
+                            type="date"
+                            fullWidth
+                            InputLabelProps={{ shrink: true }}
+                            value={histologyForm.pathologyDate}
+                            onChange={handleHistologyFieldChange('pathologyDate')}
+                        />
+                    </Box>
+
+                    {/* Sección 4: Información adicional */}
+                    <Typography variant="caption" sx={SECTION_LABEL_SX}>Información adicional</Typography>
                     <TextField
                         label="Fuente"
                         fullWidth
@@ -1031,18 +1194,29 @@ const ResponsesScreen = () => {
                         multiline
                         rows={3}
                         fullWidth
-                        sx={{ mb: 2 }}
                         value={histologyForm.notes}
                         onChange={handleHistologyFieldChange('notes')}
                     />
-                    <Button variant="contained" onClick={handleSaveHistology} disabled={histologySaving}>
-                        Guardar
-                    </Button>
-                    <Button variant="outlined" sx={{ ml: 2 }} onClick={closeHistologyModal} disabled={histologySaving}>
+                </DialogContent>
+                <DialogActions sx={DIALOG_ACTIONS_SX}>
+                    <Button
+                        variant="outlined"
+                        onClick={closeHistologyModal}
+                        disabled={histologySaving}
+                        sx={SECONDARY_BTN_SX}
+                    >
                         Cancelar
                     </Button>
-                </Box>
-            </Modal>
+                    <Button
+                        variant="contained"
+                        onClick={handleSaveHistology}
+                        disabled={histologySaving}
+                        sx={PRIMARY_BTN_SX}
+                    >
+                        Guardar
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

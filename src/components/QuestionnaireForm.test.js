@@ -79,9 +79,31 @@ describe("QuestionnaireForm visibility rules", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
 
-    expect(screen.getByText("Los siguientes campos están sin rellenar:")).toBeInTheDocument();
-    expect(screen.getByText("- Hospital")).toBeInTheDocument();
+    expect(screen.getByText("No se puede continuar todavia")).toBeInTheDocument();
+    expect(screen.getByText("Campos pendientes:")).toBeInTheDocument();
     expect(screen.queryByText("Pulse")).not.toBeInTheDocument();
+  });
+
+  it("shows an institutional alert with pending clinical fields before continuing", async () => {
+    render(
+      <QuestionnaireForm
+        questionnaire={questionnaire}
+        event={jest.fn()}
+        eventContinue={jest.fn()}
+        transientNhc="123456"
+        onTransientNhcChange={jest.fn()}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("No se puede continuar todavia")).toBeInTheDocument();
+    expect(screen.getByText("Revisa los campos obligatorios pendientes antes de avanzar.")).toBeInTheDocument();
+    expect(screen.getByText("Campos pendientes:")).toBeInTheDocument();
+    expect(screen.getAllByText("Hospital")).toHaveLength(2);
+    expect(screen.queryByText("HOSPITAL_REF")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Siguiente" })).toBeInTheDocument();
   });
 
   it("shows study code field for site coordinators", () => {
@@ -128,6 +150,44 @@ describe("QuestionnaireForm visibility rules", () => {
     expect(screen.getByLabelText(/Ámbito asistencial/)).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Urgencias" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "No especificado" })).toBeInTheDocument();
+  });
+
+  it("keeps the required indicator visible for mandatory labels without duplicating the label text", () => {
+    render(
+      <QuestionnaireForm
+        questionnaire={questionnaire}
+        event={jest.fn()}
+        eventContinue={jest.fn()}
+        transientNhc="123456"
+        onTransientNhcChange={jest.fn()}
+      />
+    );
+
+    expect(screen.getAllByText("*")).not.toHaveLength(0);
+    expect(screen.getAllByText("Hospital")).toHaveLength(1);
+    expect(screen.getAllByText("NHC")).toHaveLength(1);
+  });
+
+  it("shows the visual section index and the institutional NHC help", () => {
+    render(
+      <QuestionnaireForm
+        questionnaire={questionnaire}
+        event={jest.fn()}
+        eventContinue={jest.fn()}
+        transientNhc="123456"
+        onTransientNhcChange={jest.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText("Índice visual de secciones")).toBeInTheDocument();
+    expect(screen.getByText("Contexto")).toBeInTheDocument();
+    expect(screen.getByText("ECO-SCORE")).toBeInTheDocument();
+    expect(screen.getByText("Dato transitorio")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "El NHC se utiliza únicamente para comprobaciones internas de pseudonimización y control de duplicados. No debe mostrarse ni incluirse en exportaciones."
+      )
+    ).toBeInTheDocument();
   });
 
   it("does not save NHC in localStorage or sessionStorage", async () => {

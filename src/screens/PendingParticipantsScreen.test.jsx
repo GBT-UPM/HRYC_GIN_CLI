@@ -21,7 +21,12 @@ jest.mock("../services/studyParticipantService", () => ({
   getPendingStudyParticipants: jest.fn(),
   STUDY_PARTICIPANT_ERROR_MESSAGES: {
     forbidden: "No tiene permisos para gestionar códigos en este centro.",
-    conflict: "El código de estudio ya está asignado a otra participante del mismo centro.",
+    codeAlreadyAssigned: "El código de estudio ya está asignado a otra participante del mismo centro.",
+    multipleCandidates:
+      "Existen varios participantes pendientes compatibles. Revise los pendientes o contacte con coordinación del estudio.",
+    notFound: "No se ha encontrado ningún participante pendiente para el NHC introducido en este centro.",
+    participantNotPending: "El participante localizado ya no está pendiente de asignación.",
+    invalidRequest: "Revise los datos introducidos e inténtelo de nuevo.",
     unauthorized: "Sesión caducada. Vuelva a iniciar sesión.",
     assignGeneric: "No se pudo asignar el código de estudio.",
     fetchGeneric: "No se pudieron obtener las participantes pendientes.",
@@ -49,6 +54,7 @@ const pendingParticipants = [
         caseDisplayId: "HURYC-C000004",
         lateralityDisplay: "Derecho",
         anatomicalStructureDisplay: "Ovario",
+        careSettingDisplay: "Consulta externa",
         createdAt: "2026-05-29T10:00:00Z",
         numberOfEvaluations: 2,
       },
@@ -96,17 +102,27 @@ describe("PendingParticipantsScreen", () => {
     expect(getPendingStudyParticipants).toHaveBeenCalledWith("token", "HURYC");
   });
 
+  it("shows the main assign action and uses detail per row", async () => {
+    render(<PendingParticipantsScreen />);
+
+    await screen.findByText("HURYC-C000004");
+
+    expect(screen.getByRole("button", { name: "Asignar código por NHC" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ver detalle" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Asignar código$/ })).not.toBeInTheDocument();
+  });
+
   it("shows a safe 403 message and clears NHC after assign error", async () => {
     assignStudyPatientCode.mockRejectedValue(new Error(STUDY_PARTICIPANT_ERROR_MESSAGES.forbidden));
 
     render(<PendingParticipantsScreen />);
 
     await screen.findByText("HURYC-C000004");
-    await userEvent.click(screen.getByRole("button", { name: "Asignar código" }));
+    await userEvent.click(screen.getByRole("button", { name: "Asignar código por NHC" }));
     const nhcInput = await screen.findByLabelText(/NHC/);
     await userEvent.type(nhcInput, "123456");
     await userEvent.type(await screen.findByLabelText(/Código de estudio/), "HURYC-0001");
-    await userEvent.click(screen.getByRole("button", { name: "Asignar código" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Asignar código$/ }));
 
     expect(
       await screen.findByText("No tiene permisos para gestionar códigos en este centro.")
@@ -114,20 +130,159 @@ describe("PendingParticipantsScreen", () => {
     await waitFor(() => expect(screen.getByLabelText(/NHC/)).toHaveValue(""));
   });
 
-  it("shows a safe 409 message", async () => {
-    assignStudyPatientCode.mockRejectedValue(new Error(STUDY_PARTICIPANT_ERROR_MESSAGES.conflict));
+  it("shows a safe 409 code-used message", async () => {
+    assignStudyPatientCode.mockRejectedValue(
+      new Error(STUDY_PARTICIPANT_ERROR_MESSAGES.codeAlreadyAssigned)
+    );
 
     render(<PendingParticipantsScreen />);
 
     await screen.findByText("HURYC-C000004");
-    await userEvent.click(screen.getByRole("button", { name: "Asignar código" }));
+    await userEvent.click(screen.getByRole("button", { name: "Asignar código por NHC" }));
     await userEvent.type(await screen.findByLabelText(/NHC/), "123456");
     await userEvent.type(await screen.findByLabelText(/Código de estudio/), "HURYC-0001");
-    await userEvent.click(screen.getByRole("button", { name: "Asignar código" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Asignar código$/ }));
 
     expect(
       await screen.findByText("El código de estudio ya está asignado a otra participante del mismo centro.")
     ).toBeInTheDocument();
+  });
+
+  it("shows a safe 404 message", async () => {
+    assignStudyPatientCode.mockRejectedValue(new Error(STUDY_PARTICIPANT_ERROR_MESSAGES.notFound));
+
+    render(<PendingParticipantsScreen />);
+
+    await screen.findByText("HURYC-C000004");
+    await userEvent.click(screen.getByRole("button", { name: "Asignar código por NHC" }));
+    await userEvent.type(await screen.findByLabelText(/NHC/), "123456");
+    await userEvent.type(await screen.findByLabelText(/Código de estudio/), "HURYC-0001");
+    await userEvent.click(screen.getByRole("button", { name: /^Asignar código$/ }));
+
+    expect(
+      await screen.findByText(
+        "No se ha encontrado ningún participante pendiente para el NHC introducido en este centro."
+      )
+    ).toBeInTheDocument();
+    expect(window.location.href).not.toContain("123456");
+  });
+
+  it("shows a safe multiple-candidates message", async () => {
+    assignStudyPatientCode.mockRejectedValue(
+      new Error(STUDY_PARTICIPANT_ERROR_MESSAGES.multipleCandidates)
+    );
+
+    render(<PendingParticipantsScreen />);
+
+    await screen.findByText("HURYC-C000004");
+    await userEvent.click(screen.getByRole("button", { name: "Asignar código por NHC" }));
+    await userEvent.type(await screen.findByLabelText(/NHC/), "123456");
+    await userEvent.type(await screen.findByLabelText(/Código de estudio/), "HURYC-0001");
+    await userEvent.click(screen.getByRole("button", { name: /^Asignar código$/ }));
+
+    expect(
+      await screen.findByText(
+        "Existen varios participantes pendientes compatibles. Revise los pendientes o contacte con coordinación del estudio."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("shows a safe participant-not-pending message without echoing the NHC", async () => {
+    assignStudyPatientCode.mockRejectedValue(
+      new Error(STUDY_PARTICIPANT_ERROR_MESSAGES.participantNotPending)
+    );
+
+    render(<PendingParticipantsScreen />);
+
+    await screen.findByText("HURYC-C000004");
+    await userEvent.click(screen.getByRole("button", { name: "Asignar código por NHC" }));
+    await userEvent.type(await screen.findByLabelText(/NHC/), "123456");
+    await userEvent.type(await screen.findByLabelText(/Código de estudio/), "HURYC-0001");
+    await userEvent.click(screen.getByRole("button", { name: /^Asignar código$/ }));
+
+    expect(
+      await screen.findByText("El participante localizado ya no está pendiente de asignación.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("123456")).not.toBeInTheDocument();
+  });
+
+  it("opens detail dialog without exposing NHC or pseudonym", async () => {
+    render(<PendingParticipantsScreen />);
+
+    await screen.findByText("HURYC-C000004");
+    await userEvent.click(screen.getByRole("button", { name: "Ver detalle" }));
+
+    expect(await screen.findByText("Detalle del participante pendiente")).toBeInTheDocument();
+    expect(
+      screen.getByText("Información del caso pendiente de asignación de código de estudio.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Identificación del caso")).toBeInTheDocument();
+    expect(screen.getByText("Información clínica")).toBeInTheDocument();
+    expect(screen.getByText("Estado de asignación")).toBeInTheDocument();
+    expect(screen.getByText("Ámbito asistencial")).toBeInTheDocument();
+    expect(screen.getByText("Consulta externa")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.queryByText("123456")).not.toBeInTheDocument();
+    expect(screen.queryByText("secret-pseudonym")).not.toBeInTheDocument();
+  });
+
+  it("shows care setting code when display text is not available", async () => {
+    getPendingStudyParticipants.mockResolvedValue({
+      items: [
+        {
+          ...pendingParticipants[0],
+          linkedCases: [
+            {
+              ...pendingParticipants[0].linkedCases[0],
+              careSettingDisplay: "",
+              careSettingCode: "ER",
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<PendingParticipantsScreen />);
+
+    await screen.findByText("HURYC-C000004");
+    await userEvent.click(screen.getByRole("button", { name: "Ver detalle" }));
+
+    expect(await screen.findByText("Ámbito asistencial")).toBeInTheDocument();
+    expect(screen.getByText("ER")).toBeInTheDocument();
+  });
+
+  it("cleans the NHC field when the modal closes", async () => {
+    render(<PendingParticipantsScreen />);
+
+    await screen.findByText("HURYC-C000004");
+    await userEvent.click(screen.getByRole("button", { name: "Asignar código por NHC" }));
+    await userEvent.type(await screen.findByLabelText(/NHC/), "123456");
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Asignar código de estudio" })).not.toBeInTheDocument()
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Asignar código por NHC" }));
+
+    expect(await screen.findByLabelText(/NHC/)).toHaveValue("");
+  });
+
+  it("cleans the NHC field after a successful assignment", async () => {
+    render(<PendingParticipantsScreen />);
+
+    await screen.findByText("HURYC-C000004");
+    await userEvent.click(screen.getByRole("button", { name: "Asignar código por NHC" }));
+    await userEvent.type(await screen.findByLabelText(/NHC/), "123456");
+    await userEvent.type(await screen.findByLabelText(/Código de estudio/), "HURYC-0001");
+    await userEvent.click(screen.getByRole("button", { name: /^Asignar código$/ }));
+
+    expect(await screen.findByText("Código de estudio asignado correctamente.")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Asignar código de estudio" })).not.toBeInTheDocument()
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Asignar código por NHC" }));
+    expect(await screen.findByLabelText(/NHC/)).toHaveValue("");
+    expect(window.location.href).not.toContain("123456");
   });
 
   it("shows not authorized for users without site coordinator role", () => {

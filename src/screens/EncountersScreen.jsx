@@ -1,37 +1,111 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Container, Typography, Table, TableBody, TableCell, TableContainer,
+    Typography, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, Paper, TablePagination, TableSortLabel,
-    TextField,
-    Modal,
-    Box,
-    Button,
-    Tooltip,
-    IconButton,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Alert,
-    Chip
+    TextField, Stack, Box, Button, Tooltip, IconButton,
+    FormControl, InputLabel, Select, MenuItem, Alert, Chip,
+    Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
-
 import SearchIcon from '@mui/icons-material/Search';
+import { Close } from '@mui/icons-material';
+import StudyPageHeader from '../components/StudyPageHeader';
 import '../assets/css/ResponsesScreen.css';
 import { useKeycloak } from '@react-keycloak/web';
 import ApiService from '../services/ApiService';
-
-import LocalPrintshopIcon from '@mui/icons-material/LocalPrintshop';
-import jsPDF from 'jspdf';
-import LogoHRYC from "../assets/images/LogoHRYC.jpg";
-import Logo12oct from "../assets/images/Logo12oct.jpg";
+import { generateClinicalReportPdf } from '../utils/pdfReport';
 import { formatCodeStatusLabel, resolveDisplayStudyIdentifier, resolveStudyCodeDisplay } from '../utils/caseMetadata';
 import { formatCaseStatusLabel, formatEvaluationStatusLabel } from '../utils/caseStatus';
 import { formatEvaluationTypeLabel } from '../utils/evaluationType';
-// Datos de ejemplo (pueden ser obtenidos de una API)
-import CloseIcon from "@mui/icons-material/Close";
-import { canUseGlobalView, getAllowedCenters, getDefaultCenter } from '../utils/auth';
+import { canUseGlobalView, getAllowedCenters, getCentersDisplayLabel, getDefaultCenter, getPrimaryRoleLabel } from '../utils/auth';
 import { getCaseEvaluations } from '../services/caseEvaluationService';
+
+const getStatusChipSx = (label) => {
+    const lc = (label || '').toLowerCase();
+    if (['asignado', 'completada', 'disponible'].some(k => lc.includes(k)))
+        return { backgroundColor: '#e6f4ea', color: '#1a4726', borderColor: '#a8d5b5' };
+    if (['pendiente', 'revisión'].some(k => lc.includes(k)))
+        return { backgroundColor: '#fff8e1', color: '#7a4800', borderColor: '#fce48a' };
+    if (['conflicto', 'excluido', 'excluida', 'retirado'].some(k => lc.includes(k)))
+        return { backgroundColor: '#fde8e8', color: '#7a1212', borderColor: '#f5b3b3' };
+    if (['bloqueado', 'bloqueada', 'corregida'].some(k => lc.includes(k)))
+        return { backgroundColor: '#f3f4f6', color: '#374151', borderColor: '#d1d5db' };
+    return { backgroundColor: '#EAF1F6', color: '#1E3A5F', borderColor: '#b4cfe0' };
+};
+
+const TH_SX = {
+    backgroundColor: '#EAF1F7',
+    color: '#173B5F',
+    fontWeight: 700,
+    fontSize: '0.75rem',
+    borderBottom: '2px solid #CBD5E1',
+    py: 1.25,
+    px: 1.5,
+    whiteSpace: 'nowrap',
+};
+
+const SORT_LABEL_SX = {
+    color: '#173B5F !important',
+    '& .MuiTableSortLabel-icon': { color: '#173B5F !important' },
+    '&.Mui-active': { color: '#1E3A5F !important' },
+    '&.Mui-active .MuiTableSortLabel-icon': { color: '#1E3A5F !important' },
+};
+
+const ACTION_BTN_SX = {
+    fontSize: '0.72rem',
+    textTransform: 'none',
+    borderColor: '#D9E2EC',
+    color: '#1E3A5F',
+    fontWeight: 600,
+    py: 0.25,
+    px: 1,
+    minWidth: 0,
+    '&:hover': { borderColor: '#2F5D7C', backgroundColor: '#F5F7FA' },
+};
+
+const DIALOG_PAPER_SX = {
+    borderRadius: '12px',
+    border: '1px solid #D6E0EA',
+    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.12)',
+};
+
+const DIALOG_TITLE_SX = {
+    fontWeight: 800,
+    color: '#1F2933',
+    fontSize: '1.05rem',
+    borderBottom: '1px solid #EEF2F6',
+    pb: 1.5,
+    pr: 6,
+};
+
+const DIALOG_CONTENT_SX = { px: 3, py: 2.5 };
+const DIALOG_ACTIONS_SX = { px: 3, py: 1.5, borderTop: '1px solid #EEF2F6', gap: 1 };
+
+const INFO_BOX_SX = {
+    backgroundColor: '#eef4fa',
+    border: '1px solid #c8daea',
+    borderRadius: '8px',
+    px: 1.75,
+    py: 1.25,
+    mt: 1.5,
+    fontSize: '0.875rem',
+    color: '#2c4a6e',
+    lineHeight: 1.5,
+};
+
+const SECONDARY_BTN_SX = {
+    textTransform: 'none',
+    fontWeight: 600,
+    borderColor: '#D9E2EC',
+    color: '#1E3A5F',
+    '&:hover': { borderColor: '#2F5D7C', backgroundColor: '#F5F7FA' },
+};
+
+const PRIMARY_BTN_SX = {
+    textTransform: 'none',
+    fontWeight: 700,
+    backgroundColor: '#1E3A5F',
+    '&:hover': { backgroundColor: '#173050' },
+};
 
 const tipoMap = {
     'sólida': 'sólido',
@@ -44,6 +118,8 @@ const EncountersScreen = () => {
     const allowedCenters = getAllowedCenters(keycloak);
     const isGlobalView = canUseGlobalView(keycloak);
     const shouldSelectCenter = !isGlobalView && allowedCenters.length > 1;
+    const roleLabel = getPrimaryRoleLabel(keycloak);
+    const centersLabel = getCentersDisplayLabel(keycloak);
     const [selectedCenter, setSelectedCenter] = useState(getDefaultCenter(keycloak));
     const [data, setData] = useState([]);
     // eslint-disable-next-line no-unused-vars
@@ -58,6 +134,7 @@ const EncountersScreen = () => {
     const [openModal, setOpenModal] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [pendingPrintData, setPendingPrintData] = useState(null);
+    const [infoOpen, setInfoOpen] = useState(false);
 
     const parseQuestionnaireResponses = (questionnaireResponse) => {
         try {
@@ -129,195 +206,28 @@ const EncountersScreen = () => {
     };
     const handlePrintButtonClick = (includeProbability, responses, observations, practitionerName, rowItem = {}) => {
         try {
-            const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
-
             const generated = responses.map((r) => generateReport(r));
-
-            const getResponse = (key) => {
-                const answer = responses[0].item.find(
-                    (resp) => resp.linkId.toLowerCase() === key.toLowerCase()
-                )?.answer?.[0];
-
-                return (
-                    answer?.valueString ||
-                    answer?.valueInteger ||
-                    answer?.valueDate ||
-                    answer?.valueCoding?.display ||
-                    ''
-                );
-            };
-
-            const checkAndAddPage = (doc, nextBlockHeight) => {
-                const pageHeight = doc.internal.pageSize.getHeight();
-                if (yPosition + nextBlockHeight > pageHeight - 30) {
-                    doc.addPage();
-                    yPosition = 20;
-                }
-            };
-
-            const doc = new jsPDF();
-
-            // Tamaño más pequeño
-            const width = 55;   // ancho en mm
-            const height = 10;  // alto en mm
-
-            // Coordenadas Y iguales → quedan alineados en horizontal
-            doc.addImage(LogoHRYC, "JPEG", 10, 10, width, height);
-            doc.addImage(Logo12oct, "JPEG", 70, 10, width, height);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(14);
-            doc.text("Servicio de Ginecología y Obstetricia", 10, 35);
-
-            const hospital = getResponse("HOSPITAL_REF");
+            const observationTexts = (observations || [])
+                .map((o) => o?.text || o?.valueString || '')
+                .filter((t) => t.length > 0);
             const studyIdentifier = resolveDisplayStudyIdentifier({
                 ...rowItem,
                 questionnaireResponse: responses,
             });
-            const patientAge = getResponse("PAT_EDAD");
-            const patientFUR = getResponse("PAT_FUR");
-            const indicacion = getResponse("PAT_IND");
-            const indicacion_otro = getResponse("PAT_IND_OTRO");
-            const sonographerInitials = getResponse("ECO_EXP_SIGLAS");
-            const laterality = getResponse("MA_LADO");
 
-            let yPosition = 50;
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "bold");
-            checkAndAddPage(doc, 10);
-            doc.text("Datos del estudio:", 10, yPosition);
-            yPosition += 10;
-
-            const addField = (label, value) => {
-                if (value === undefined || value === null || value === "") return;
-                checkAndAddPage(doc, 10);
-                doc.setFontSize(11);
-                doc.setFont("helvetica", "bold");
-                doc.text(label, 15, yPosition);
-                doc.setFont("helvetica", "normal");
-                doc.text(String(value), 65, yPosition);
-                yPosition += 10;
-            };
-
-            addField("Identificador:", studyIdentifier);
-            addField("Edad:", patientAge ? `${patientAge} años` : "");
-            addField("FUR:", formatDate(patientFUR));
-            addField("Centro:", hospital);
-            addField("Ecografista:", sonographerInitials);
-            addField("Lateralidad:", laterality);
-
-            const addSectionWithAutoBreak = (title, text) => {
-                const textLines = text.trim() !== "" ? doc.splitTextToSize(text, 180) : [];
-                const totalHeight = textLines.length * 5 + 10;
-
-                // Añade salto de página solo si se va a imprimir algo más que el título
-                checkAndAddPage(doc, totalHeight);
-
-                // Imprime el título siempre
-                doc.setFontSize(12);
-                doc.setFont("helvetica", "bold");
-                doc.text(title, 10, yPosition);
-                yPosition += 10;
-
-                if (textLines.length > 0) {
-                    doc.setFontSize(11);
-                    doc.setFont("helvetica", "normal");
-                    doc.text(textLines, 10, yPosition);
-                    yPosition += textLines.length * 5 + 10;
-                }
-            };
-
-            //addSectionWithAutoBreak("Indicación de la ecografía:", indicacion);
-            let indicacionFinal = indicacion;
-            if (indicacion === "1" && indicacion_otro.trim() !== "") {
-                indicacionFinal = indicacion_otro.trim();
-            }
-            indicacionFinal = String(indicacionFinal || "").toLowerCase()
-            const edadText = patientAge ? `${patientAge} años` : "de edad desconocida";
-            const indicacionText = `Mujer de ${edadText} que acude a consulta de ecografía para valoración por ${indicacionFinal}.`;
-
-            addSectionWithAutoBreak("Indicación de la ecografía:", indicacionText);
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "bold");
-            checkAndAddPage(doc, 10);
-            doc.text("Descripción de la imagen:", 10, yPosition);
-            yPosition += 10;
-
-            doc.setFontSize(11);
-            doc.setFont("helvetica", "normal");
-            generated.forEach((report, index) => {
-                if (hasMassInReports) {
-                    checkAndAddPage(doc, 10);
-                    doc.setFont("helvetica", "bold");
-                    doc.text("Masa anexial " + (index + 1), 15, yPosition);
-                    yPosition += 10;
-                }
-
-                doc.setFont("helvetica", "normal");
-                const htmlConSaltos = report.text.replace(/<br\s*\/?>/gi, "\n");
-                const tempDiv = document.createElement("div");
-                tempDiv.innerHTML = htmlConSaltos;
-                const plainText = tempDiv.innerText;
-                const normalizedText = plainText.replace(/\n+/g, "\n").trim();
-
-                const textLines = doc.splitTextToSize(normalizedText, 180);
-                textLines.forEach((line) => {
-                    checkAndAddPage(doc, 6);
-                    doc.text(line, 10, yPosition);
-                    yPosition += 6;
-                });
-
-                if (includeProbability && report.text_score) {
-                    const scoreLines = doc.splitTextToSize(report.text_score, 180);
-                    scoreLines.forEach((line) => {
-                        checkAndAddPage(doc, 6);
-                        doc.text(line, 10, yPosition);
-                        yPosition += 6;
-                    });
-                }
-
-                yPosition += 4;
+            generateClinicalReportPdf({
+                responses,
+                reports: generated,
+                observations: observationTexts,
+                includeProbability,
+                centerIdHint: rowItem.centerId || '',
+                practitionerName: practitionerName || '',
+                careSettingDisplay: rowItem.careSettingDisplay || '',
+                studyPatientCode: studyIdentifier || '',
             });
-
-            const validObservations = observations;
-            if (validObservations.length > 0) {
-                addSectionWithAutoBreak("Conclusiones del ecografista:", "");
-
-                validObservations.forEach((observation, index) => {
-                    if (validObservations.length > 1) {
-                        checkAndAddPage(doc, 10);
-                        doc.setFontSize(11);
-                        doc.setFont("helvetica", "bold");
-                        doc.text("Conclusión de la Masa Anexial " + (index + 1), 15, yPosition);
-                        yPosition += 10;
-                    }
-
-                    doc.setFontSize(11);
-                    doc.setFont("helvetica", "normal");
-                    const text = observation.text || observation.valueString || "";
-                    const textLines = doc.splitTextToSize(text, 180);
-                    textLines.forEach((line) => {
-                        checkAndAddPage(doc, 6);
-                        doc.text(line, 10, yPosition);
-                        yPosition += 6;
-                    });
-                    yPosition += 4;
-                });
-            }
-
-            const today = new Date();
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "italic");
-            // doc.text("Hospital Universitario Ramón y Cajal - Madrid", 10, 260);
-            doc.text(hospital, 10, 260);
-            doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
-            //const practitionerName = sessionStorage.getItem('practitionerName');
-            doc.text("Ecografista: " + (sonographerInitials || practitionerName || ""), 10, 270);
-
-            doc.autoPrint();
-            window.open(doc.output("bloburl"), "_blank");
         } catch (error) {
-            console.error("Error al guardar el encounter:", error);
-            setError("Error al guardar el encounter.");
+            console.error('Error al generar el informe:', error);
+            setError('Error al generar el informe.');
         }
     };
     const generateReport = useCallback((res) => {
@@ -618,14 +528,62 @@ const EncountersScreen = () => {
     };
     // Paginación de datos
     const paginatedData = sortedData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-    return (
-        <Container className="container">
+    const visibleScopeLabel = isGlobalView
+        ? "Vista global"
+        : selectedCenter
+            ? `Centro ${selectedCenter}`
+            : "Centro pendiente";
 
-            <Typography variant="h4" gutterBottom>
-                📋 Lista de Citas Cursadas
-            </Typography>
+    return (
+        <Box sx={{ px: 0, py: 0 }}>
+            {/* Encabezado institucional */}
+            <StudyPageHeader
+                title="Citas / encuentros"
+                subtitle="Consulta de encuentros clínicos registrados y evaluaciones asociadas al estudio."
+                visibleScopeLabel={visibleScopeLabel}
+                roleLabel={roleLabel}
+                centersLabel={centersLabel}
+                recordCount={filteredData.length}
+                onInfoClick={() => setInfoOpen(true)}
+            />
+
+            {/* Dialog Información de la vista */}
+            <Dialog open={infoOpen} onClose={() => setInfoOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: DIALOG_PAPER_SX }}>
+                <DialogTitle sx={DIALOG_TITLE_SX}>
+                    Información de la vista
+                    <IconButton onClick={() => setInfoOpen(false)} size="small" aria-label="Cerrar" sx={{ position: "absolute", right: 12, top: 12, color: "#52616B" }}>
+                        <Close fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ px: 2.5, py: 1.5 }}>
+                    <Stack spacing={0}>
+                        {[
+                            ["Encuentros visibles", isGlobalView ? "Todos los centros (vista global)" : `Centro: ${selectedCenter || "pendiente"}`],
+                            ["Relación encuentro-caso", "Cada encuentro corresponde a una evaluación ecográfica vinculada a un caso del estudio."],
+                            ["Evaluación primaria", "Primera evaluación ecográfica registrada para el caso."],
+                            ["Evaluación secundaria", "Evaluación adicional sobre el mismo caso (segundo observador)."],
+                            ["Informe clínico", "La acción 'Informe' genera el informe ecográfico en PDF para impresión o descarga."],
+                            ["Pseudonimización", "Los datos mostrados no incluyen identificativos del paciente."],
+                        ].map(([label, value], index, arr) => (
+                            <Box key={label} sx={{ py: 1.25, borderBottom: index < arr.length - 1 ? "1px solid #EEF2F6" : "none" }}>
+                                <Typography variant="caption" sx={{ color: "#52616B", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                                    {label}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: "#1F2933", fontWeight: 600, mt: 0.25 }}>
+                                    {value}
+                                </Typography>
+                            </Box>
+                        ))}
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ px: 2.5, py: 1.25 }}>
+                    <Button onClick={() => setInfoOpen(false)} size="small" sx={{ textTransform: "none", color: "#1E3A5F", fontWeight: 700 }}>
+                        Cerrar
+                    </Button>
+                </DialogActions>
+            </Dialog>
             {shouldSelectCenter && (
-                <FormControl sx={{ minWidth: 220, mt: 2 }}>
+                <FormControl sx={{ minWidth: 220, mb: 2 }}>
                     <InputLabel id="encounters-center-label">Centro</InputLabel>
                     <Select
                         labelId="encounters-center-label"
@@ -640,316 +598,307 @@ const EncountersScreen = () => {
                     </Select>
                 </FormControl>
             )}
-            {isGlobalView && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Vista global
-                </Typography>
-            )}
+
             {error && (
-                <Alert severity="error" sx={{ mt: 2 }}>
+                <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
                 </Alert>
             )}
-            {/* Campo de búsqueda */}
-            <TextField
-                label="Buscar por caso, evaluación, código de estudio, centro, lateralidad, ámbito, tipo o ecografista"
-                variant="outlined"
-                fullWidth
-                sx={{ mt: 5 }}
-                className="search-box"
-                InputProps={{
-                    startAdornment: <SearchIcon color="primary" sx={{ marginRight: 1 }} />
-                }}
-                onChange={(e) => setSearch(e.target.value)}
-            />
-
-            <TableContainer className="table-container" component={Paper} sx={{ marginTop: 3 }}>
-                <Table>
-                    <TableHead>
-                        <TableRow className="table-header2">
-	                            <TableCell>
-	                                <TableSortLabel
-	                                    active={orderBy === 'identifier'}
-	                                    direction={orderDirection}
-	                                    onClick={() => handleSortRequest('identifier')}
-	                                >
-	                                    Caso / Evaluación
-	                                </TableSortLabel>
-	                            </TableCell>
-	                            <TableCell>
-	                                <TableSortLabel
-	                                    active={orderBy === 'codeStatus'}
-	                                    direction={orderDirection}
-	                                    onClick={() => handleSortRequest('codeStatus')}
-	                                >
-	                                    Estado código
-	                                </TableSortLabel>
-	                            </TableCell>
-	                            <TableCell>
-	                                <TableSortLabel
-	                                    active={orderBy === 'evaluationType'}
-	                                    direction={orderDirection}
-	                                    onClick={() => handleSortRequest('evaluationType')}
-	                                >
-	                                    Tipo
-	                                </TableSortLabel>
-	                            </TableCell>
-	                            <TableCell>
-	                                <TableSortLabel
-	                                    active={orderBy === 'caseStatus'}
-	                                    direction={orderDirection}
-	                                    onClick={() => handleSortRequest('caseStatus')}
-	                                >
-	                                    Estado caso
-	                                </TableSortLabel>
-	                            </TableCell>
-	                            <TableCell>
-	                                <TableSortLabel
-	                                    active={orderBy === 'evaluationStatus'}
-	                                    direction={orderDirection}
-	                                    onClick={() => handleSortRequest('evaluationStatus')}
-	                                >
-	                                    Estado evaluación
-	                                </TableSortLabel>
-	                            </TableCell>
-	                            <TableCell>
-	                                <TableSortLabel
-	                                    active={orderBy === 'studyCode'}
-	                                    direction={orderDirection}
-	                                    onClick={() => handleSortRequest('studyCode')}
-	                                >
-	                                    Código de estudio
-	                                </TableSortLabel>
-	                            </TableCell>
-	                            <TableCell>
-	                                <TableSortLabel
-	                                    active={orderBy === 'center'}
-	                                    direction={orderDirection}
-	                                    onClick={() => handleSortRequest('center')}
-	                                >
-	                                    Centro
-	                                </TableSortLabel>
-	                            </TableCell>
-		                            <TableCell>
-		                                <TableSortLabel
-		                                    active={orderBy === 'laterality'}
-	                                    direction={orderDirection}
-	                                    onClick={() => handleSortRequest('laterality')}
-	                                >
-		                                    Lateralidad
-		                                </TableSortLabel>
-		                            </TableCell>
-		                            <TableCell>
-		                                <TableSortLabel
-		                                    active={orderBy === 'careSettingDisplay'}
-		                                    direction={orderDirection}
-		                                    onClick={() => handleSortRequest('careSettingDisplay')}
-		                                >
-		                                    Ámbito asistencial
-		                                </TableSortLabel>
-		                            </TableCell>
-	                            <TableCell>
-                                <TableSortLabel
-                                    active={orderBy === 'risk'}
-                                    direction={orderDirection}
-                                    onClick={() => handleSortRequest('risk')}
-                                >
-                                    Riesgo
-                                </TableSortLabel>
-                            </TableCell>
-
-                            <TableCell>
-                                <TableSortLabel
-                                    active={orderBy === 'observerInitials'}
-                                    direction={orderDirection}
-                                    onClick={() => handleSortRequest('observerInitials')}
-                                >
-                                    Ecografista
-                                </TableSortLabel>
-                            </TableCell>
-                            <TableCell>
-                                <TableSortLabel
-                                    active={orderBy === 'createdAt'}
-                                    direction={orderDirection}
-                                    onClick={() => handleSortRequest('createdAt')}
-                                >
-                                    Fecha de la cita
-                                </TableSortLabel>
-                            </TableCell>
-                            <TableCell><span>Acciones</span></TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {paginatedData.map((item, index) => {
-                            //const questionnaireResponse = JSON.parse(item.questionnaireResponse);
-                            return (
-                                <TableRow
-                                    className="table-row"
-                                    key={index}
-                                    hover
-
-                                    style={{ cursor: 'pointer' }}
-                                >
-	                                    <TableCell>{getIdentifier(item)}</TableCell>
-	                                    <TableCell>{getCodeStatus(item)}</TableCell>
-	                                    <TableCell>
-	                                        <Chip
-	                                            label={getEvaluationType(item)}
-	                                            size="small"
-	                                            variant="outlined"
-	                                            sx={{
-	                                                borderColor: '#9bb7d7',
-	                                                color: '#315f86',
-	                                                backgroundColor: '#f3f8fc',
-	                                                fontWeight: 500,
-	                                            }}
-	                                        />
-	                                    </TableCell>
-	                                    <TableCell>{getCaseStatus(item)}</TableCell>
-	                                    <TableCell>{getEvaluationStatus(item)}</TableCell>
-		                                    <TableCell>{getStudyCode(item)}</TableCell>
-		                                    <TableCell>{getCenter(item)}</TableCell>
-		                                    <TableCell>{getLaterality(item)}</TableCell>
-		                                    <TableCell>{getCareSetting(item)}</TableCell>
-	                                    <TableCell>
-                                        {(() => {
-                                            return !isNaN(parseFloat(item.risk))
-                                                ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
-                                                : "No procede";
-                                        })()}
-                                    </TableCell>
-                                    <TableCell>{item.observerInitials || '—'}</TableCell>
-                                    <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleString() : '—'}</TableCell>
-                                    <TableCell style={{ textAlign: 'right' }}>
-                                        <Tooltip title="Imprimir informe">
-                                            <IconButton
-                                                color="primary"
-                                                aria-label="Imprimir informe"
-                                                // Abrir modal para dar posibilidad de incluir probabilidad en el informe
-                                                onClick={async () => {
-                                                    const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(item.questionnaireResponseFhirId);
-                                                    const patMaItem = findItemByLinkId(questionnaireResponse?.item, 'PAT_MA');
-                                                    const answer = patMaItem?.answer?.[0];
-                                                    const hasMass =
-                                                        answer?.valueCoding?.display === "Sí" ||
-                                                        answer?.valueString === "1" ||
-                                                        answer?.valueCoding?.code === "1";
-
-	                                                    if (hasMass) {
-                                                        setPendingPrintData({
-                                                            rowItem: item,
-                                                        });
-                                                        setIsModalOpen(true);
-                                                    } else {
-                                                        handleRowClick(item, false);
-                                                    }
-                                                }}
-                                            >
-                                                <LocalPrintshopIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
-            </TableContainer>
-
-            {/* Paginación */}
-            <TablePagination
-                component="div"
-                count={filteredData.length}
-                page={page}
-                rowsPerPage={rowsPerPage}
-                rowsPerPageOptions={[5, 10, 25]}
-                onPageChange={(event, newPage) => setPage(newPage)}
-                onRowsPerPageChange={(event) => {
-                    setRowsPerPage(parseInt(event.target.value, 10));
-                    setPage(0);
-                }}
-            />
-            {/* Modal para mostrar el detalle del cuestionario */}
-            <Modal open={openModal} onClose={() => setOpenModal(false)}>
-                <Box className="modal-box" sx={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: 700,
-                    bgcolor: 'background.paper',
-                    boxShadow: 24,
-                    p: 4,
-                    borderRadius: 2
-                }}>
-                    <Typography variant="h6" gutterBottom>
-                        Detalle del Cuestionario
-                    </Typography>
-
-                    <Button variant="contained" sx={{ mt: 2 }} onClick={() => setOpenModal(false)}>
-                        Cerrar
-                    </Button>
-                </Box>
-            </Modal>
-            {/* Modal para imprimir el informe */}
-            <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)}>
-                <Box
-                    sx={{
-                    p: 4,
-                    backgroundColor: "white",
-                    borderRadius: 2,
-                    maxWidth: 400,
-                    mx: "auto",
-                    my: "20%",
-                    position: "relative",
-                    }}
-                >
-                {/* Cabecera con título y botón de cierre */}
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Typography variant="h6">Confirmación</Typography>
-                <IconButton
-                    aria-label="close"
-                    onClick={() => setIsModalOpen(false)}
-                    sx={{ color: (theme) => theme.palette.grey[500] }}
-                >
-                    <CloseIcon />
-                </IconButton>
-                </Box>
-
-                {/* Texto de confirmación */}
-                <Typography sx={{ mt: 2 }}>
-                ¿Desea incluir la probabilidad de malignidad en el informe?
-                </Typography>
-
-                {/* Botones de acción */}
-                <Box sx={{ display: "flex", justifyContent: "space-between", mt: 3 }}>
-                <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => {
-                    handleRowClick(pendingPrintData.rowItem, true);
-                    setPendingPrintData(null);
-                    setIsModalOpen(false);
-                    }}
-                >
-                    Sí
-                </Button>
-
-                <Button
+            {/* Card de búsqueda */}
+            <Paper elevation={0} sx={{ p: 2, mb: 2, border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF" }}>
+                <TextField
+                    label="Buscar por caso, evaluación, código de estudio, centro, lateralidad, ámbito, tipo o ecografista"
                     variant="outlined"
-                    color="secondary"
-                    onClick={() => {
-                    handleRowClick(pendingPrintData.rowItem, false);
-                    setPendingPrintData(null);
-                    setIsModalOpen(false);
+                    fullWidth
+                    size="small"
+                    InputProps={{
+                        startAdornment: <SearchIcon sx={{ color: "#52616B", mr: 1, fontSize: "1.1rem" }} />,
                     }}
-                >
-                    No
-                </Button>
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+            </Paper>
+
+            {/* Card de tabla */}
+            <Paper elevation={0} sx={{ border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF", overflow: "hidden" }}>
+                <TableContainer sx={{ overflowX: "auto" }}>
+                    <Table size="small">
+                        <TableHead>
+                            <TableRow>
+                                <TableCell sx={TH_SX}>
+                                    <TableSortLabel active={orderBy === 'studyCode'} direction={orderDirection} onClick={() => handleSortRequest('studyCode')} sx={SORT_LABEL_SX}>
+                                        Código de estudio
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={TH_SX}>
+                                    <TableSortLabel active={orderBy === 'identifier'} direction={orderDirection} onClick={() => handleSortRequest('identifier')} sx={SORT_LABEL_SX}>
+                                        Caso / Evaluación
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={TH_SX}>
+                                    <TableSortLabel active={orderBy === 'evaluationType'} direction={orderDirection} onClick={() => handleSortRequest('evaluationType')} sx={SORT_LABEL_SX}>
+                                        Tipo
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={TH_SX}>
+                                    <TableSortLabel active={orderBy === 'center'} direction={orderDirection} onClick={() => handleSortRequest('center')} sx={SORT_LABEL_SX}>
+                                        Centro / Ámbito
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={TH_SX}>
+                                    <TableSortLabel active={orderBy === 'laterality'} direction={orderDirection} onClick={() => handleSortRequest('laterality')} sx={SORT_LABEL_SX}>
+                                        Lateralidad
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={TH_SX}>
+                                    <TableSortLabel active={orderBy === 'codeStatus'} direction={orderDirection} onClick={() => handleSortRequest('codeStatus')} sx={SORT_LABEL_SX}>
+                                        Estado código
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={TH_SX}>
+                                    <TableSortLabel active={orderBy === 'caseStatus'} direction={orderDirection} onClick={() => handleSortRequest('caseStatus')} sx={SORT_LABEL_SX}>
+                                        Estado caso
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={TH_SX}>
+                                    <TableSortLabel active={orderBy === 'evaluationStatus'} direction={orderDirection} onClick={() => handleSortRequest('evaluationStatus')} sx={SORT_LABEL_SX}>
+                                        Estado evaluación
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={TH_SX}>
+                                    <TableSortLabel active={orderBy === 'risk'} direction={orderDirection} onClick={() => handleSortRequest('risk')} sx={SORT_LABEL_SX}>
+                                        Riesgo
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={TH_SX}>
+                                    <TableSortLabel active={orderBy === 'createdAt'} direction={orderDirection} onClick={() => handleSortRequest('createdAt')} sx={SORT_LABEL_SX}>
+                                        Fecha
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={{ ...TH_SX, textAlign: "right" }}>Acciones</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {paginatedData.map((item, index) => {
+                                const codeLabel = getCodeStatus(item);
+                                const caseLabel = getCaseStatus(item);
+                                const evalLabel = getEvaluationStatus(item);
+                                const typeLabel = getEvaluationType(item);
+                                const riskDisplay = !isNaN(parseFloat(item.risk))
+                                    ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
+                                    : 'No procede';
+
+                                return (
+                                    <TableRow
+                                        key={index}
+                                        hover
+                                        sx={{
+                                            '&:hover': { backgroundColor: '#F5F8FC' },
+                                            '&:last-child td': { borderBottom: 0 },
+                                        }}
+                                    >
+                                        {/* Código de estudio */}
+                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#1F2933', lineHeight: 1.3 }}>
+                                                {getStudyCode(item) || '—'}
+                                            </Typography>
+                                        </TableCell>
+
+                                        {/* Caso / Evaluación */}
+                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#1F2933', lineHeight: 1.3 }}>
+                                                {item.caseDisplayId || getIdentifier(item) || '—'}
+                                            </Typography>
+                                            {item.evaluationDisplayId && (
+                                                <Typography variant="caption" sx={{ fontSize: '0.72rem', color: '#52616B', lineHeight: 1.2, display: 'block' }}>
+                                                    {item.evaluationDisplayId}
+                                                </Typography>
+                                            )}
+                                        </TableCell>
+
+                                        {/* Tipo */}
+                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                            {typeLabel && typeLabel !== '—' ? (
+                                                <Chip
+                                                    label={typeLabel}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    sx={{
+                                                        height: 22,
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: 600,
+                                                        backgroundColor: typeLabel === 'Primaria' ? '#EAF1F6' : '#F3F4F6',
+                                                        color: typeLabel === 'Primaria' ? '#1E3A5F' : '#374151',
+                                                        borderColor: typeLabel === 'Primaria' ? '#b4cfe0' : '#d1d5db',
+                                                    }}
+                                                />
+                                            ) : (
+                                                <Typography variant="caption" sx={{ color: '#52616B' }}>—</Typography>
+                                            )}
+                                        </TableCell>
+
+                                        {/* Centro / Ámbito */}
+                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#1F2933', lineHeight: 1.3 }}>
+                                                {getCenter(item)}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ fontSize: '0.72rem', color: '#52616B', lineHeight: 1.2, display: 'block' }}>
+                                                {getCareSetting(item)}
+                                            </Typography>
+                                        </TableCell>
+
+                                        {/* Lateralidad */}
+                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', color: '#1F2933', lineHeight: 1.3 }}>
+                                                {getLaterality(item)}
+                                            </Typography>
+                                        </TableCell>
+
+                                        {/* Estado código */}
+                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                            {codeLabel && codeLabel !== '—' ? (
+                                                <Chip label={codeLabel} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600, ...getStatusChipSx(codeLabel) }} />
+                                            ) : null}
+                                        </TableCell>
+
+                                        {/* Estado caso */}
+                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                            {caseLabel && caseLabel !== '—' ? (
+                                                <Chip label={caseLabel} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600, ...getStatusChipSx(caseLabel) }} />
+                                            ) : null}
+                                        </TableCell>
+
+                                        {/* Estado evaluación */}
+                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                            {evalLabel && evalLabel !== '—' ? (
+                                                <Chip label={evalLabel} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600, ...getStatusChipSx(evalLabel) }} />
+                                            ) : null}
+                                        </TableCell>
+
+                                        {/* Riesgo */}
+                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', color: '#1F2933', lineHeight: 1.3 }}>
+                                                {riskDisplay}
+                                            </Typography>
+                                        </TableCell>
+
+                                        {/* Fecha / Ecografista */}
+                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', color: '#1F2933', lineHeight: 1.3 }}>
+                                                {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'}
+                                            </Typography>
+                                            {item.observerInitials && (
+                                                <Typography variant="caption" sx={{ fontSize: '0.72rem', color: '#52616B', lineHeight: 1.2, display: 'block' }}>
+                                                    {item.observerInitials}
+                                                </Typography>
+                                            )}
+                                        </TableCell>
+
+                                        {/* Acciones */}
+                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                            <Tooltip title="Imprimir informe">
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    aria-label="Imprimir informe"
+                                                    sx={ACTION_BTN_SX}
+                                                    onClick={async () => {
+                                                        const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(item.questionnaireResponseFhirId);
+                                                        const patMaItem = findItemByLinkId(questionnaireResponse?.item, 'PAT_MA');
+                                                        const answer = patMaItem?.answer?.[0];
+                                                        const hasMass =
+                                                            answer?.valueCoding?.display === "Sí" ||
+                                                            answer?.valueString === "1" ||
+                                                            answer?.valueCoding?.code === "1";
+
+                                                        if (hasMass) {
+                                                            setPendingPrintData({ rowItem: item });
+                                                            setIsModalOpen(true);
+                                                        } else {
+                                                            handleRowClick(item, false);
+                                                        }
+                                                    }}
+                                                >
+                                                    Informe
+                                                </Button>
+                                            </Tooltip>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+                {/* Paginación integrada */}
+                <Box sx={{ borderTop: "1px solid #D9E2EC" }}>
+                    <TablePagination
+                        component="div"
+                        count={filteredData.length}
+                        page={page}
+                        rowsPerPage={rowsPerPage}
+                        rowsPerPageOptions={[5, 10, 25]}
+                        onPageChange={(event, newPage) => setPage(newPage)}
+                        onRowsPerPageChange={(event) => {
+                            setRowsPerPage(parseInt(event.target.value, 10));
+                            setPage(0);
+                        }}
+                        sx={{ fontSize: '0.8rem' }}
+                    />
                 </Box>
-            </Box>
-            </Modal>
-        </Container>
+            </Paper>
+
+            {/* Dialog: confirmación de inclusión de probabilidad */}
+            <Dialog
+                open={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{ sx: DIALOG_PAPER_SX }}
+            >
+                <DialogTitle sx={DIALOG_TITLE_SX}>
+                    Incluir probabilidad en el informe
+                    <IconButton
+                        aria-label="close"
+                        onClick={() => setIsModalOpen(false)}
+                        size="small"
+                        sx={{ position: 'absolute', right: 12, top: 12, color: '#52616B' }}
+                    >
+                        <Close fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent sx={DIALOG_CONTENT_SX}>
+                    <Typography sx={{ color: '#1F2933' }}>
+                        Seleccione si desea que la probabilidad de malignidad calculada se incluya en el informe PDF.
+                    </Typography>
+                    <Box sx={INFO_BOX_SX}>
+                        Esta decisión afecta únicamente a la versión del informe que se va a generar. No modifica las respuestas del cuestionario ni el cálculo realizado.
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={DIALOG_ACTIONS_SX}>
+                    <Button
+                        variant="outlined"
+                        onClick={() => {
+                            handleRowClick(pendingPrintData.rowItem, false);
+                            setPendingPrintData(null);
+                            setIsModalOpen(false);
+                        }}
+                        sx={SECONDARY_BTN_SX}
+                    >
+                        No incluir
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => {
+                            handleRowClick(pendingPrintData.rowItem, true);
+                            setPendingPrintData(null);
+                            setIsModalOpen(false);
+                        }}
+                        sx={PRIMARY_BTN_SX}
+                    >
+                        Incluir en informe
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Box>
     );
 };
 

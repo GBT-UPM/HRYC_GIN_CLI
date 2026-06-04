@@ -69,10 +69,10 @@ describe('ResponsesScreen', () => {
     expect(screen.getByText('Abierto')).toBeInTheDocument();
     expect(screen.getByText('Completada')).toBeInTheDocument();
     expect(screen.getByText('Consulta externa')).toBeInTheDocument();
-    expect(screen.getAllByText('Pendiente').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Histología pendiente').length).toBeGreaterThan(0);
     expect(screen.queryByText('Editar Histología')).not.toBeInTheDocument();
     expect(screen.queryByTestId('EditIcon')).not.toBeInTheDocument();
-    expect(screen.getByText('Registrar histopatología del caso')).toBeInTheDocument();
+    expect(screen.getByText('Histología')).toBeInTheDocument();
     expect(screen.queryByText('123456')).not.toBeInTheDocument();
     expect(screen.queryByText('secret-pseudonym')).not.toBeInTheDocument();
     expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/cases/evaluations?centerId=HURYC', {});
@@ -136,8 +136,8 @@ describe('ResponsesScreen', () => {
     expect(secondaryBadge).toBeInTheDocument();
     expect(secondaryBadge.closest('tr')).not.toHaveClass('error');
     expect(secondaryBadge.closest('.MuiChip-root')).not.toHaveClass('MuiChip-colorError');
-    expect(screen.getAllByText('Registrar histopatología del caso')).toHaveLength(1);
-    expect(screen.getByText('Histología compartida con el caso')).toBeInTheDocument();
+    expect(screen.getAllByText('Histología')).toHaveLength(1);
+    expect(screen.getByText('Compartida con caso')).toBeInTheDocument();
 
     const searchInput = screen.getByLabelText(searchLabel);
 
@@ -156,6 +156,107 @@ describe('ResponsesScreen', () => {
     fireEvent.change(searchInput, { target: { value: 'SECONDARY' } });
     expect(screen.getByText('HURYC-C000001-E000010')).toBeInTheDocument();
     expect(screen.queryByText('HURYC-C000001-E000009')).not.toBeInTheDocument();
+  });
+
+  it('treats no-mass records as histology not applicable and hides the action', async () => {
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ([
+        {
+          caseId: 2,
+          evaluationId: 12,
+          caseDisplayId: 'HURYC-C000002',
+          evaluationDisplayId: 'HURYC-C000002-E000012',
+          evaluationType: 'PRIMARY',
+          primaryEvaluation: true,
+          centerId: 'HURYC',
+          codeStatus: 'PENDING_CODE',
+          caseStatus: 'OPEN',
+          evaluationStatus: 'COMPLETED',
+          hasAdnexalMass: false,
+          lateralityCode: 'NOT_APPLICABLE',
+          lateralityDisplay: 'No aplica',
+          anatomicalStructureCode: 'NOT_APPLICABLE',
+          anatomicalStructureDisplay: 'No aplica',
+          careSettingCode: 'EMERGENCY',
+          careSettingDisplay: 'Urgencias',
+          risk: null,
+          histology: null,
+          histologyStatus: null,
+          observerInitials: 'ABC',
+          createdAt: '2026-05-31T09:00:00',
+          questionnaireResponseFhirId: 103,
+        },
+      ]),
+    });
+
+    render(<ResponsesScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('HURYC-C000002-E000012')).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText('No procede').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Histología pendiente')).not.toBeInTheDocument();
+    expect(screen.queryByText('Histología')).not.toBeInTheDocument();
+    expect(screen.getByText('Ver')).toBeInTheDocument();
+  });
+
+  it('falls back to careSettingCode when careSettingDisplay is missing', async () => {
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ([
+        {
+          caseId: 1,
+          evaluationId: 9,
+          caseDisplayId: 'HURYC-C000001',
+          evaluationDisplayId: 'HURYC-C000001-E000009',
+          evaluationType: 'PRIMARY',
+          primaryEvaluation: true,
+          centerId: 'HURYC',
+          codeStatus: 'PENDING_CODE',
+          caseStatus: 'OPEN',
+          evaluationStatus: 'COMPLETED',
+          careSettingCode: 'EMERGENCY',
+          careSettingDisplay: 'Urgencias',
+          lateralityDisplay: 'Derecho',
+          risk: '0.12',
+          histology: null,
+          observerInitials: 'ABC',
+          createdAt: '2026-05-31T09:00:00',
+          questionnaireResponseFhirId: 101,
+        },
+        {
+          caseId: 1,
+          evaluationId: 10,
+          caseDisplayId: 'HURYC-C000001',
+          evaluationDisplayId: 'HURYC-C000001-E000010',
+          evaluationType: 'SECONDARY',
+          primaryEvaluation: false,
+          centerId: 'HURYC',
+          codeStatus: 'PENDING_CODE',
+          caseStatus: 'OPEN',
+          evaluationStatus: 'COMPLETED',
+          careSettingCode: 'OUTPATIENT',
+          careSettingDisplay: '',
+          lateralityDisplay: 'Derecho',
+          risk: '0.13',
+          histology: null,
+          observerInitials: 'DEF',
+          createdAt: '2026-06-01T09:00:00',
+          questionnaireResponseFhirId: 102,
+        },
+      ]),
+    });
+
+    render(<ResponsesScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('HURYC-C000001-E000010')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Urgencias')).toBeInTheDocument();
+    expect(screen.getByText('Consulta externa')).toBeInTheDocument();
   });
 
   it('submits histopathology through the controlled case endpoint', async () => {
@@ -264,7 +365,7 @@ describe('ResponsesScreen', () => {
 
     render(<ResponsesScreen />);
 
-    fireEvent.click(await screen.findByText('Registrar histopatología del caso'));
+    fireEvent.click(await screen.findByText('Histología'));
     fireEvent.mouseDown(screen.getByLabelText('Estado histopatología'));
     fireEvent.click(screen.getByText('Disponible'));
     fireEvent.change(screen.getByLabelText('Diagnóstico'), { target: { value: 'Cistoadenoma seroso' } });
@@ -290,9 +391,9 @@ describe('ResponsesScreen', () => {
     });
 
     expect(ApiService.mock.calls.some((call) => call[2] === '/fhir/Observation')).toBe(false);
-    expect(await screen.findByText('Actualizar histopatología del caso')).toBeInTheDocument();
-    expect(screen.getAllByText('Benigno - Cistoadenoma seroso')).toHaveLength(2);
-    expect(screen.getByText('Histología compartida con el caso')).toBeInTheDocument();
+    expect(await screen.findByText('Histología registrada')).toBeInTheDocument();
+    expect(screen.getByText('Histología')).toBeInTheDocument();
+    expect(screen.getByText('Compartida con caso')).toBeInTheDocument();
   });
 
   it('does not show histopathology write action to clinicians or study coordinators', async () => {
@@ -323,7 +424,7 @@ describe('ResponsesScreen', () => {
     await waitFor(() => {
       expect(screen.getByText('HURYC-C000001-E000009')).toBeInTheDocument();
     });
-    expect(screen.queryByText('Registrar histopatología del caso')).not.toBeInTheDocument();
+    expect(screen.queryByText('Histología')).not.toBeInTheDocument();
 
     ApiService.mockClear();
     ApiService.mockResolvedValue({
@@ -352,7 +453,7 @@ describe('ResponsesScreen', () => {
     await waitFor(() => {
       expect(screen.getAllByText('HURYC-C000001-E000009').length).toBeGreaterThan(0);
     });
-    expect(screen.queryByText('Registrar histopatología del caso')).not.toBeInTheDocument();
+    expect(screen.queryByText('Histología')).not.toBeInTheDocument();
   });
 
   it('shows safe 403 message when histopathology write is rejected', async () => {
@@ -381,7 +482,7 @@ describe('ResponsesScreen', () => {
 
     render(<ResponsesScreen />);
 
-    fireEvent.click(await screen.findByText('Registrar histopatología del caso'));
+    fireEvent.click(await screen.findByText('Histología'));
     fireEvent.click(screen.getByText('Guardar'));
 
     expect(await screen.findByText('No tiene permisos para registrar histopatología en este centro.')).toBeInTheDocument();

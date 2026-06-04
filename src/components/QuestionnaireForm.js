@@ -12,6 +12,36 @@ import { CARE_SETTING_OPTIONS, normalizeCareSetting } from "../utils/careSetting
 export const HIDDEN_LINK_IDS = new Set(["PAT_CODIGO", "PAT_NHC", "PAT_NOMBRE"]);
 export const isHiddenQuestionnaireItem = (linkId) => HIDDEN_LINK_IDS.has(linkId);
 export const NHC_REQUIRED_MESSAGE = "Debe introducir el NHC para continuar.";
+const SECTION_INDEX_LABELS = [
+  "Contexto",
+  "Datos clínicos",
+  "Ecografista",
+  "Masa anexial",
+  "Hallazgos",
+  "ECO-SCORE",
+];
+
+const renderFieldLabel = ({ htmlFor, text, required = false, chipText = "" }) => (
+  <label htmlFor={htmlFor} className="questionnaire-field-label">
+    <span className="questionnaire-label-main">
+      <span className="questionnaire-label-text">{text}</span>
+      {required ? (
+        <span className="required-asterisk" aria-hidden="true">
+          *
+        </span>
+      ) : null}
+    </span>
+    {chipText ? <span className="questionnaire-inline-chip">{chipText}</span> : null}
+  </label>
+);
+
+const getPendingFieldLabels = (requiredFieldsError = "") =>
+  String(requiredFieldsError || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("- "))
+    .map((line) => line.replace(/^- /, "").trim())
+    .filter(Boolean);
 
 const QuestionnaireForm = ({
   questionnaire,
@@ -35,6 +65,7 @@ const QuestionnaireForm = ({
   const [validatingStudyCode, setValidatingStudyCode] = useState(false);
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const pendingFieldLabels = getPendingFieldLabels(requiredFieldsError);
 
   // Verifica si hay masa anexial
   const hasMass = answers.find(a => a.linkId === "PAT_MA")?.answer?.[0]?.valueCoding.display === "Sí" || false;
@@ -192,6 +223,24 @@ const getAnswerDisplayValue = (linkId) => {
    */
 const isItemEnabled = (item) => {
   return checkEnableWhen(item.enableWhen, answers);
+};
+
+const getItemClassName = (item, extraClassName = "") => {
+  const itemClasses = ["questionnaire-item"];
+
+  if (item.type === "text") {
+    itemClasses.push("questionnaire-item--full");
+  } else if (item.type === "choice" && item.repeats) {
+    itemClasses.push("questionnaire-item--full");
+  } else {
+    itemClasses.push("questionnaire-item--compact");
+  }
+
+  if (extraClassName) {
+    itemClasses.push(extraClassName);
+  }
+
+  return itemClasses.join(" ");
 };
 
 /**
@@ -613,8 +662,10 @@ const renderInput = (item) => {
    */
     const renderGroup = (itemGroup) => {
       return (
-        <div key={itemGroup.linkId} className="questionnaire-group">
-          <h3 className="questionnaire-group-title">{itemGroup.text}</h3>
+        <section key={itemGroup.linkId} className="questionnaire-group questionnaire-card">
+          <div className="questionnaire-section-heading">
+            <h3 className="questionnaire-group-title">{itemGroup.text}</h3>
+          </div>
           <div className="questionnaire-container-group">
             {itemGroup.item.map((child) => {
               const styleString =
@@ -633,30 +684,50 @@ const renderInput = (item) => {
                 <div
                   id={child.linkId}
                   key={child.linkId}
-                  className="questionnaire-item"
+                  className={getItemClassName(child)}
                   style={style}
                 >
-                  <label>
-                    {child.text}
-                    {child.required && <span className="required-asterisk">*</span>}
-                  </label>
+                  {renderFieldLabel({
+                    text: child.text,
+                    required: child.required,
+                  })}
                   {renderInput(child)}
                 </div>
               );
             })}
           </div>
-        </div>
+        </section>
       );
     };
 
 	  return (
-	    <><h2 className="questionnaire-title">{questionnaire.title}</h2>
-	    <div className="questionnaire-container">
-        <div className="questionnaire-item">
-          <label htmlFor="transient-nhc">
-            NHC
-            <span className="required-asterisk">*</span>
-          </label>
+	    <>
+      <div className="questionnaire-shell">
+        <div className="questionnaire-intro-card questionnaire-card">
+          <div className="questionnaire-intro-copy">
+            <p className="questionnaire-eyebrow">Registro clínico guiado</p>
+            <h2 className="questionnaire-title">Formulario clínico estructurado</h2>
+            <p className="questionnaire-subtitle">
+              Complete el cuestionario manteniendo el flujo actual de registro, validación y cálculo clínico.
+            </p>
+          </div>
+          <div className="questionnaire-section-index" aria-label="Índice visual de secciones">
+            {SECTION_INDEX_LABELS.map((label) => (
+              <span key={label} className="questionnaire-section-pill">
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+	    <div className="questionnaire-container questionnaire-card">
+        <div className={getItemClassName({ type: "string" }, "questionnaire-item--context")}>
+          {renderFieldLabel({
+            htmlFor: "transient-nhc",
+            text: "NHC",
+            required: true,
+            chipText: "Dato transitorio",
+          })}
           <input
             id="transient-nhc"
             type="text"
@@ -676,19 +747,23 @@ const renderInput = (item) => {
             aria-describedby={nhcError ? "transient-nhc-error" : undefined}
           />
           {nhcError && (
-            <p id="transient-nhc-error" className="error-message">
+            <p id="transient-nhc-error" className="questionnaire-inline-error" role="alert">
               {nhcError}
             </p>
           )}
-          <small>
-            El NHC se utilizará únicamente para comprobar si ya existe un caso registrado para esta paciente y lateralidad. No se almacenará en el recurso FHIR ni se incluirá en las exportaciones del estudio.
-          </small>
+          <div className="questionnaire-help-box">
+            <small>
+              El NHC se utiliza únicamente para comprobaciones internas de pseudonimización y control de duplicados.
+              No debe mostrarse ni incluirse en exportaciones.
+            </small>
+          </div>
 	        </div>
-	        <div className="questionnaire-item">
-	          <label htmlFor="care-setting">
-	            Ámbito asistencial
-	            <span className="required-asterisk">*</span>
-	          </label>
+	        <div className={getItemClassName({ type: "choice" }, "questionnaire-item--context")}>
+	          {renderFieldLabel({
+	            htmlFor: "care-setting",
+	            text: "Ámbito asistencial",
+	            required: true,
+	          })}
 	          <select
 	            id="care-setting"
 	            value={normalizeCareSetting(careSettingCode).code}
@@ -707,8 +782,11 @@ const renderInput = (item) => {
 	          </select>
 	        </div>
 	        {canEnterStudyPatientCode && (
-          <div className="questionnaire-item">
-            <label htmlFor="study-patient-code">Código de estudio</label>
+          <div className={getItemClassName({ type: "string" }, "questionnaire-item--context")}>
+            {renderFieldLabel({
+              htmlFor: "study-patient-code",
+              text: "Código de estudio",
+            })}
             <input
               id="study-patient-code"
               type="text"
@@ -758,29 +836,45 @@ const renderInput = (item) => {
               <div
                 id={item.linkId}
                 key={item.linkId}
-                className="questionnaire-item"
+                className={getItemClassName(item)}
                 style={style}
               >
-                <label>
-                  {item.text}
-                  {item.required && <span className="required-asterisk">*</span>}
-                </label>
+                {renderFieldLabel({
+                  text: item.text,
+                  required: item.required,
+                })}
               {renderInput(item)}
               </div>
             );
           }
         })}
       </div>
+      {requiredFieldsError && pendingFieldLabels.length > 0 && (
+        <section className="questionnaire-validation-alert" role="alert" aria-live="polite">
+          <div className="questionnaire-validation-alert__header">
+            <span className="questionnaire-validation-alert__icon" aria-hidden="true">
+              !
+            </span>
+            <div>
+              <h3 className="questionnaire-validation-alert__title">No se puede continuar todavia</h3>
+              <p className="questionnaire-validation-alert__subtitle">
+                Revisa los campos obligatorios pendientes antes de avanzar.
+              </p>
+            </div>
+          </div>
+          <p className="questionnaire-validation-alert__label">Campos pendientes:</p>
+          <div className="questionnaire-validation-alert__chips">
+            {pendingFieldLabels.map((label) => (
+              <span key={label} className="questionnaire-validation-chip">
+                {label}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
       <button className="save-btn" onClick={handleNextClick} disabled={validatingStudyCode}>
         {validatingStudyCode ? "Validando..." : "Siguiente"}
       </button>
-      {requiredFieldsError && (
-        <div className="error-message">
-          {requiredFieldsError.split('\n').map((line, index) => (
-            <p key={index}>{line}</p>
-          ))}
-        </div>
-      )}
       {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h2>Confirmación</h2>
@@ -798,14 +892,17 @@ const renderInput = (item) => {
           <>
             <p>Pulse <b>continuar</b> para elaborar el informe.</p>
             <p><b>Si continúa no podrá volver a este cuestionario.</b></p>
-            <button className="save" onClick={() => { event(answers); setIsModalOpen(false); }}>Continuar</button>
-            {/* Mostrar solo si hay masa anexial */}
-            {hasMass && (
-              <button className="continue" onClick={() => { eventContinue(answers); handleReset(); setIsModalOpen(false)} }>Añadir masa anexial</button>)}
+            <div className="custom-modal-actions">
+              <button className="save" onClick={() => { event(answers); setIsModalOpen(false); }}>Continuar</button>
+              {/* Mostrar solo si hay masa anexial */}
+              {hasMass && (
+                <button className="continue" onClick={() => { eventContinue(answers); handleReset(); setIsModalOpen(false)} }>Añadir masa anexial</button>)}
               <button className="cancel" onClick={() => setIsModalOpen(false)}>Cancelar</button>
+            </div>
           </>
         )}
       </Modal>
+      </div>
     </>
   );
 };

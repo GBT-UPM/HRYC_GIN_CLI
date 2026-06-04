@@ -3,10 +3,6 @@ import PropTypes from 'prop-types';
 import '../assets/css/ResponsesSummary.css';
 
 import '../assets/css/ResponsesProbability.css';
-import jsPDF from 'jspdf';
-import LogoHRYC from "../assets/images/LogoHRYC.jpg";
-import Logo12oct from "../assets/images/Logo12oct.jpg";
-
 import Modal from "./Modal";
 
 import { useKeycloak } from '@react-keycloak/web';
@@ -19,8 +15,14 @@ import { generatePeriod } from '../screens/QuestionnaireScreen';
 import { useRiskAssessmentTemplate } from '../hooks/useRiskAssessmentTemplate';
 import { usePatientTemplate } from '../hooks/usePatientTemplate';
 import { maskNhc, sanitizeQuestionnaireResponse } from '../utils/privacy';
-import { formatDuplicateCaseSummary, validateCaseMetadata } from '../utils/caseMetadata';
-import { DEFAULT_CARE_SETTING, normalizeCareSetting } from '../utils/careSetting';
+import {
+  formatCodeStatusLabel,
+  resolveDisplayStudyIdentifier,
+  resolveStudyCodeDisplay,
+  validateCaseMetadata,
+} from '../utils/caseMetadata';
+import { DEFAULT_CARE_SETTING, getCareSettingDisplay, normalizeCareSetting } from '../utils/careSetting';
+import { generateClinicalReportPdf } from '../utils/pdfReport';
 import {
   addSecondaryEvaluation,
   checkDuplicateCase,
@@ -120,6 +122,21 @@ const ResponsesProbability = ({
   const effectiveStudyPatientCode = canUseStudyPatientCode
     ? String(studyPatientCode || "").trim()
     : "";
+  const reportMetadata = (() => {
+    try {
+      return validateCaseMetadata(sanitizeQuestionnaireResponse(responses?.[0] || {}));
+    } catch (validationError) {
+      return {
+        centerId: "",
+        lateralityDisplay: "",
+        anatomicalStructureDisplay: "",
+        massIndex: responses?.length ? 1 : 0,
+      };
+    }
+  })();
+  const reportCenterId = reportMetadata.centerId || "";
+  const reportMassCount = reports.length || responses?.length || 0;
+  const reportStudyCodeLabel = effectiveStudyPatientCode || "Pendiente";
 
   const selectedDuplicateMatch = duplicateMatches.find(
     (match) => String(match?.caseId || match?.id || "") === String(selectedDuplicateCaseId || "")
@@ -146,6 +163,28 @@ const ResponsesProbability = ({
 
     return "";
   })();
+
+  const getDuplicateCaseIdentifier = (match) =>
+    resolveDisplayStudyIdentifier(match) || `Caso ${match?.caseId || match?.id || "sin identificador"}`;
+
+  const getDuplicateCaseStudyCode = (match) =>
+    match?.codeStatus === "CODE_ASSIGNED" ? resolveStudyCodeDisplay(match) : "";
+
+  const getDuplicateCaseDate = (match) =>
+    match?.createdAt ? new Date(match.createdAt).toLocaleDateString("es-ES") : "No disponible";
+
+  const getDuplicateCaseCenterScope = (match) => {
+    const center = match?.centerId || match?.center || match?.centerName || "";
+    const careSetting =
+      match?.careSettingDisplay ||
+      (match?.careSettingCode ? getCareSettingDisplay(match.careSettingCode) : "");
+
+    if (center && careSetting) {
+      return `${center} · ${careSetting}`;
+    }
+
+    return center || careSetting || "No disponible";
+  };
 
 
   // Verifica si hay masa anexial
@@ -495,6 +534,11 @@ const ResponsesProbability = ({
   const runDuplicateChecks = async ({ nhc, options, preparedResponses, decisions = {}, startIndex = 0 }) => {
     for (let index = startIndex; index < preparedResponses.length; index++) {
       const { metadata } = preparedResponses[index];
+
+      if (!metadata.hasAdnexalMass) {
+        continue;
+      }
+
       const duplicateResult = await checkDuplicateCase(keycloak.token, {
         centerId: metadata.centerId,
         nhc,
@@ -694,6 +738,7 @@ const ResponsesProbability = ({
                 lateralityDisplay: preparedResponse.metadata.lateralityDisplay,
                 anatomicalStructureCode: preparedResponse.metadata.anatomicalStructureCode,
                 anatomicalStructureDisplay: preparedResponse.metadata.anatomicalStructureDisplay,
+                hasAdnexalMass: preparedResponse.metadata.hasAdnexalMass,
                 questionnaireResponse: sanitizedQuestionnaireResponse,
                 encounterId: encId,
                 observerInitials: preparedResponse.metadata.observerInitials,
@@ -756,260 +801,122 @@ const ResponsesProbability = ({
     }
   };
 
-  const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return isNaN(date) ? '' : date.toLocaleDateString('es-ES');
-  };
-
   const generatePdf = (includeProbability) => {
     try {
-      const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
-
-      const getResponse = (key) => {
-        const answer = responses[0].item.find(
-          (resp) => resp.linkId.toLowerCase() === key.toLowerCase()
-        )?.answer?.[0];
-
-        return (
-          answer?.valueString ||
-          answer?.valueInteger ||
-          answer?.valueDate ||
-          answer?.valueCoding?.display ||
-          ''
-        );
-      };
-  
-      const checkAndAddPage = (doc, nextBlockHeight) => {
-        const pageHeight = doc.internal.pageSize.getHeight();
-        if (yPosition + nextBlockHeight > pageHeight - 30) {
-          doc.addPage();
-          yPosition = 20;
-        }
-      };
-  
-      const doc = new jsPDF();
-  
-      // Tamaño más pequeño
-      const width = 55;   // ancho en mm
-      const height = 10;  // alto en mm
-
-      // Coordenadas Y iguales → quedan alineados en horizontal
-      doc.addImage(LogoHRYC, "JPEG", 10, 10, width, height);
-      doc.addImage(Logo12oct, "JPEG", 70, 10, width, height);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.text("Servicio de Ginecología y Obstetricia", 10, 35);
-  
-      const patientAge = getResponse("PAT_EDAD");
-      const patientFUR = getResponse("PAT_FUR");
-      const indicacion = getResponse("PAT_IND");
-      const indicacion_otro = getResponse("PAT_IND_OTRO");
-      const hospital = getResponse("HOSPITAL_REF");
-      const sonographerInitials = getResponse("ECO_EXP_SIGLAS");
-  
-      let yPosition = 50;
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      checkAndAddPage(doc, 10);
-      doc.text("Datos del estudio:", 10, yPosition);
-      yPosition += 10;
-  
-      const addField = (label, value) => {
-        if (value === undefined || value === null || value === "") return;
-        checkAndAddPage(doc, 10);
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "bold");
-        doc.text(label, 15, yPosition);
-        doc.setFont("helvetica", "normal");
-        doc.text(String(value), 65, yPosition);
-        yPosition += 10;
-      };
-  
-      addField("Edad:", patientAge ? `${patientAge} años` : "");
-      addField("FUR:", formatDate(patientFUR));
-      addField("Hospital:", hospital);
-      addField("Ecografista:", sonographerInitials);
-  
-      const addSectionWithAutoBreak = (title, text) => {
-        const textLines = text.trim() !== "" ? doc.splitTextToSize(text, 180) : [];
-        const totalHeight = textLines.length * 5 + 10;
-      
-        // Añade salto de página solo si se va a imprimir algo más que el título
-        checkAndAddPage(doc, totalHeight);
-      
-        // Imprime el título siempre
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text(title, 10, yPosition);
-        yPosition += 10;
-      
-        if (textLines.length > 0) {
-          doc.setFontSize(11);
-          doc.setFont("helvetica", "normal");
-          doc.text(textLines, 10, yPosition);
-          yPosition += textLines.length * 5 + 10;
-        }
-      };
-  
-      //addSectionWithAutoBreak("Indicación de la ecografía:", indicacion);
-      let indicacionFinal = indicacion;
-      if (indicacion === "1" && indicacion_otro.trim() !== "") {
-        indicacionFinal = indicacion_otro.trim();
-      }
-      indicacionFinal = String(indicacionFinal || "").toLowerCase()
-      const edadText = patientAge ? `${patientAge} años` : "de edad desconocida";
-      const indicacionText = `Mujer de ${edadText} que acude a consulta de ecografía para valoración por ${indicacionFinal}.`;
-
-      addSectionWithAutoBreak("Indicación de la ecografía:", indicacionText);
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      checkAndAddPage(doc, 10);
-      doc.text("Descripción de la imagen:", 10, yPosition);
-      yPosition += 10;
-  
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "normal");
-      reports.forEach((report, index) => {
-        if (hasMassInReports) {
-          checkAndAddPage(doc, 10);
-          doc.setFont("helvetica", "bold");
-          doc.text("Masa anexial " + (index + 1), 15, yPosition);
-          yPosition += 10;
-        }
-  
-        doc.setFont("helvetica", "normal");
-        const htmlConSaltos = report.text.replace(/<br\s*\/?>/gi, "\n");
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = htmlConSaltos;
-        const plainText = tempDiv.innerText;
-        const normalizedText = plainText.replace(/\n+/g, "\n").trim();
-  
-        const textLines = doc.splitTextToSize(normalizedText, 180);
-        textLines.forEach((line) => {
-          checkAndAddPage(doc, 6);
-          doc.text(line, 10, yPosition);
-          yPosition += 6;
-        });
-
-        if (includeProbability && report.text_score) {
-          const scoreLines = doc.splitTextToSize(report.text_score, 180);
-          scoreLines.forEach((line) => {
-            checkAndAddPage(doc, 6);
-            doc.text(line, 10, yPosition);
-            yPosition += 6;
-          });
-        }
-  
-        yPosition += 4;
+      generateClinicalReportPdf({
+        responses,
+        reports,
+        observations,
+        includeProbability,
+        centerIdHint: reportCenterId,
+        practitionerName: sessionStorage.getItem('practitionerName') || '',
+        careSettingDisplay: normalizedCareSetting.display || '',
+        studyPatientCode: effectiveStudyPatientCode || '',
       });
-  
-
-      // Espacio para las conclusiones
-      const validObservations = observations.filter((observation) => observation.trim().length > 0); // Filtra las observaciones vacías o nulas
-  
-      if (validObservations.length > 0) {
-        addSectionWithAutoBreak("Conclusiones del ecografista:", "");
-  
-        validObservations.forEach((observation, index) => {
-          if (validObservations.length > 1) {
-            checkAndAddPage(doc, 10);
-            doc.setFontSize(11);
-            doc.setFont("helvetica", "bold");
-            doc.text("Conclusión de la Masa Anexial " + (index + 1), 15, yPosition);
-            yPosition += 10;
-          }
-  
-          doc.setFontSize(11);
-          doc.setFont("helvetica", "normal");
-          const text = observation;
-          const textLines = doc.splitTextToSize(text, 180);
-          textLines.forEach((line) => {
-            checkAndAddPage(doc, 6);
-            doc.text(line, 10, yPosition);
-            yPosition += 6;
-          });
-          yPosition += 4;
-        });
-      }
-  
-      const today = new Date();
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "italic");
-      doc.text(hospital, 10, 260);
-      doc.text("Fecha: " + today.toLocaleDateString(), 150, 260);
-      const practitionerName = sessionStorage.getItem('practitionerName');
-      doc.text("Ecografista: " + (sonographerInitials || practitionerName || ""), 10, 270);
-  
-      doc.autoPrint();
-      window.open(doc.output("bloburl"), "_blank");  // Abre el PDF en una nueva pestaña
     } catch (error) {
-      console.error("Error al guardar el encounter:", error);
-      setError("Error al guardar el encounter.");
+      console.error('Error al generar el informe:', error);
+      setError('Error al generar el informe.');
     }
   };
   return (
     <div className="responses-summary">
-      <h3>Informe Médico</h3>
+      <section className="responses-review-card">
+        <header className="responses-review-card__header">
+          <div>
+            <p className="responses-review-card__eyebrow">Cierre clínico del cuestionario</p>
+            <h3>Informe médico</h3>
+            <p className="responses-review-card__subtitle">
+              Revisión del contenido generado a partir del cuestionario ecográfico.
+            </p>
+          </div>
+          <div className="responses-review-card__meta">
+            {mass && reportMassCount > 0 && (
+              <span className="responses-review-chip">Masa anexial #{Math.min(reportMassCount, 1)}</span>
+            )}
+            {!mass && (
+              <span className="responses-review-chip">Sin masa anexial</span>
+            )}
+            {reportCenterId && (
+              <span className="responses-review-chip">{reportCenterId}</span>
+            )}
+            <span className="responses-review-chip">{normalizedCareSetting.display}</span>
+            <span className="responses-review-chip">Código {reportStudyCodeLabel}</span>
+          </div>
+        </header>
+
+        {reportMassCount > 0 && (
+          <section className="responses-review-panel responses-review-panel--context">
+            <h4>Contexto clínico</h4>
+            <p className="responses-review-panel__supporting">
+              Revise el informe estructurado y complete una conclusión clínica libre si desea complementar el cierre del caso.
+            </p>
+            <div className="responses-review-facts">
+              {reportMetadata.lateralityDisplay && (
+                <div className="responses-review-fact">
+                  <span className="responses-review-fact__label">Lateralidad</span>
+                  <span className="responses-review-fact__value">{reportMetadata.lateralityDisplay}</span>
+                </div>
+              )}
+              {reportMetadata.anatomicalStructureDisplay && (
+                <div className="responses-review-fact">
+                  <span className="responses-review-fact__label">Estructura anatómica</span>
+                  <span className="responses-review-fact__value">{reportMetadata.anatomicalStructureDisplay}</span>
+                </div>
+              )}
+              {reportCenterId && (
+                <div className="responses-review-fact">
+                  <span className="responses-review-fact__label">Hospital participante</span>
+                  <span className="responses-review-fact__value">{reportCenterId}</span>
+                </div>
+              )}
+              <div className="responses-review-fact">
+                <span className="responses-review-fact__label">Ámbito asistencial</span>
+                <span className="responses-review-fact__value">{normalizedCareSetting.display}</span>
+              </div>
+            </div>
+          </section>
+        )}
 
       {/* Iterar sobre los reportes */}
       {reports.map((report, index) => (
-        <div key={index} className="report-item">
+        <article key={index} className="report-item responses-review-panel">
 
           {/* Mostrar SÓLO si hay masa anexial */}
           {mass  && <h4>Masa anexial #{index + 1}</h4>}
 
           {/* SIEMPRE se muestra */}
-          <div className="parts">
-            <div className='tlabel'>Informe:</div>
-            <div className='text' dangerouslySetInnerHTML={{ __html: report.text }} />
-          </div>
+          <section className="parts responses-review-section">
+            <div className='tlabel'>Informe estructurado</div>
+            <div className='text responses-report-box' dangerouslySetInnerHTML={{ __html: report.text }} />
+          </section>
 
-          {/* Mostrar SÓLO si hay masa anexial
-          {hasMassInReports && calcularScore && (
-            <div className="parts">
-              <span className='tlabel'>Probabilidad de malignidad: </span>
-              <span className='text' dangerouslySetInnerHTML={{ __html: ((report.score ?? 0)* 100).toFixed(2) + '%' }} />
-            </div>
-          )} */}
-
-          {/* Mostrar SÓLO si hay masa anexial
-          {hasMassInReports && calcularScore && (
-            <div className="parts">
-              <span className='tlabel'>Probabilidad de malignidad: </span>
-              <span className='text' dangerouslySetInnerHTML={{ __html: ((report.score ?? 0)* 100).toFixed(2) + '%' }} />
-              <span 
-                title='Probabilidad de malignidad orientativa calculada según datos ecográficos aportados y fórmula publicada en Rodríguez-Rubio C, Vegas-Viedma S, Del Olmo-Reillo M, Quintana-Zapata P, Sancho-Sauco J, Pablos-Antona MJ, Alcázar JL, Pelayo-Delgado I. ECO-SCORE: Development of a New Ultrasound Score for the Study of Cystic and Solid-Cystic Adnexal Masses Based on Imaging Characteristics. Biomedicines. 2025 Jan 29;13(2):317. doi: 10.3390/biomedicines13020317.'
-                style={{ marginLeft: '6px', cursor:'help', color: '#555' }}
-                >
-                ℹ️
-              </span>
-            </div>
-          )} */}
-
-          {/* Mostrar SÓLO si hay masa anexial */}
           {mass && sco && (
-            <div className="parts">
-              <span className='tlabel'>Probabilidad de malignidad: </span>
+            <section className="parts responses-review-section responses-score-box">
+              <span className='tlabel'>Probabilidad de malignidad</span>
               <span className='text' dangerouslySetInnerHTML={{ __html: ((report.score ?? 0)* 100).toFixed(2) + '%' }} />
-              <p style={{ fontSize: '0.70em', color: '#555', marginTop: '5px' }}>
+              <p className="responses-score-box__note">
                 <em>
                   (Rodríguez-Rubio C, Vegas-Viedma S, Del Olmo-Reillo M, Quintana-Zapata P, Sancho-Sauco J, Pablos-Antona MJ, Alcázar JL, Pelayo-Delgado I. ECO-SCORE: Development of a New Ultrasound Score for the Study of Cystic and Solid-Cystic Adnexal Masses Based on Imaging Characteristics. Biomedicines. 2025 Jan 29;13(2):317. doi: 10.3390/biomedicines13020317. PMID: 40002730; PMCID: PMC11852474)
                 </em>
               </p>
-            </div>
+            </section>
           )}
-
           {/* Campo de texto para observación */}
-          <div className="parts">
-            <div className='tlabel'>Conclusión del ecografista:</div>
+          <section className="parts responses-review-section">
+            <div className='tlabel'>Conclusión del ecografista</div>
+            <p className="responses-review-panel__supporting">
+              Añada una conclusión clínica libre si desea complementar el informe estructurado.
+            </p>
             <div className='text'>
-              <textarea rows="7" cols="75"
-                style={{ padding: '8px' }}
+              <textarea
+                className="responses-observation-textarea"
+                rows="7"
+                cols="75"
                 value={observations[index] || ""}
                 onChange={(e) => handleObservationChange(index, e.target.value)}
               />
             </div>
-          </div>
+          </section>
 
 
           {/* Botón para este reporte 
@@ -1017,118 +924,264 @@ const ResponsesProbability = ({
             Descarga Informe
           </button>
           */}
-        </div>
+        </article>
       ))}
-
-	      {/* Botón final para volver 
-	      <button className="save-btn" onClick={event}>
-	        Volver al cuestionario
-	      </button>*/}
-      {saveMessage && <p className="success-message">{saveMessage}</p>}
-      {error && <p className="error-message">{error}</p>}
-	      <button
-        className="save-btn"
-        onClick={() => beginCaseSave({ shouldPrint: false, includeProbability: false })}
+      <div className="responses-final-actions">
+        <div className="responses-final-actions__messages">
+          {saveMessage && <p className="success-message">{saveMessage}</p>}
+          {error && <p className="error-message">{error}</p>}
+        </div>
+        <div className="responses-final-actions__buttons">
+	        <button
+          className="save-btn"
+          onClick={() => beginCaseSave({ shouldPrint: false, includeProbability: false })}
+          disabled={saveInProgress}
+        >
+          Guardar
+        </button>
+        <button className="save-btn" onClick={() => {
+          if (sco)  {
+            setIsModalOpen(true);
+          } else {
+            beginCaseSave({ shouldPrint: true, includeProbability: false });
+          }
+        }}
         disabled={saveInProgress}
-      >
-        Guardar
-      </button>
-      <button className="save-btn" onClick={() => {
-        if (sco)  {
-          setIsModalOpen(true);
-        } else {
-          beginCaseSave({ shouldPrint: true, includeProbability: false });
-        }
-      }}
-      disabled={saveInProgress}
-      >
-        Guardar e Imprimir
-      </button>
+        >
+          Guardar e Imprimir
+        </button>
+        </div>
+      </div>
+      </section>
+
       {/* Modal para dar opción de incluir la probabilidad en el informe */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-      <h2>Confirmación</h2> 
-      <p>¿Desea incluir la probabilidad de malignidad en el informe?</p>
-      <button className="save" onClick={() => {
-          setIsModalOpen(false);
-          beginCaseSave({ shouldPrint: true, includeProbability: true });
-      }}>Sí
-      </button>
-      <button className="cancel" onClick={() => {
-        setIsModalOpen(false);
-        beginCaseSave({ shouldPrint: true, includeProbability: false });
-      }}>No
-      </button>
-    </Modal>
+        <h2>Incluir probabilidad en el informe</h2>
+        <p>Seleccione si desea que la probabilidad de malignidad calculada se incluya en el informe PDF.</p>
+        <div className="custom-modal-info">
+          Esta decisión afecta únicamente a la versión del informe que se va a generar. No modifica las respuestas del cuestionario ni el cálculo realizado.
+        </div>
+        <div className="custom-modal-actions">
+          <button className="cancel" onClick={() => {
+            setIsModalOpen(false);
+            beginCaseSave({ shouldPrint: true, includeProbability: false });
+          }}>No incluir</button>
+          <button className="save" onClick={() => {
+            setIsModalOpen(false);
+            beginCaseSave({ shouldPrint: true, includeProbability: true });
+          }}>Incluir en informe</button>
+        </div>
+      </Modal>
       <Modal isOpen={isSaveConfirmationOpen} onClose={() => setIsSaveConfirmationOpen(false)}>
-        <h2>Confirmar guardado</h2>
         {(() => {
           const metadata = pendingSaveRequest?.preparedResponses?.[0]?.metadata || {};
           const codeLabel =
             canUseStudyPatientCode && String(studyPatientCode || "").trim()
               ? String(studyPatientCode).trim()
               : "Pendiente";
+          const massCount = pendingSaveRequest?.preparedResponses?.length || 0;
+          const nhcStatus = pendingSaveRequest?.nhc ? "NHC informado" : "NHC no informado";
+          const massLabel = `${massCount} ${massCount === 1 ? "masa" : "masas"}`;
+          const hasStudyCode = codeLabel !== "Pendiente";
 
           return (
-            <>
-              <p>
-                Al guardar, se comprobará si existe un caso previo para esta paciente, lateralidad y estructura. El NHC no se almacenará en el recurso FHIR ni se incluirá en las exportaciones del estudio.
-              </p>
-              <ul>
-                <li><b>Centro:</b> {metadata.centerId || "No disponible"}</li>
-                <li><b>NHC:</b> {maskNhc(pendingSaveRequest?.nhc)}</li>
-	                <li><b>Código de estudio:</b> {codeLabel}</li>
-	                <li><b>Ámbito asistencial:</b> {normalizedCareSetting.display}</li>
-	                <li><b>Lateralidad:</b> {metadata.lateralityDisplay || "No disponible"}</li>
-                <li><b>Estructura anatómica:</b> {metadata.anatomicalStructureDisplay || "No disponible"}</li>
-                <li><b>Siglas ecografista:</b> {metadata.observerInitials || "No disponible"}</li>
-                <li><b>Número de masas:</b> {pendingSaveRequest?.preparedResponses?.length || 0}</li>
-              </ul>
-              <button className="cancel" onClick={() => setIsSaveConfirmationOpen(false)} disabled={saveInProgress}>
-                Cancelar
-              </button>
-              <button className="save" onClick={confirmCaseSave} disabled={saveInProgress}>
-                Guardar
-              </button>
-            </>
+            <div className="save-confirmation-modal">
+              <header className="save-confirmation-modal__header">
+                <h2>Confirmar guardado del cuestionario</h2>
+                <p className="save-confirmation-modal__subtitle">
+                  Revise los datos principales antes de guardar el cuestionario ecográfico.
+                </p>
+                <div className="save-confirmation-modal__chips">
+                  <span className="responses-review-chip responses-review-chip--info">{maskNhc(pendingSaveRequest?.nhc)}</span>
+                  <span className={`responses-review-chip ${hasStudyCode ? "responses-review-chip--neutral" : "responses-review-chip--pending"}`}>
+                    {codeLabel}
+                  </span>
+                  <span className="responses-review-chip responses-review-chip--soft">{massLabel}</span>
+                </div>
+              </header>
+
+              <section className="save-confirmation-callout" aria-label="Información de privacidad y duplicados">
+                <p>
+                  Al guardar, se comprobará si ya existe un caso previo para esta paciente, lateralidad y estructura.
+                  El NHC se utilizará únicamente para comprobaciones internas de pseudonimización y duplicados.
+                  No se mostrará ni se incluirá en las exportaciones del estudio.
+                  No se almacenará en los recursos FHIR generados.
+                </p>
+              </section>
+
+              <section className="save-confirmation-summary">
+                <h3>Resumen del registro</h3>
+                <div className="save-confirmation-summary__grid">
+                  <section className="save-confirmation-section">
+                    <h4>Contexto del estudio</h4>
+                    <div className="save-confirmation-field">
+                      <span className="save-confirmation-field__label">Centro</span>
+                      <span className="save-confirmation-field__value">{metadata.centerId || "No disponible"}</span>
+                    </div>
+                    <div className="save-confirmation-field">
+                      <span className="save-confirmation-field__label">Ámbito asistencial</span>
+                      <span className="save-confirmation-field__value">{normalizedCareSetting.display}</span>
+                    </div>
+                    <div className="save-confirmation-field">
+                      <span className="save-confirmation-field__label">Código de estudio</span>
+                      <span className={`responses-review-chip ${hasStudyCode ? "responses-review-chip--neutral" : "responses-review-chip--pending"}`}>
+                        {codeLabel}
+                      </span>
+                    </div>
+                  </section>
+
+                  <section className="save-confirmation-section">
+                    <h4>Datos de comprobación</h4>
+                    <div className="save-confirmation-field">
+                      <span className="save-confirmation-field__label">NHC</span>
+                      <span className="responses-review-chip responses-review-chip--info">{nhcStatus}</span>
+                    </div>
+                    <div className="save-confirmation-field">
+                      <span className="save-confirmation-field__label">Lateralidad</span>
+                      <span className="save-confirmation-field__value">{metadata.lateralityDisplay || "No disponible"}</span>
+                    </div>
+                    <div className="save-confirmation-field">
+                      <span className="save-confirmation-field__label">Estructura anatómica</span>
+                      <span className="save-confirmation-field__value">{metadata.anatomicalStructureDisplay || "No disponible"}</span>
+                    </div>
+                  </section>
+
+                  <section className="save-confirmation-section">
+                    <h4>Cuestionario</h4>
+                    <div className="save-confirmation-field">
+                      <span className="save-confirmation-field__label">Siglas ecografista</span>
+                      <span className="save-confirmation-field__value">{metadata.observerInitials || "No disponible"}</span>
+                    </div>
+                    <div className="save-confirmation-field">
+                      <span className="save-confirmation-field__label">Número de masas</span>
+                      <span className="responses-review-chip responses-review-chip--soft">{massLabel}</span>
+                    </div>
+                  </section>
+                </div>
+              </section>
+
+              <footer className="save-confirmation-modal__actions">
+                <button className="cancel" onClick={() => setIsSaveConfirmationOpen(false)} disabled={saveInProgress}>
+                  Cancelar
+                </button>
+                <button className="save" onClick={confirmCaseSave} disabled={saveInProgress}>
+                  Guardar
+                </button>
+              </footer>
+            </div>
           );
         })()}
       </Modal>
       <Modal isOpen={isDuplicateModalOpen} onClose={clearDuplicateModalState}>
-        <h2>Posible caso ya registrado</h2>
-        <p>
-          Ya existe un caso registrado para esta paciente con la misma lateralidad y estructura anatómica. Indique si esta exploración corresponde a una nueva evaluación del caso existente o a un caso independiente.
-        </p>
-        {duplicateModalMessage && <p>{duplicateModalMessage}</p>}
-        {error && <p className="error-message">{error}</p>}
-        {duplicateMatches.length > 0 && (
-          <div>
-            {duplicateMatches.map((match, index) => {
-              const caseId = match.caseId || match.id;
-              return (
-                <label key={`${caseId || "case"}-${index}`} style={{ display: "block", marginBottom: "8px" }}>
-                  <input
-                    type="radio"
-                    name="duplicateCase"
-                    value={caseId || ""}
-                    checked={String(selectedDuplicateCaseId) === String(caseId || "")}
-                    onChange={(event) => setSelectedDuplicateCaseId(event.target.value)}
-                  />
-                  {" "}
-                  {formatDuplicateCaseSummary(match)}
-                </label>
-              );
-            })}
-          </div>
-        )}
-        <button className="save" onClick={() => handleDuplicateDecision("secondary")} disabled={saveInProgress}>
-          Añadir como nueva evaluación
-        </button>
-        <button className="continue" onClick={() => handleDuplicateDecision("independent")} disabled={saveInProgress}>
-          Crear caso independiente
-        </button>
-        <button className="cancel" onClick={clearDuplicateModalState} disabled={saveInProgress}>
-          Cancelar
-        </button>
+        <div className="duplicate-case-modal">
+          <header className="duplicate-case-modal__header">
+            <h2>Caso previo detectado</h2>
+            <p className="duplicate-case-modal__subtitle">
+              Se ha encontrado un caso registrado con la misma paciente, lateralidad y estructura anatómica.
+              Revise la información antes de continuar.
+            </p>
+          </header>
+
+          <section className="duplicate-case-modal__info" aria-label="Información sobre comprobación de duplicados">
+            <div className="duplicate-case-modal__info-icon" aria-hidden="true">i</div>
+            <p>
+              Esta comprobación utiliza el NHC de forma transitoria para detectar posibles duplicados.
+              El NHC no se mostrará ni se incluirá en las exportaciones del estudio.
+              No se almacenará en los recursos FHIR generados.
+            </p>
+          </section>
+
+          {duplicateModalMessage && (
+            <p className="duplicate-case-modal__message">{duplicateModalMessage}</p>
+          )}
+          {error && <p className="error-message">{error}</p>}
+
+          {duplicateMatches.length > 0 && (
+            <section className="duplicate-case-modal__section" aria-labelledby="duplicate-case-match-title">
+              <h3 id="duplicate-case-match-title">Caso coincidente</h3>
+              <div className="duplicate-case-modal__cards">
+                {duplicateMatches.map((match, index) => {
+                  const caseId = match.caseId || match.id;
+                  const isSelected = String(selectedDuplicateCaseId) === String(caseId || "");
+                  const identifier = getDuplicateCaseIdentifier(match);
+                  const studyCodeLabel = getDuplicateCaseStudyCode(match);
+                  const statusLabel = formatCodeStatusLabel(match?.codeStatus);
+
+                  return (
+                    <label
+                      key={`${caseId || "case"}-${index}`}
+                      className={`duplicate-case-card${isSelected ? " duplicate-case-card--selected" : ""}`}
+                    >
+                      <div className="duplicate-case-card__selector">
+                        <input
+                          type="radio"
+                          name="duplicateCase"
+                          value={caseId || ""}
+                          checked={isSelected}
+                          onChange={(event) => setSelectedDuplicateCaseId(event.target.value)}
+                        />
+                      </div>
+                      <div className="duplicate-case-card__content">
+                        <div className="duplicate-case-card__topline">
+                          <div>
+                            <div className="duplicate-case-card__eyebrow">Caso coincidente</div>
+                            <div className="duplicate-case-card__title">{identifier}</div>
+                          </div>
+                          {studyCodeLabel && (
+                            <span className="responses-review-chip responses-review-chip--neutral">
+                              Código {studyCodeLabel}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="duplicate-case-card__headline">
+                          {[match?.lateralityDisplay || match?.laterality, match?.anatomicalStructureDisplay || match?.anatomicalStructure]
+                            .filter(Boolean)
+                            .join(" · ") || "No disponible"}
+                        </div>
+
+                        <div className="duplicate-case-card__grid">
+                          <div className="duplicate-case-card__field">
+                            <span className="duplicate-case-card__label">Fecha</span>
+                            <span className="duplicate-case-card__value">{getDuplicateCaseDate(match)}</span>
+                          </div>
+                          <div className="duplicate-case-card__field">
+                            <span className="duplicate-case-card__label">Estado</span>
+                            <span className="duplicate-case-card__value">{statusLabel}</span>
+                          </div>
+                          <div className="duplicate-case-card__field duplicate-case-card__field--wide">
+                            <span className="duplicate-case-card__label">Centro / ámbito</span>
+                            <span className="duplicate-case-card__value">{getDuplicateCaseCenterScope(match)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          <section className="duplicate-case-modal__section duplicate-case-modal__section--decision">
+            <h3>¿Cómo desea continuar?</h3>
+            <p>
+              Si corresponde a la misma lesión, añada el registro como una nueva evaluación.
+              Cree un caso independiente solo si se trata de una lesión o caso distinto.
+            </p>
+          </section>
+
+          <footer className="duplicate-case-modal__actions">
+            <button className="cancel duplicate-case-modal__action-tertiary" onClick={clearDuplicateModalState} disabled={saveInProgress}>
+              Cancelar
+            </button>
+            <button className="continue duplicate-case-modal__action-secondary" onClick={() => handleDuplicateDecision("independent")} disabled={saveInProgress}>
+              Crear caso independiente
+            </button>
+            <button className="save duplicate-case-modal__action-primary" onClick={() => handleDuplicateDecision("secondary")} disabled={saveInProgress}>
+              Añadir como nueva evaluación
+            </button>
+          </footer>
+        </div>
       </Modal>
       <Modal isOpen={isStudyCodeConflictOpen} onClose={cancelStudyCodeConflictModal}>
         <h2>Conflicto de código de estudio</h2>

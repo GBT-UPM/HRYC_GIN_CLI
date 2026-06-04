@@ -183,10 +183,21 @@ export const extractAnatomicalStructureMetadata = (questionnaireResponse) =>
 export const extractObserverInitials = (questionnaireResponse) =>
   getAnswerValue(questionnaireResponse, "ECO_EXP_SIGLAS");
 
+export const extractHasAdnexalMass = (questionnaireResponse) =>
+  normalize(getAnswerValue(questionnaireResponse, "PAT_MA")) !== "no";
+
 export const validateCaseMetadata = (questionnaireResponse) => {
+  const hasAdnexalMass = extractHasAdnexalMass(questionnaireResponse);
   const centerId = extractCenterId(questionnaireResponse);
-  const laterality = extractLateralityMetadata(questionnaireResponse);
-  const anatomicalStructure = extractAnatomicalStructureMetadata(questionnaireResponse);
+
+  const laterality = hasAdnexalMass
+    ? extractLateralityMetadata(questionnaireResponse)
+    : { code: "NOT_APPLICABLE", display: "No aplica" };
+
+  const anatomicalStructure = hasAdnexalMass
+    ? extractAnatomicalStructureMetadata(questionnaireResponse)
+    : { code: "NOT_APPLICABLE", display: "No aplica" };
+
   const observerInitials = extractObserverInitials(questionnaireResponse);
   const studyCode = extractStudyCode(questionnaireResponse);
   const errors = [];
@@ -195,15 +206,16 @@ export const validateCaseMetadata = (questionnaireResponse) => {
     errors.push("No se pudo identificar el centro participante.");
   }
 
-  if (!laterality.code) {
+  if (hasAdnexalMass && !laterality.code) {
     errors.push("No se pudo identificar la lateralidad de la masa.");
   }
 
-  if (!anatomicalStructure.code) {
+  if (hasAdnexalMass && !anatomicalStructure.code) {
     errors.push("No se pudo identificar la estructura anatómica de la masa.");
   }
 
   return {
+    hasAdnexalMass,
     centerId,
     lateralityCode: laterality.code,
     lateralityDisplay: laterality.display,

@@ -93,6 +93,31 @@ describe("caseService", () => {
     expect(JSON.stringify(payload.questionnaireResponse)).not.toContain("PAT_CODIGO");
     expect(JSON.stringify(payload.questionnaireResponse)).not.toContain("HURYC-0001");
     expect(payload.nhc).not.toBe("STUDY-1");
+    expect(payload.hasAdnexalMass).toBe(true);
+  });
+
+  it("sends hasAdnexalMass false for no-mass registrations", async () => {
+    ApiService.mockResolvedValue(okResponse({ caseId: 2, evaluationId: 3, questionnaireResponseFhirId: 200 }));
+
+    await createCase("token", {
+      centerId: "HURYC",
+      nhc: "transient",
+      lateralityCode: "NOT_APPLICABLE",
+      lateralityDisplay: "No aplica",
+      anatomicalStructureCode: "NOT_APPLICABLE",
+      anatomicalStructureDisplay: "No aplica",
+      hasAdnexalMass: false,
+      encounterId: "enc-2",
+      observerInitials: "XYZ",
+      careSettingCode: "EMERGENCY",
+      careSettingDisplay: "Urgencias",
+      questionnaireResponse: { item: [] },
+    });
+
+    const payload = ApiService.mock.calls[0][3];
+    expect(payload.hasAdnexalMass).toBe(false);
+    expect(payload.lateralityCode).toBe("NOT_APPLICABLE");
+    expect(payload.anatomicalStructureCode).toBe("NOT_APPLICABLE");
   });
 
   it("calls add secondary evaluation endpoint", async () => {

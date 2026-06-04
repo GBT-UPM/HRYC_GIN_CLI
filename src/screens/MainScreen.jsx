@@ -41,7 +41,8 @@ import {
   isSiteCoordinator,
   isStudyCoordinator,
 } from "../utils/auth";
-import { CASE_EVALUATION_ERROR_MESSAGES, getCaseEvaluations } from "../services/caseEvaluationService";
+import { CASE_EVALUATION_ERROR_MESSAGES } from "../services/caseEvaluationService";
+import { DASHBOARD_ERROR_MESSAGES, getStudyDashboardStats } from "../services/studyDashboardService";
 
 const getUniqueCount = (items, selector) => {
   const values = new Set();
@@ -59,16 +60,26 @@ const getUniqueCount = (items, selector) => {
 export const buildDashboardCounts = (evaluations = []) => {
   const safeEvaluations = Array.isArray(evaluations) ? evaluations : [];
 
+  const isAdnexalMass = (item) => {
+    if (item.hasAdnexalMass === true)  return true;
+    if (item.hasAdnexalMass === false) return false;
+    // Legacy fallback: treat as mass unless both codes are NOT_APPLICABLE
+    return item.lateralityCode !== 'NOT_APPLICABLE';
+  };
+
   return {
-    Patient: getUniqueCount(
+    participants: getUniqueCount(
       safeEvaluations,
-      (item) => item.studyPatientCode || item.patientCode || item.patientId || item.caseId || item.caseDisplayId
+      (item) => item.studyParticipantId || item.studyPatientCode || item.patientCode
     ),
-    Encounter: safeEvaluations.length,
-    QuestionnaireResponse: safeEvaluations.filter((item) => item.questionnaireResponseFhirId).length,
-    RiskAssessment: getUniqueCount(
+    encounters: getUniqueCount(safeEvaluations, (item) => item.encounterId),
+    ultrasoundRecords: getUniqueCount(
       safeEvaluations,
-      (item) => item.caseId || item.caseDisplayId || item.studyPatientCode || item.patientCode
+      (item) => item.caseId || item.caseDisplayId
+    ),
+    adnexalMasses: getUniqueCount(
+      safeEvaluations.filter(isAdnexalMass),
+      (item) => item.caseId || item.caseDisplayId
     ),
   };
 };
@@ -84,10 +95,10 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
   const shouldSelectCenter = !isGlobalView && allowedCenters.length > 1;
 
   const [counts, setCounts] = useState({
-    Patient: 0,
-    Encounter: 0,
-    QuestionnaireResponse: 0,
-    RiskAssessment: 0,
+    participants: 0,
+    encounters: 0,
+    ultrasoundRecords: 0,
+    adnexalMasses: 0,
   });
   const [selectedCenter, setSelectedCenter] = useState(getDefaultCenter(keycloak));
   const [error, setError] = useState("");
@@ -112,17 +123,16 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
 
       try {
         setError("");
-        const data = await getCaseEvaluations(
-          token,
-          keycloak,
-          selectedCenter,
-          "No se pudieron cargar los datos del panel."
-        );
-        const nextCounts = buildDashboardCounts(data);
-        setCounts(nextCounts);
+        const stats = await getStudyDashboardStats(token, keycloak, selectedCenter);
+        setCounts({
+          participants:      stats.participantsCount      ?? 0,
+          encounters:        stats.encountersCount        ?? 0,
+          ultrasoundRecords: stats.ultrasoundRecordsCount ?? 0,
+          adnexalMasses:     stats.adnexalMassesCount     ?? 0,
+        });
       } catch (error) {
         console.error("Error al llamar al backend:", error);
-        setError(error.message || "No se pudieron cargar los datos del panel.");
+        setError(error.message || DASHBOARD_ERROR_MESSAGES.generic);
       }
     };
 
@@ -172,27 +182,27 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
   const metricCards = [
     {
       label: "Pacientes incluidas",
-      subtext: "Registros pseudonimizados",
+      subtext: "Participantes únicas registradas",
       icon: <People fontSize="small" />,
-      count: counts.Patient,
+      count: counts.participants,
     },
     {
       label: "Encuentros registrados",
-      subtext: "Citas / ecografías",
+      subtext: "Citas/ecografías con registro",
       icon: <CalendarMonth fontSize="small" />,
-      count: counts.Encounter,
+      count: counts.encounters,
     },
     {
-      label: "Casos y evaluaciones",
-      subtext: "Primarias y secundarias",
+      label: "Registros ecográficos",
+      subtext: "Con o sin masa anexial",
       icon: <MedicalInformation fontSize="small" />,
-      count: counts.QuestionnaireResponse,
+      count: counts.ultrasoundRecords,
     },
     {
-      label: "Masas anexiales",
-      subtext: "Con cuestionario ecográfico",
+      label: "Masas anexiales detectadas",
+      subtext: "Solo registros con masa",
       icon: <LocalHospital fontSize="small" />,
-      count: counts.RiskAssessment,
+      count: counts.adnexalMasses,
     },
   ];
 
