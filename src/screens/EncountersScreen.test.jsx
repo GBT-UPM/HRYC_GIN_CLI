@@ -6,6 +6,13 @@ import ApiService from '../services/ApiService';
 
 let mockKeycloak;
 const searchLabel = 'Buscar por código de estudio, fecha, centro, ámbito, lesión o ecografista…';
+const calculableEcoScoreItems = [
+  { linkId: 'PAT_MA', answer: [{ valueCoding: { display: 'Sí' } }] },
+  { linkId: 'MA_Q_CONTORNO', answer: [{ valueCoding: { display: 'Regular' } }] },
+  { linkId: 'MA_SA', answer: [{ valueCoding: { display: 'No' } }] },
+  { linkId: 'MA_Q_AS', answer: [{ valueCoding: { display: 'No' } }] },
+  { linkId: 'MA_PAPS', answer: [{ valueCoding: { display: 'No' } }] },
+];
 
 jest.mock('@react-keycloak/web', () => ({
   useKeycloak: () => ({
@@ -387,7 +394,7 @@ describe('EncountersScreen', () => {
           status: 200,
           json: async () => ({
             item: [
-              { linkId: 'PAT_MA', answer: [{ valueCoding: { display: 'Sí' } }] },
+              ...calculableEcoScoreItems,
               { linkId: 'MA_LADO', answer: [{ valueCoding: { display: 'Derecho' } }] },
               { linkId: 'MA_ESTRUCTURA', answer: [{ valueCoding: { display: 'Ovario' } }] },
             ],
@@ -502,7 +509,7 @@ describe('EncountersScreen', () => {
           status: 200,
           json: async () => ({
             item: [
-              { linkId: 'PAT_MA', answer: [{ valueCoding: { display: 'Sí' } }] },
+              ...calculableEcoScoreItems,
             ],
           }),
         });
@@ -557,7 +564,7 @@ describe('EncountersScreen', () => {
           status: 200,
           json: async () => ({
             item: [
-              { linkId: 'PAT_MA',       answer: [{ valueCoding: { display: 'Sí' } }] },
+              ...calculableEcoScoreItems,
               { linkId: 'HOSPITAL_REF', answer: [{ valueString: 'HURYC' }] },
               { linkId: 'PAT_EDAD',     answer: [{ valueInteger: 50 }] },
               { linkId: 'PAT_IND',      answer: [{ valueString: 'masa pélvica' }] },

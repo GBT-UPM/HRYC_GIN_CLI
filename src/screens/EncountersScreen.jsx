@@ -18,6 +18,7 @@ import { formatCaseStatusLabel, formatEvaluationStatusLabel } from '../utils/cas
 import { formatEvaluationTypeLabel } from '../utils/evaluationType';
 import { canUseGlobalView, getAllowedCenters, getCentersDisplayLabel, getDefaultCenter, getPrimaryRoleLabel } from '../utils/auth';
 import { getCaseEvaluations } from '../services/caseEvaluationService';
+import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS } from '../utils/ecoScore';
 
 const getStatusChipSx = (label) => {
     const lc = (label || '').toLowerCase();
@@ -249,6 +250,7 @@ const EncountersScreen = () => {
             const riskValues = items
                 .map((item) => item.risk)
                 .filter((risk) => risk !== null && risk !== undefined && String(risk).trim() !== '');
+            const hasAnyMass = items.some(hasAdnexalMass);
             const lesionLabels = Array.from(new Set(items.map(getLesionLabel)));
             return {
                 key,
@@ -268,7 +270,7 @@ const EncountersScreen = () => {
                 evaluationsSummary: getEvaluationsSummary(items),
                 riskSummary: riskValues.length > 0
                     ? riskValues.map((risk) => !isNaN(parseFloat(risk)) ? `${(parseFloat(risk) * 100).toFixed(2)}%` : risk).join(', ')
-                    : 'No procede',
+                    : hasAnyMass ? 'No calculado' : 'No procede',
                 lesions: items,
             };
         });
@@ -380,11 +382,7 @@ const EncountersScreen = () => {
         const MA_CARC = getValue('MA_CARC');
 
 
-        //Calcular logit y probabilidad      
-        const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
-        const probabilidad = calcularProbabilidad(logit);
-
-        const RES_SCORE = probabilidad.toFixed(4);    //no sé si esto se mostraría en el informe o solo para información del médico.
+        const ecoScore = calculateEcoScoreFromQuestionnaireResponse(res);
 
         //Construcción del informe
         let report = '';
@@ -402,7 +400,9 @@ const EncountersScreen = () => {
             report += `Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL} folículo/s.<br/>`;
 
             return {
-                text: report
+                text: report,
+                ecoScoreStatus: ecoScore.status,
+                missingEcoScoreVariables: ecoScore.missingVariables,
             };
         } else {    //Si SÍ hay masa anexial
             const estructurasFemeninas = ['trompa'];
@@ -474,37 +474,17 @@ const EncountersScreen = () => {
                 if (MA_CARC === 'sí') {   //Carcinomatosis.
                     report += 'Hay carcinomatosis.<br/>';
                 }
-                // if (MA_PROB === 'sí') {   // ¿Quiere calcular la probabilidad?
-                //   report += `La probabilidad de que la masa anexial sea maligna es de <b>${RES_SCORE}</b>. <br/>`;
-                // }
                 }
             }            
             return {
                 text: report,
-                score: RES_SCORE,
-                text_score: `La probabilidad de que la masa anexial sea maligna es de ${(RES_SCORE ?? 0)* 100}%.`,
+                score: ecoScore.score,
+                probability: ecoScore.probability,
+                text_score: ecoScore.text_score,
+                ecoScoreStatus: ecoScore.status,
+                missingEcoScoreVariables: ecoScore.missingVariables,
             };
     }, []);
-    const calcularLogit = (contorno, sombra, vascAreaSolida, vascPapila) => {
-        let logit = -3.625;
-
-        //Cálculo coeficientes
-        if (contorno === 'irregular') logit += 1.299;
-
-        if (sombra === 'no') logit += 1.847;
-
-        if (vascAreaSolida === 'nula (score color 1)' || vascAreaSolida === 'leve (score color 2)') logit += 2.209;
-        else if (vascAreaSolida === 'moderada (score color 3)' || vascAreaSolida === 'abundante (score color 4)') logit += 2.967
-
-        if (vascPapila === 'nula (score color 1)' || vascPapila === 'leve (score color 2)') logit += 1.253;
-        else if (vascPapila === 'moderada (score color 3)' || vascPapila === 'abundante (score color 4)') logit += 1.988;
-
-        return logit;
-    }
-    // Función para calcular la probabilidad.
-    const calcularProbabilidad = (logit) => {
-        return 1 / (1 + Math.exp(-logit));
-    };
     const fetchQuestionnaire = useCallback(async () => {
         if (!keycloak.token) {
             return;
@@ -607,13 +587,8 @@ const EncountersScreen = () => {
         }
         return responses;
     };
-    const questionnaireHasMass = (questionnaireResponse) => {
-        const patMaItem = findItemByLinkId(questionnaireResponse?.item, 'PAT_MA');
-        const answer = patMaItem?.answer?.[0];
-        return answer?.valueCoding?.display === "Sí" ||
-            answer?.valueString === "1" ||
-            answer?.valueCoding?.code === "1";
-    };
+    const questionnaireHasCalculatedEcoScore = (questionnaireResponse) =>
+        calculateEcoScoreFromQuestionnaireResponse(questionnaireResponse).status === ECO_SCORE_STATUS.CALCULATED;
     const buildReportRowItem = (encounter) => ({
         ...(encounter?.lesions?.[0] || {}),
         centerId: encounter?.centerId || '',
@@ -626,7 +601,7 @@ const EncountersScreen = () => {
             if (responses.length === 0) {
                 return;
             }
-            if (responses.some(questionnaireHasMass)) {
+            if (responses.some(questionnaireHasCalculatedEcoScore)) {
                 setPendingPrintData({ encounter, responses });
                 setIsModalOpen(true);
                 return;
@@ -916,7 +891,7 @@ const EncountersScreen = () => {
                                                                             : item.histology || item.histologyStatus || 'Pendiente';
                                                                     const riskDisplay = !isNaN(parseFloat(item.risk))
                                                                         ? `${(parseFloat(item.risk) * 100).toFixed(2)}%`
-                                                                        : 'No procede';
+                                                                        : hasAdnexalMass(item) ? 'No calculado' : 'No procede';
                                                                     return (
                                                                         <TableRow key={item.evaluationId || item.caseId}>
                                                                             <TableCell>{item.caseDisplayId || '—'}</TableCell>

@@ -47,6 +47,7 @@ import {
 import { getCaseEvaluations } from '../services/caseEvaluationService';
 import { upsertHistopathology } from '../services/histopathologyService';
 import StudyPageHeader from '../components/StudyPageHeader';
+import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS } from '../utils/ecoScore';
 
 const tipoMap = {
     'sólida': 'sólido',
@@ -406,9 +407,7 @@ const ResponsesScreen = () => {
         const MA_ASC_TIPO = getValue('MA_ASC_TIPO');
         const MA_CARC = getValue('MA_CARC');
 
-        const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
-        const probabilidad = calcularProbabilidad(logit);
-        const RES_SCORE = probabilidad.toFixed(4);
+        const ecoScore = calculateEcoScoreFromQuestionnaireResponse(selectedQuestionnaire);
 
         let report = '';
         if (PAT_MA === 'no') {
@@ -484,23 +483,12 @@ const ResponsesScreen = () => {
                     report += '<div>Hay carcinomatosis.</div>';
                 }
             }
-            report += `<div>La probabilidad de que la masa anexial sea maligna es de ${(RES_SCORE ?? 0) * 100}%.</div>`;
+            if (ecoScore.status === ECO_SCORE_STATUS.CALCULATED) {
+                report += `<div>La probabilidad de que la masa anexial sea maligna es de ${ecoScore.probability * 100}%.</div>`;
+            }
         }
         return report;
     };
-
-    const calcularLogit = (contorno, sombra, vascAreaSolida, vascPapila) => {
-        let logit = -3.625;
-        if (contorno === 'irregular') logit += 1.299;
-        if (sombra === 'no') logit += 1.847;
-        if (vascAreaSolida === 'nula (score color 1)' || vascAreaSolida === 'leve (score color 2)') logit += 2.209;
-        else if (vascAreaSolida === 'moderada (score color 3)' || vascAreaSolida === 'abundante (score color 4)') logit += 2.967;
-        if (vascPapila === 'nula (score color 1)' || vascPapila === 'leve (score color 2)') logit += 1.253;
-        else if (vascPapila === 'moderada (score color 3)' || vascPapila === 'abundante (score color 4)') logit += 1.988;
-        return logit;
-    };
-
-    const calcularProbabilidad = (logit) => 1 / (1 + Math.exp(-logit));
 
     const fetchQuestionnaire = useCallback(async () => {
         if (!keycloak.token) {
@@ -810,7 +798,7 @@ const ResponsesScreen = () => {
                                 const evalLabel = getEvaluationStatus(item);
                                 const riskDisplay = !isNaN(parseFloat(item.risk))
                                     ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
-                                    : 'No procede';
+                                    : item.hasAdnexalMass === false ? 'No procede' : 'No calculado';
                                 const histologyChip = getHistologyChipProps(item);
 
                                 return (

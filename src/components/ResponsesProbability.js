@@ -23,6 +23,7 @@ import {
 } from '../utils/caseMetadata';
 import { DEFAULT_CARE_SETTING, getCareSettingDisplay, normalizeCareSetting } from '../utils/careSetting';
 import { generateClinicalReportPdf } from '../utils/pdfReport';
+import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS } from '../utils/ecoScore';
 import {
   addSecondaryEvaluation,
   checkDuplicateCase,
@@ -278,11 +279,7 @@ const ResponsesProbability = ({
     //const MA_PROB = getValue('MA_PROB'); //¿Quiere calcular la probabilidad?
 
 
-    //Calcular logit y probabilidad      
-    const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
-    const probabilidad = calcularProbabilidad(logit);
-
-    const RES_SCORE = probabilidad.toFixed(4);
+    const ecoScore = calculateEcoScoreFromQuestionnaireResponse(res);
 
     //Construcción del informe
     let report = '';
@@ -299,7 +296,9 @@ const ResponsesProbability = ({
       report += `Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL} folículo/s.<br/>`;
 
       return {
-        text: report
+        text: report,
+        ecoScoreStatus: ecoScore.status,
+        missingEcoScoreVariables: ecoScore.missingVariables,
       };
     } else {  //Si SÍ hay masa anexial
         const estructurasFemeninas = ['trompa'];
@@ -371,52 +370,33 @@ const ResponsesProbability = ({
           if (MA_CARC === 'sí') {   //Carcinomatosis.
             report += 'Hay carcinomatosis.<br/>';
           }
-          // if (MA_PROB === 'sí') {   // ¿Quiere calcular la probabilidad?
-          //   report += `La probabilidad de que la masa anexial sea maligna es de <b>${RES_SCORE}</b>. <br/>`;
-          // }
         }
     }
     return {
       text: report,
-      score: RES_SCORE,
-      text_score: `La probabilidad de que la masa anexial sea maligna es de ${(RES_SCORE ?? 0)* 100}%.`,
+      score: ecoScore.score,
+      probability: ecoScore.probability,
+      text_score: ecoScore.text_score,
+      ecoScoreStatus: ecoScore.status,
+      missingEcoScoreVariables: ecoScore.missingVariables,
     };
   }, []);
   useEffect(() => {
     if (!responses || responses.length === 0) return;
 
-
-    const hasMassInReports = responses[0].item.find((resp) => resp.linkId.toLowerCase() === "PAT_MA".toLowerCase()).answer[0].valueCoding.display !== "No";
-    const calcularScore = responses[0]?.item?.some(resp => resp.linkId?.toLowerCase() === "MA_PROB".toLowerCase() && resp.answer?.[0]?.valueCoding?.display !== "No");
+    const generated = responses.map((r) => generateReport(r));
+    const hasMassInReports = generated.some(
+      (report) => report.ecoScoreStatus !== ECO_SCORE_STATUS.NOT_APPLICABLE
+    );
+    const hasCalculatedScore = generated.some(
+      (report) => report.ecoScoreStatus === ECO_SCORE_STATUS.CALCULATED
+    );
 
     setMass(hasMassInReports);
-    setSco(calcularScore);
+    setSco(hasCalculatedScore);
 
-    const generated = responses.map((r) => generateReport(r));
     setReports(generated);
   }, [responses, generateReport]);
-  // Función para calcular logit(p)
-  const calcularLogit = (contorno, sombra, vascAreaSolida, vascPapila) => {
-    let logit = -3.625;
-
-    //Cálculo coeficientes
-    if (contorno === 'irregular') logit += 1.299;
-
-    if (sombra === 'no') logit += 1.847;
-
-    if (vascAreaSolida === 'ninguno (score color 1)' || vascAreaSolida === 'leve (score color 2)') logit += 2.209;
-    else if (vascAreaSolida === 'moderado (score color 3)' || vascAreaSolida === 'abundante (score color 4)') logit += 2.967
-
-    if (vascPapila === 'ninguno (score color 1)' || vascPapila === 'leve (score color 2)') logit += 1.253;
-    else if (vascPapila === 'moderado (score color 3)' || vascPapila === 'abundante (score color 4)') logit += 1.988;
-
-    return logit;
-  }
-
-  // Función para calcular la probabilidad.
-  const calcularProbabilidad = (logit) => {
-    return 1 / (1 + Math.exp(-logit));
-  };
 
   // Función para generar el informe médico
 
@@ -697,7 +677,7 @@ const ResponsesProbability = ({
 
       const contextCenterId = preparedResponses[startIndex]?.metadata?.centerId || preparedResponses[0]?.metadata?.centerId;
       const context = persistenceContext || await createPersistenceContext(contextCenterId, normalizedCareSetting.code);
-      const { hasMassInReports, patientId, encId, imgStuId } = context;
+      const { patientId, encId, imgStuId } = context;
       const requestStudyPatientCode =
         canUseStudyPatientCode && studyPatientCodeOverride !== null
           ? String((studyPatientCodeOverride ?? studyPatientCode) || "").trim()
@@ -755,7 +735,7 @@ const ResponsesProbability = ({
           const obsId = generateId();
           const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
           await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
-          if (hasMassInReports) {
+          if (reports[index]?.ecoScoreStatus === ECO_SCORE_STATUS.CALCULATED) {
             const riskId = generateId();
             const RiskAssessment = generateRiskAssessment(riskId, encId, patientId, null, reports[index].score, "", questionnaireResponseId)
             await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
@@ -890,7 +870,7 @@ const ResponsesProbability = ({
             <div className='text responses-report-box' dangerouslySetInnerHTML={{ __html: report.text }} />
           </section>
 
-          {mass && sco && (
+          {report.ecoScoreStatus === ECO_SCORE_STATUS.CALCULATED && (
             <section className="parts responses-review-section responses-score-box">
               <span className='tlabel'>Probabilidad de malignidad</span>
               <span className='text' dangerouslySetInnerHTML={{ __html: ((report.score ?? 0)* 100).toFixed(2) + '%' }} />

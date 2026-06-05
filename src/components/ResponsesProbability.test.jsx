@@ -735,11 +735,18 @@ describe("no-mass questionnaire (PAT_MA = No)", () => {
 });
 
 describe("probability inclusion modal content and behaviour", () => {
+  const calculableEcoScoreItems = [
+    { linkId: "MA_PROB", answer: [{ valueCoding: { display: "Sí" } }] },
+    { linkId: "MA_Q_CONTORNO", answer: [{ valueCoding: { display: "Regular" } }] },
+    { linkId: "MA_SA", answer: [{ valueCoding: { display: "No" } }] },
+    { linkId: "MA_Q_AS", answer: [{ valueCoding: { display: "No" } }] },
+    { linkId: "MA_PAPS", answer: [{ valueCoding: { display: "No" } }] },
+  ];
   const responseWithScore = {
     ...questionnaireResponse,
     item: [
       ...questionnaireResponse.item,
-      { linkId: "MA_PROB", answer: [{ valueCoding: { display: "Sí" } }] },
+      ...calculableEcoScoreItems,
     ],
   };
 
