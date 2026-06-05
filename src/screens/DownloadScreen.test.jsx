@@ -93,11 +93,17 @@ describe('DownloadScreen', () => {
     render(<DownloadScreen />);
 
     expect(screen.getByText('Exportaciones científicas')).toBeInTheDocument();
+    expect(screen.getByText('Descarga de datasets del estudio en formatos CSV y Excel para análisis científico.')).toBeInTheDocument();
     expect(screen.getByLabelText('Centro')).toBeInTheDocument();
-    expect(screen.getByText('Esta sección permite descargar los datos del estudio en formato Excel o CSV para análisis. La exportación no incluye NHC, nombres, pseudónimos internos ni el QuestionnaireResponse completo.')).toBeInTheDocument();
-    expect(screen.getByText('Una fila por masa/caso. Recomendado para el análisis principal del estudio.')).toBeInTheDocument();
-    expect(screen.getByText('Una fila por evaluación ecográfica. Útil para análisis interobservador.')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Columnas dataset por casos')).not.toBeInTheDocument();
+    expect(screen.getByText('Datos pseudonimizados')).toBeInTheDocument();
+    expect(screen.queryByText('0 registros')).not.toBeInTheDocument();
+    expect(screen.getByText('Las exportaciones científicas excluyen identificadores clínicos directos, nombres, pseudónimos internos, hashes y formularios FHIR completos. Solo se exportan variables aprobadas para análisis.')).toBeInTheDocument();
+    expect(screen.getByText('Los registros pendientes de código no se incluyen con la configuración actual. Si desea incluir registros pendientes de código, active la opción “Incluir casos pendientes de código” en filtros avanzados.')).toBeInTheDocument();
+    expect(screen.getByText('Dataset por casos')).toBeInTheDocument();
+    expect(screen.getByText('Dataset por evaluaciones')).toBeInTheDocument();
+    expect(screen.getByText('Una fila por caso o registro ecográfico. Recomendado para el análisis principal del estudio.')).toBeInTheDocument();
+    expect(screen.getByText('Una fila por evaluación ecográfica. Útil para análisis interobservador y revisión de evaluaciones primarias/secundarias.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Columnas del dataset por casos')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Estado del código')).not.toBeInTheDocument();
 
     await waitForDefaultPreset();
@@ -206,8 +212,10 @@ describe('DownloadScreen', () => {
     render(<DownloadScreen />);
     await waitForDefaultPreset();
 
+    expect(screen.getByText(/Los registros pendientes de código no se incluyen/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Filtros avanzados/ }));
     fireEvent.click(screen.getByLabelText('Incluir casos pendientes de código'));
+    expect(screen.queryByText(/Los registros pendientes de código no se incluyen/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Descargar Excel por casos' }));
 
     await waitFor(() => {
@@ -271,14 +279,14 @@ describe('DownloadScreen', () => {
     render(<DownloadScreen />);
     await waitForDefaultPreset();
 
-    expect(screen.queryByLabelText('Columnas dataset por casos')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Columnas dataset por evaluaciones')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Columnas del dataset por casos')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Columnas del dataset por evaluaciones')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Personalizar columnas/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Selección de variables exportables/ }));
 
-    expect(screen.getByLabelText('Columnas dataset por casos')).toBeInTheDocument();
-    expect(screen.getByLabelText('Columnas dataset por evaluaciones')).toBeInTheDocument();
-    expect(screen.getByText('Opción avanzada. Solo se muestran variables aprobadas como exportables. No se pueden seleccionar NHC, nombres, pseudónimos internos ni campos sensibles.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Columnas del dataset por casos')).toBeInTheDocument();
+    expect(screen.getByLabelText('Columnas del dataset por evaluaciones')).toBeInTheDocument();
+    expect(screen.getByText('No se pueden seleccionar identificadores clínicos directos, nombres, pseudónimos internos ni campos sensibles.')).toBeInTheDocument();
   });
 
   it('shows detailed filters only after opening advanced filters', async () => {

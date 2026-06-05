@@ -10,7 +10,9 @@ const StudyPageHeader = ({
     roleLabel,
     centersLabel,
     recordCount,
+    extraChips,
     onInfoClick,
+    infoButtonLabel,
 }) => (
     <Paper
         elevation={0}
@@ -49,7 +51,7 @@ const StudyPageHeader = ({
                     variant="outlined"
                     startIcon={<InfoOutlined sx={{ fontSize: '1rem !important' }} />}
                     onClick={onInfoClick}
-                    aria-label="Información de la vista"
+                    aria-label={infoButtonLabel}
                     sx={{
                         borderColor: '#D9E2EC',
                         color: '#52616B',
@@ -62,7 +64,7 @@ const StudyPageHeader = ({
                         '&:hover': { borderColor: '#2F5D7C', color: '#1E3A5F', backgroundColor: '#F5F7FA' },
                     }}
                 >
-                    Información de la vista
+                    {infoButtonLabel}
                 </Button>
             </Box>
             <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
@@ -78,12 +80,17 @@ const StudyPageHeader = ({
                 {centersLabel && (
                     <Chip label={`Centros: ${centersLabel}`} size="small" variant="outlined" sx={{ fontSize: '0.75rem' }} />
                 )}
-                <Chip
-                    label={`${recordCount} registros`}
-                    size="small"
-                    variant="outlined"
-                    sx={{ fontSize: '0.75rem' }}
-                />
+                {extraChips.map((chipLabel) => (
+                    <Chip key={chipLabel} label={chipLabel} size="small" variant="outlined" sx={{ fontSize: '0.75rem' }} />
+                ))}
+                {typeof recordCount === 'number' && (
+                    <Chip
+                        label={`${recordCount} registros`}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: '0.75rem' }}
+                    />
+                )}
             </Stack>
         </Stack>
     </Paper>
@@ -95,14 +102,19 @@ StudyPageHeader.propTypes = {
     visibleScopeLabel: PropTypes.string.isRequired,
     roleLabel: PropTypes.string,
     centersLabel: PropTypes.string,
-    recordCount: PropTypes.number.isRequired,
+    recordCount: PropTypes.number,
+    extraChips: PropTypes.arrayOf(PropTypes.string),
     onInfoClick: PropTypes.func.isRequired,
+    infoButtonLabel: PropTypes.string,
 };
 
 StudyPageHeader.defaultProps = {
     subtitle: '',
     roleLabel: '',
     centersLabel: '',
+    recordCount: null,
+    extraChips: [],
+    infoButtonLabel: 'Información de la vista',
 };
 
 export default StudyPageHeader;

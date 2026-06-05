@@ -4,10 +4,10 @@ import {
     TableHead, TableRow, Paper, TablePagination, TableSortLabel,
     TextField, Stack, Box, Button, Tooltip, IconButton,
     FormControl, InputLabel, Select, MenuItem, Alert, Chip,
-    Dialog, DialogTitle, DialogContent, DialogActions,
+    Dialog, DialogTitle, DialogContent, DialogActions, Collapse,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import { Close } from '@mui/icons-material';
+import { Close, KeyboardArrowDown, KeyboardArrowUp } from '@mui/icons-material';
 import StudyPageHeader from '../components/StudyPageHeader';
 import '../assets/css/ResponsesScreen.css';
 import { useKeycloak } from '@react-keycloak/web';
@@ -107,6 +107,21 @@ const PRIMARY_BTN_SX = {
     '&:hover': { backgroundColor: '#173050' },
 };
 
+const DETAIL_TH_SX = {
+    color: '#52616B',
+    fontWeight: 800,
+    fontSize: '0.72rem',
+    borderBottom: '1px solid #D9E2EC',
+    py: 1,
+};
+
+const DETAIL_STATUS_CHIP_SX = {
+    height: 22,
+    fontSize: '0.68rem',
+    fontWeight: 700,
+    maxWidth: '100%',
+};
+
 const tipoMap = {
     'sólida': 'sólido',
     'quística': 'quístico',
@@ -129,12 +144,10 @@ const EncountersScreen = () => {
     const [orderDirection, setOrderDirection] = useState('desc');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
-    // eslint-disable-next-line no-unused-vars
-    const [selectedQuestionnaire, setSelectedQuestionnaire] = useState(null);
-    const [openModal, setOpenModal] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [pendingPrintData, setPendingPrintData] = useState(null);
     const [infoOpen, setInfoOpen] = useState(false);
+    const [expandedEncounterId, setExpandedEncounterId] = useState(null);
 
     const parseQuestionnaireResponses = (questionnaireResponse) => {
         try {
@@ -186,7 +199,80 @@ const EncountersScreen = () => {
     const getEvaluationType = (item) => formatEvaluationTypeLabel(item.evaluationType, item.primaryEvaluation, item.evaluationId);
     const getCenter = (item) => item.centerId || item.center || item.centerName || getQuestionnaireValue(item.questionnaireResponse, "HOSPITAL_REF") || "—";
     const getLaterality = (item) => item.lateralityDisplay || item.laterality || getQuestionnaireValue(item.questionnaireResponse, "MA_LADO") || "—";
+    const getAnatomicalStructure = (item) => item.anatomicalStructureDisplay || item.anatomicalStructure || getQuestionnaireValue(item.questionnaireResponse, "MA_ESTRUCTURA") || "—";
     const getCareSetting = (item) => item.careSettingDisplay || "No especificado";
+    const hasAdnexalMass = (item) => item.hasAdnexalMass !== false;
+    const getEncounterKey = (item) => item.encounterId || `sin-encounter-${item.evaluationId || item.caseId || item.questionnaireResponseFhirId || 'legacy'}`;
+    const getEncounterShortLabel = (encounter) => {
+        if (!encounter.encounterId) {
+            return 'Encuentro sin identificador';
+        }
+        return `Encuentro ${encounter.encounterId.slice(0, 8)}…`;
+    };
+    const getLesionLabel = (item) => {
+        if (!hasAdnexalMass(item)) {
+            return 'Sin masa anexial';
+        }
+        const laterality = getLaterality(item);
+        const structure = getAnatomicalStructure(item);
+        const parts = [laterality, structure].filter((value) => value && value !== '—');
+        return parts.length > 0 ? parts.join(' · ') : 'Lesión no especificada';
+    };
+    const pluralize = (count, singular, plural) => `${count} ${count === 1 ? singular : plural}`;
+    const getEvaluationsSummary = (items) => {
+        const primaryCount = items.filter((item) => item.evaluationType === 'PRIMARY' || item.primaryEvaluation === true).length;
+        const secondaryCount = items.filter((item) => item.evaluationType === 'SECONDARY').length;
+        const parts = [];
+        if (primaryCount > 0) parts.push(pluralize(primaryCount, 'primaria', 'primarias'));
+        if (secondaryCount > 0) parts.push(pluralize(secondaryCount, 'secundaria', 'secundarias'));
+        return parts.length > 0 ? parts.join(' + ') : pluralize(items.length, 'evaluación', 'evaluaciones');
+    };
+    const getEncounterSummary = (items) => {
+        const massCount = items.filter(hasAdnexalMass).length;
+        if (massCount === 0) {
+            return 'Sin masa anexial';
+        }
+        const secondaryCount = items.filter((item) => item.evaluationType === 'SECONDARY').length;
+        const massSummary = pluralize(massCount, 'masa detectada', 'masas detectadas');
+        return secondaryCount > 0
+            ? `${massSummary}; ${pluralize(secondaryCount, 'evaluación secundaria', 'evaluaciones secundarias')}`
+            : massSummary;
+    };
+    const buildEncounterGroups = (items) => {
+        const groups = new Map();
+        items.forEach((item) => {
+            const key = getEncounterKey(item);
+            groups.set(key, [...(groups.get(key) || []), item]);
+        });
+        return Array.from(groups.entries()).map(([key, items]) => {
+            const first = items[0] || {};
+            const riskValues = items
+                .map((item) => item.risk)
+                .filter((risk) => risk !== null && risk !== undefined && String(risk).trim() !== '');
+            const lesionLabels = Array.from(new Set(items.map(getLesionLabel)));
+            return {
+                key,
+                encounterId: first.encounterId || '',
+                centerId: getCenter(first),
+                careSettingDisplay: getCareSetting(first),
+                createdAt: first.createdAt,
+                observerInitials: Array.from(new Set(items.map((item) => item.observerInitials).filter(Boolean))).join(', '),
+                studyPatientCode: getStudyCode(first),
+                identifier: getIdentifier(first),
+                codeStatusLabel: getCodeStatus(first),
+                caseStatusLabel: Array.from(new Set(items.map(getCaseStatus).filter(Boolean))).join(', '),
+                evaluationStatusLabel: Array.from(new Set(items.map(getEvaluationStatus).filter(Boolean))).join(', '),
+                findingsSummary: getEncounterSummary(items),
+                lesionLabels,
+                lesionSummary: lesionLabels.length > 3 ? `${lesionLabels.slice(0, 3).join('; ')} +${lesionLabels.length - 3}` : lesionLabels.join('; '),
+                evaluationsSummary: getEvaluationsSummary(items),
+                riskSummary: riskValues.length > 0
+                    ? riskValues.map((risk) => !isNaN(parseFloat(risk)) ? `${(parseFloat(risk) * 100).toFixed(2)}%` : risk).join(', ')
+                    : 'No procede',
+                lesions: items,
+            };
+        });
+    };
 
     const fetchQuestionnaireResponseByFhirId = useCallback(async (questionnaireResponseFhirId) => {
         if (!questionnaireResponseFhirId) {
@@ -200,10 +286,6 @@ const EncountersScreen = () => {
         return response.json();
     }, [keycloak.token]);
 
-    const formatDate = (dateStr) => {
-        const date = new Date(dateStr);
-        return isNaN(date) ? '' : date.toLocaleDateString('es-ES');
-    };
     const handlePrintButtonClick = (includeProbability, responses, observations, practitionerName, rowItem = {}) => {
         try {
             const generated = responses.map((r) => generateReport(r));
@@ -464,43 +546,47 @@ const EncountersScreen = () => {
         setOrderBy(property);
     };
 
+    const encounterRows = buildEncounterGroups(data);
+
     // Filtrado de datos basado en la búsqueda
-    const filteredData = data.filter((item) =>
+    const filteredData = encounterRows.filter((encounter) =>
         [
-            item.observerInitials,
-            item.risk,
-            item.histology,
-            item.caseDisplayId,
-            item.evaluationDisplayId,
-            item.studyPatientCode,
-            item.careSettingDisplay,
-            item.caseStatus,
-            item.evaluationStatus,
-            item.evaluationType,
-            getEvaluationType(item),
-            getIdentifier(item),
-            getStudyCode(item),
-            getCodeStatus(item),
-            getCaseStatus(item),
-            getEvaluationStatus(item),
-            getCenter(item),
-            getLaterality(item),
-            getCareSetting(item),
-            new Date(item.createdAt).toLocaleString()
+            encounter.encounterId,
+            encounter.studyPatientCode,
+            encounter.identifier,
+            encounter.centerId,
+            encounter.careSettingDisplay,
+            encounter.findingsSummary,
+            encounter.lesionSummary,
+            encounter.evaluationsSummary,
+            encounter.codeStatusLabel,
+            encounter.caseStatusLabel,
+            encounter.evaluationStatusLabel,
+            encounter.riskSummary,
+            encounter.observerInitials,
+            new Date(encounter.createdAt).toLocaleString(),
+            ...encounter.lesions.flatMap((item) => [
+                item.caseDisplayId,
+                item.evaluationDisplayId,
+                item.evaluationType,
+                getEvaluationType(item),
+                getLaterality(item),
+                getAnatomicalStructure(item),
+                item.observerInitials,
+            ]),
         ].join(" ").toLowerCase().includes(search.toLowerCase())
     );
 
     // Ordenación de datos
     const sortedData = filteredData.sort((a, b) => {
         const getSortValue = (item, property) => {
-            if (property === "identifier") return getIdentifier(item);
-            if (property === "studyCode") return getStudyCode(item);
-            if (property === "codeStatus") return getCodeStatus(item);
-            if (property === "caseStatus") return getCaseStatus(item);
-            if (property === "evaluationStatus") return getEvaluationStatus(item);
-            if (property === "evaluationType") return getEvaluationType(item);
-            if (property === "center") return getCenter(item);
-            if (property === "laterality") return getLaterality(item);
+            if (property === "identifier") return item.encounterId || item.key;
+            if (property === "studyCode") return item.studyPatientCode;
+            if (property === "status") return `${item.codeStatusLabel} ${item.caseStatusLabel} ${item.evaluationStatusLabel}`;
+            if (property === "summary") return item.findingsSummary;
+            if (property === "evaluations") return item.evaluationsSummary;
+            if (property === "center") return item.centerId;
+            if (property === "lesions") return item.lesionSummary;
             return item[property] || "";
         };
         const firstValue = getSortValue(a, orderBy);
@@ -511,19 +597,47 @@ const EncountersScreen = () => {
             return firstValue > secondValue ? -1 : 1;
         }
     });
-    // Función para abrir el modal con el detalle del cuestionario
-    const handleRowClick = async (item, includeProbability) => {
-        try {
+    const fetchQuestionnaireResponsesForEncounter = async (encounter) => {
+        const responses = [];
+        for (const item of encounter.lesions) {
             const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(item.questionnaireResponseFhirId);
-            if (!questionnaireResponse) {
+            if (questionnaireResponse) {
+                responses.push(questionnaireResponse);
+            }
+        }
+        return responses;
+    };
+    const questionnaireHasMass = (questionnaireResponse) => {
+        const patMaItem = findItemByLinkId(questionnaireResponse?.item, 'PAT_MA');
+        const answer = patMaItem?.answer?.[0];
+        return answer?.valueCoding?.display === "Sí" ||
+            answer?.valueString === "1" ||
+            answer?.valueCoding?.code === "1";
+    };
+    const buildReportRowItem = (encounter) => ({
+        ...(encounter?.lesions?.[0] || {}),
+        centerId: encounter?.centerId || '',
+        careSettingDisplay: encounter?.careSettingDisplay || '',
+        studyPatientCode: encounter?.studyPatientCode || encounter?.identifier || '',
+    });
+    const handleEncounterReport = async (encounter) => {
+        try {
+            const responses = await fetchQuestionnaireResponsesForEncounter(encounter);
+            if (responses.length === 0) {
                 return;
             }
-
-            setSelectedQuestionnaire(questionnaireResponse);
-            const observations = item.histology ? [{ text: item.histology }] : [];
-            handlePrintButtonClick(includeProbability, [questionnaireResponse], observations, item.observerInitials, item);
+            if (responses.some(questionnaireHasMass)) {
+                setPendingPrintData({ encounter, responses });
+                setIsModalOpen(true);
+                return;
+            }
+            const observations = encounter.lesions
+                .map((item) => item.histology ? { text: item.histology } : null)
+                .filter(Boolean);
+            handlePrintButtonClick(false, responses, observations, encounter.observerInitials, buildReportRowItem(encounter));
         } catch (error) {
-            console.error("Error al obtener el cuestionario:", error);
+            console.error("Error al obtener los cuestionarios del encuentro:", error);
+            setError("No se pudo generar el informe del encuentro.");
         }
     };
     // Paginación de datos
@@ -559,7 +673,7 @@ const EncountersScreen = () => {
                     <Stack spacing={0}>
                         {[
                             ["Encuentros visibles", isGlobalView ? "Todos los centros (vista global)" : `Centro: ${selectedCenter || "pendiente"}`],
-                            ["Relación encuentro-caso", "Cada encuentro corresponde a una evaluación ecográfica vinculada a un caso del estudio."],
+                            ["Relación encuentro-caso", "Cada fila representa un encuentro clínico y agrupa sus casos/evaluaciones asociados."],
                             ["Evaluación primaria", "Primera evaluación ecográfica registrada para el caso."],
                             ["Evaluación secundaria", "Evaluación adicional sobre el mismo caso (segundo observador)."],
                             ["Informe clínico", "La acción 'Informe' genera el informe ecográfico en PDF para impresión o descarga."],
@@ -607,7 +721,7 @@ const EncountersScreen = () => {
             {/* Card de búsqueda */}
             <Paper elevation={0} sx={{ p: 2, mb: 2, border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF" }}>
                 <TextField
-                    label="Buscar por caso, evaluación, código de estudio, centro, lateralidad, ámbito, tipo o ecografista"
+                    label="Buscar por código de estudio, fecha, centro, ámbito, lesión o ecografista…"
                     variant="outlined"
                     fullWidth
                     size="small"
@@ -624,6 +738,7 @@ const EncountersScreen = () => {
                     <Table size="small">
                         <TableHead>
                             <TableRow>
+                                <TableCell sx={TH_SX} />
                                 <TableCell sx={TH_SX}>
                                     <TableSortLabel active={orderBy === 'studyCode'} direction={orderDirection} onClick={() => handleSortRequest('studyCode')} sx={SORT_LABEL_SX}>
                                         Código de estudio
@@ -631,198 +746,204 @@ const EncountersScreen = () => {
                                 </TableCell>
                                 <TableCell sx={TH_SX}>
                                     <TableSortLabel active={orderBy === 'identifier'} direction={orderDirection} onClick={() => handleSortRequest('identifier')} sx={SORT_LABEL_SX}>
-                                        Caso / Evaluación
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell sx={TH_SX}>
-                                    <TableSortLabel active={orderBy === 'evaluationType'} direction={orderDirection} onClick={() => handleSortRequest('evaluationType')} sx={SORT_LABEL_SX}>
-                                        Tipo
+                                        Fecha / encuentro
                                     </TableSortLabel>
                                 </TableCell>
                                 <TableCell sx={TH_SX}>
                                     <TableSortLabel active={orderBy === 'center'} direction={orderDirection} onClick={() => handleSortRequest('center')} sx={SORT_LABEL_SX}>
-                                        Centro / Ámbito
+                                        Centro / ámbito
                                     </TableSortLabel>
                                 </TableCell>
                                 <TableCell sx={TH_SX}>
-                                    <TableSortLabel active={orderBy === 'laterality'} direction={orderDirection} onClick={() => handleSortRequest('laterality')} sx={SORT_LABEL_SX}>
-                                        Lateralidad
+                                    <TableSortLabel active={orderBy === 'summary'} direction={orderDirection} onClick={() => handleSortRequest('summary')} sx={SORT_LABEL_SX}>
+                                        Resumen del encuentro
                                     </TableSortLabel>
                                 </TableCell>
                                 <TableCell sx={TH_SX}>
-                                    <TableSortLabel active={orderBy === 'codeStatus'} direction={orderDirection} onClick={() => handleSortRequest('codeStatus')} sx={SORT_LABEL_SX}>
-                                        Estado código
+                                    <TableSortLabel active={orderBy === 'lesions'} direction={orderDirection} onClick={() => handleSortRequest('lesions')} sx={SORT_LABEL_SX}>
+                                        Lesiones / hallazgos
                                     </TableSortLabel>
                                 </TableCell>
                                 <TableCell sx={TH_SX}>
-                                    <TableSortLabel active={orderBy === 'caseStatus'} direction={orderDirection} onClick={() => handleSortRequest('caseStatus')} sx={SORT_LABEL_SX}>
-                                        Estado caso
+                                    <TableSortLabel active={orderBy === 'evaluations'} direction={orderDirection} onClick={() => handleSortRequest('evaluations')} sx={SORT_LABEL_SX}>
+                                        Evaluaciones
                                     </TableSortLabel>
                                 </TableCell>
                                 <TableCell sx={TH_SX}>
-                                    <TableSortLabel active={orderBy === 'evaluationStatus'} direction={orderDirection} onClick={() => handleSortRequest('evaluationStatus')} sx={SORT_LABEL_SX}>
-                                        Estado evaluación
+                                    <TableSortLabel active={orderBy === 'status'} direction={orderDirection} onClick={() => handleSortRequest('status')} sx={SORT_LABEL_SX}>
+                                        Estado
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell sx={TH_SX}>
-                                    <TableSortLabel active={orderBy === 'risk'} direction={orderDirection} onClick={() => handleSortRequest('risk')} sx={SORT_LABEL_SX}>
-                                        Riesgo
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell sx={TH_SX}>
-                                    <TableSortLabel active={orderBy === 'createdAt'} direction={orderDirection} onClick={() => handleSortRequest('createdAt')} sx={SORT_LABEL_SX}>
-                                        Fecha
-                                    </TableSortLabel>
-                                </TableCell>
+                                <TableCell sx={TH_SX}>Riesgo</TableCell>
                                 <TableCell sx={{ ...TH_SX, textAlign: "right" }}>Acciones</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {paginatedData.map((item, index) => {
-                                const codeLabel = getCodeStatus(item);
-                                const caseLabel = getCaseStatus(item);
-                                const evalLabel = getEvaluationStatus(item);
-                                const typeLabel = getEvaluationType(item);
-                                const riskDisplay = !isNaN(parseFloat(item.risk))
-                                    ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
-                                    : 'No procede';
-
+                            {paginatedData.map((encounter) => {
+                                const isExpanded = expandedEncounterId === encounter.key;
                                 return (
-                                    <TableRow
-                                        key={index}
-                                        hover
-                                        sx={{
-                                            '&:hover': { backgroundColor: '#F5F8FC' },
-                                            '&:last-child td': { borderBottom: 0 },
-                                        }}
-                                    >
-                                        {/* Código de estudio */}
-                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
-                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#1F2933', lineHeight: 1.3 }}>
-                                                {getStudyCode(item) || '—'}
-                                            </Typography>
-                                        </TableCell>
-
-                                        {/* Caso / Evaluación */}
-                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
-                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#1F2933', lineHeight: 1.3 }}>
-                                                {item.caseDisplayId || getIdentifier(item) || '—'}
-                                            </Typography>
-                                            {item.evaluationDisplayId && (
-                                                <Typography variant="caption" sx={{ fontSize: '0.72rem', color: '#52616B', lineHeight: 1.2, display: 'block' }}>
-                                                    {item.evaluationDisplayId}
+                                    <React.Fragment key={encounter.key}>
+                                        <TableRow hover sx={{ '&:hover': { backgroundColor: '#F5F8FC' } }}>
+                                            <TableCell sx={{ width: 42, py: 1, px: 1 }}>
+                                                <IconButton
+                                                    size="small"
+                                                    aria-label={isExpanded ? 'Contraer detalle del encuentro' : 'Expandir detalle del encuentro'}
+                                                    onClick={() => setExpandedEncounterId(isExpanded ? null : encounter.key)}
+                                                >
+                                                    {isExpanded ? <KeyboardArrowUp fontSize="small" /> : <KeyboardArrowDown fontSize="small" />}
+                                                </IconButton>
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1F2933' }}>
+                                                    {encounter.studyPatientCode || 'Pendiente'}
                                                 </Typography>
-                                            )}
-                                        </TableCell>
-
-                                        {/* Tipo */}
-                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
-                                            {typeLabel && typeLabel !== '—' ? (
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1F2933' }}>
+                                                    {encounter.createdAt ? new Date(encounter.createdAt).toLocaleDateString() : '—'}
+                                                </Typography>
+                                                <Tooltip title={encounter.encounterId || ''} disableHoverListener={!encounter.encounterId}>
+                                                    <Typography variant="caption" sx={{ color: '#52616B', display: 'block', whiteSpace: 'nowrap' }}>
+                                                        {getEncounterShortLabel(encounter)}
+                                                    </Typography>
+                                                </Tooltip>
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1F2933' }}>
+                                                    {encounter.centerId}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: '#52616B', display: 'block' }}>
+                                                    {encounter.careSettingDisplay}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                                <Chip label={encounter.findingsSummary} size="small" variant="outlined" sx={{ fontWeight: 700, ...getStatusChipSx(encounter.findingsSummary) }} />
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                                <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ maxWidth: 260 }}>
+                                                    {(encounter.lesionLabels?.length ? encounter.lesionLabels : ['No aplica']).map((lesion) => (
+                                                        <Chip
+                                                            key={lesion}
+                                                            label={lesion}
+                                                            size="small"
+                                                            variant="outlined"
+                                                            sx={{
+                                                                height: 22,
+                                                                fontSize: '0.7rem',
+                                                                fontWeight: 700,
+                                                                backgroundColor: '#F8FAFC',
+                                                                borderColor: '#D9E2EC',
+                                                                color: '#1F2933',
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </Stack>
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1F2933' }}>
+                                                    {encounter.evaluationsSummary}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
+                                                <Stack spacing={0.5}>
+                                                    {encounter.codeStatusLabel ? <Chip label={encounter.codeStatusLabel} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600, ...getStatusChipSx(encounter.codeStatusLabel) }} /> : null}
+                                                    {encounter.evaluationStatusLabel ? <Chip label={encounter.evaluationStatusLabel} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600, ...getStatusChipSx(encounter.evaluationStatusLabel) }} /> : null}
+                                                </Stack>
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
                                                 <Chip
-                                                    label={typeLabel}
+                                                    label={encounter.riskSummary}
                                                     size="small"
                                                     variant="outlined"
                                                     sx={{
                                                         height: 22,
                                                         fontSize: '0.72rem',
-                                                        fontWeight: 600,
-                                                        backgroundColor: typeLabel === 'Primaria' ? '#EAF1F6' : '#F3F4F6',
-                                                        color: typeLabel === 'Primaria' ? '#1E3A5F' : '#374151',
-                                                        borderColor: typeLabel === 'Primaria' ? '#b4cfe0' : '#d1d5db',
+                                                        fontWeight: 700,
+                                                        whiteSpace: 'nowrap',
+                                                        backgroundColor: '#F8FAFC',
+                                                        borderColor: '#D9E2EC',
+                                                        color: '#1F2933',
                                                     }}
                                                 />
-                                            ) : (
-                                                <Typography variant="caption" sx={{ color: '#52616B' }}>—</Typography>
-                                            )}
-                                        </TableCell>
-
-                                        {/* Centro / Ámbito */}
-                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
-                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#1F2933', lineHeight: 1.3 }}>
-                                                {getCenter(item)}
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ fontSize: '0.72rem', color: '#52616B', lineHeight: 1.2, display: 'block' }}>
-                                                {getCareSetting(item)}
-                                            </Typography>
-                                        </TableCell>
-
-                                        {/* Lateralidad */}
-                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
-                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', color: '#1F2933', lineHeight: 1.3 }}>
-                                                {getLaterality(item)}
-                                            </Typography>
-                                        </TableCell>
-
-                                        {/* Estado código */}
-                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
-                                            {codeLabel && codeLabel !== '—' ? (
-                                                <Chip label={codeLabel} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600, ...getStatusChipSx(codeLabel) }} />
-                                            ) : null}
-                                        </TableCell>
-
-                                        {/* Estado caso */}
-                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
-                                            {caseLabel && caseLabel !== '—' ? (
-                                                <Chip label={caseLabel} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600, ...getStatusChipSx(caseLabel) }} />
-                                            ) : null}
-                                        </TableCell>
-
-                                        {/* Estado evaluación */}
-                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
-                                            {evalLabel && evalLabel !== '—' ? (
-                                                <Chip label={evalLabel} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600, ...getStatusChipSx(evalLabel) }} />
-                                            ) : null}
-                                        </TableCell>
-
-                                        {/* Riesgo */}
-                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
-                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', color: '#1F2933', lineHeight: 1.3 }}>
-                                                {riskDisplay}
-                                            </Typography>
-                                        </TableCell>
-
-                                        {/* Fecha / Ecografista */}
-                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
-                                            <Typography variant="body2" sx={{ fontSize: '0.82rem', color: '#1F2933', lineHeight: 1.3 }}>
-                                                {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'}
-                                            </Typography>
-                                            {item.observerInitials && (
-                                                <Typography variant="caption" sx={{ fontSize: '0.72rem', color: '#52616B', lineHeight: 1.2, display: 'block' }}>
-                                                    {item.observerInitials}
-                                                </Typography>
-                                            )}
-                                        </TableCell>
-
-                                        {/* Acciones */}
-                                        <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                            <Tooltip title="Imprimir informe">
-                                                <Button
-                                                    size="small"
-                                                    variant="outlined"
-                                                    aria-label="Imprimir informe"
-                                                    sx={ACTION_BTN_SX}
-                                                    onClick={async () => {
-                                                        const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(item.questionnaireResponseFhirId);
-                                                        const patMaItem = findItemByLinkId(questionnaireResponse?.item, 'PAT_MA');
-                                                        const answer = patMaItem?.answer?.[0];
-                                                        const hasMass =
-                                                            answer?.valueCoding?.display === "Sí" ||
-                                                            answer?.valueString === "1" ||
-                                                            answer?.valueCoding?.code === "1";
-
-                                                        if (hasMass) {
-                                                            setPendingPrintData({ rowItem: item });
-                                                            setIsModalOpen(true);
-                                                        } else {
-                                                            handleRowClick(item, false);
-                                                        }
-                                                    }}
-                                                >
-                                                    Informe
-                                                </Button>
-                                            </Tooltip>
-                                        </TableCell>
-                                    </TableRow>
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                                    <Button size="small" variant="outlined" sx={ACTION_BTN_SX} onClick={() => setExpandedEncounterId(isExpanded ? null : encounter.key)}>
+                                                        Ver
+                                                    </Button>
+                                                    <Tooltip title="Imprimir informe del encuentro">
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            aria-label="Imprimir informe"
+                                                            sx={ACTION_BTN_SX}
+                                                            onClick={() => handleEncounterReport(encounter)}
+                                                        >
+                                                            Informe
+                                                        </Button>
+                                                    </Tooltip>
+                                                </Stack>
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableCell colSpan={10} sx={{ py: 0, borderBottom: isExpanded ? '1px solid #D9E2EC' : 0 }}>
+                                                <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                                                    <Box sx={{ p: 2, backgroundColor: '#F8FAFC' }}>
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1F2933', mb: 1.5 }}>
+                                                            Casos y evaluaciones del encuentro
+                                                        </Typography>
+                                                        <Table size="small">
+                                                            <TableHead>
+                                                                <TableRow>
+                                                                    <TableCell sx={DETAIL_TH_SX}>Caso</TableCell>
+                                                                    <TableCell sx={DETAIL_TH_SX}>Evaluación</TableCell>
+                                                                    <TableCell sx={DETAIL_TH_SX}>Tipo</TableCell>
+                                                                    <TableCell sx={DETAIL_TH_SX}>Lesión</TableCell>
+                                                                    <TableCell sx={DETAIL_TH_SX}>Ámbito</TableCell>
+                                                                    <TableCell sx={DETAIL_TH_SX}>Ecografista</TableCell>
+                                                                    <TableCell sx={DETAIL_TH_SX}>Estados</TableCell>
+                                                                    <TableCell sx={DETAIL_TH_SX}>Riesgo</TableCell>
+                                                                    <TableCell sx={DETAIL_TH_SX}>Histología</TableCell>
+                                                                </TableRow>
+                                                            </TableHead>
+                                                            <TableBody>
+                                                                {encounter.lesions.map((item) => {
+                                                                    const typeLabel = getEvaluationType(item);
+                                                                    const histologyLabel = !hasAdnexalMass(item)
+                                                                        ? 'No aplicable'
+                                                                        : item.evaluationType === 'SECONDARY'
+                                                                            ? 'Compartida con caso'
+                                                                            : item.histology || item.histologyStatus || 'Pendiente';
+                                                                    const riskDisplay = !isNaN(parseFloat(item.risk))
+                                                                        ? `${(parseFloat(item.risk) * 100).toFixed(2)}%`
+                                                                        : 'No procede';
+                                                                    return (
+                                                                        <TableRow key={item.evaluationId || item.caseId}>
+                                                                            <TableCell>{item.caseDisplayId || '—'}</TableCell>
+                                                                            <TableCell>{item.evaluationDisplayId || '—'}</TableCell>
+                                                                            <TableCell>{typeLabel}</TableCell>
+                                                                            <TableCell>{getLesionLabel(item)}</TableCell>
+                                                                            <TableCell>{getCareSetting(item)}</TableCell>
+                                                                            <TableCell>{item.observerInitials || '—'}</TableCell>
+                                                                            <TableCell>
+                                                                                <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+                                                                                    <Chip label={getCodeStatus(item)} size="small" variant="outlined" sx={{ ...DETAIL_STATUS_CHIP_SX, ...getStatusChipSx(getCodeStatus(item)) }} />
+                                                                                    <Chip label={`Caso: ${getCaseStatus(item)}`} size="small" variant="outlined" sx={{ ...DETAIL_STATUS_CHIP_SX, ...getStatusChipSx(getCaseStatus(item)) }} />
+                                                                                    <Chip label={`Evaluación: ${getEvaluationStatus(item)}`} size="small" variant="outlined" sx={{ ...DETAIL_STATUS_CHIP_SX, ...getStatusChipSx(getEvaluationStatus(item)) }} />
+                                                                                </Stack>
+                                                                            </TableCell>
+                                                                            <TableCell>{riskDisplay}</TableCell>
+                                                                            <TableCell>{histologyLabel}</TableCell>
+                                                                        </TableRow>
+                                                                    );
+                                                                })}
+                                                            </TableBody>
+                                                        </Table>
+                                                    </Box>
+                                                </Collapse>
+                                            </TableCell>
+                                        </TableRow>
+                                    </React.Fragment>
                                 );
                             })}
                         </TableBody>
@@ -877,7 +998,16 @@ const EncountersScreen = () => {
                     <Button
                         variant="outlined"
                         onClick={() => {
-                            handleRowClick(pendingPrintData.rowItem, false);
+                            const observations = (pendingPrintData?.encounter?.lesions || [])
+                                .map((item) => item.histology ? { text: item.histology } : null)
+                                .filter(Boolean);
+                            handlePrintButtonClick(
+                                false,
+                                pendingPrintData?.responses || [],
+                                observations,
+                                pendingPrintData?.encounter?.observerInitials || '',
+                                buildReportRowItem(pendingPrintData?.encounter)
+                            );
                             setPendingPrintData(null);
                             setIsModalOpen(false);
                         }}
@@ -888,7 +1018,16 @@ const EncountersScreen = () => {
                     <Button
                         variant="contained"
                         onClick={() => {
-                            handleRowClick(pendingPrintData.rowItem, true);
+                            const observations = (pendingPrintData?.encounter?.lesions || [])
+                                .map((item) => item.histology ? { text: item.histology } : null)
+                                .filter(Boolean);
+                            handlePrintButtonClick(
+                                true,
+                                pendingPrintData?.responses || [],
+                                observations,
+                                pendingPrintData?.encounter?.observerInitials || '',
+                                buildReportRowItem(pendingPrintData?.encounter)
+                            );
                             setPendingPrintData(null);
                             setIsModalOpen(false);
                         }}
