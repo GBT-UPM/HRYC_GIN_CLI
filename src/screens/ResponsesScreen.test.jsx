@@ -259,6 +259,120 @@ describe('ResponsesScreen', () => {
     expect(screen.getByText('Consulta externa')).toBeInTheDocument();
   });
 
+  it('shows ECO-SCORE decimal risk as percentage without multiplying a percentage twice', async () => {
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ([
+        {
+          caseId: 3,
+          evaluationId: 13,
+          caseDisplayId: 'HURYC-C000003',
+          evaluationDisplayId: 'HURYC-C000003-E000013',
+          evaluationType: 'SECONDARY',
+          primaryEvaluation: false,
+          centerId: 'HURYC',
+          codeStatus: 'CODE_ASSIGNED',
+          caseStatus: 'OPEN',
+          evaluationStatus: 'COMPLETED',
+          hasAdnexalMass: true,
+          lateralityDisplay: 'Derecho',
+          careSettingDisplay: 'Urgencias',
+          risk: '0.4593',
+          ecoScoreProbabilityPercent: 45.93,
+          histology: null,
+          observerInitials: 'ABC',
+          createdAt: '2026-06-01T09:00:00',
+          questionnaireResponseFhirId: 104,
+        },
+      ]),
+    });
+
+    render(<ResponsesScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('HURYC-C000003-E000013')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('45.93%')).toBeInTheDocument();
+    expect(screen.queryByText('4593.00%')).not.toBeInTheDocument();
+  });
+
+  it('shows rounded ECO-SCORE probability in the evaluation summary modal', async () => {
+    ApiService
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([
+          {
+            caseId: 4,
+            evaluationId: 14,
+            caseDisplayId: 'HURYC-C000004',
+            evaluationDisplayId: 'HURYC-C000004-E000014',
+            evaluationType: 'PRIMARY',
+            primaryEvaluation: true,
+            centerId: 'HURYC',
+            codeStatus: 'CODE_ASSIGNED',
+            caseStatus: 'OPEN',
+            evaluationStatus: 'COMPLETED',
+            hasAdnexalMass: true,
+            lateralityDisplay: 'Derecho',
+            careSettingDisplay: 'Urgencias',
+            risk: '0.9763',
+            histology: null,
+            observerInitials: 'ABC',
+            createdAt: '2026-06-01T09:00:00',
+            questionnaireResponseFhirId: 105,
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({
+          item: [
+            { linkId: 'PAT_MA', answer: [{ valueCoding: { display: 'Sí' } }] },
+            { linkId: 'MA_TIPO', answer: [{ valueCoding: { display: 'Sólido-quística' } }] },
+            { linkId: 'MA_ESTRUCTURA', answer: [{ valueCoding: { display: 'Ovario' } }] },
+            { linkId: 'MA_LADO', answer: [{ valueCoding: { display: 'Derecho' } }] },
+            { linkId: 'MA_M1', answer: [{ valueDecimal: 10 }] },
+            { linkId: 'MA_M2', answer: [{ valueDecimal: 20 }] },
+            { linkId: 'MA_M3', answer: [{ valueDecimal: 30 }] },
+            { linkId: 'MA_CONTENIDO', answer: [{ valueCoding: { display: 'Líquido' } }] },
+            { linkId: 'MA_Q_CONTORNO', answer: [{ valueCoding: { display: 'Irregular' } }] },
+            { linkId: 'MA_Q_GROSOR', answer: [{ valueDecimal: 2 }] },
+            { linkId: 'MA_Q_VASC', answer: [{ valueCoding: { display: 'Leve (score color 2)' } }] },
+            { linkId: 'MA_PAPS', answer: [{ valueCoding: { display: 'Sí' } }] },
+            { linkId: 'MA_Q_P', answer: [{ valueInteger: 1 }] },
+            { linkId: 'MA_Q_P_M1', answer: [{ valueDecimal: 5 }] },
+            { linkId: 'MA_Q_P_M2', answer: [{ valueDecimal: 3 }] },
+            { linkId: 'MA_Q_P_CONTORNO', answer: [{ valueCoding: { display: 'Regular' } }] },
+            { linkId: 'MA_Q_P_VASC', answer: [{ valueCoding: { display: 'Abundante (score color 4)' } }] },
+            { linkId: 'MA_Q_AS', answer: [{ valueCoding: { display: 'Sí' } }] },
+            { linkId: 'MA_Q_AS_N', answer: [{ valueInteger: 1 }] },
+            { linkId: 'MA_Q_AS_M1', answer: [{ valueDecimal: 4 }] },
+            { linkId: 'MA_Q_AS_M2', answer: [{ valueDecimal: 3 }] },
+            { linkId: 'MA_Q_AS_M3', answer: [{ valueDecimal: 2 }] },
+            { linkId: 'MA_Q_AS_VASC', answer: [{ valueCoding: { display: 'Leve (score color 2)' } }] },
+            { linkId: 'MA_SA', answer: [{ valueCoding: { display: 'No' } }] },
+          ],
+        }),
+      });
+
+    render(<ResponsesScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('HURYC-C000004-E000014')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Ver'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Resumen de evaluación ecográfica')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/La probabilidad de que la masa anexial sea maligna es de 97\.63 %\./)).toBeInTheDocument();
+    expect(screen.queryByText(/97\.629/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/4593\.00%/)).not.toBeInTheDocument();
+  });
+
   it('submits histopathology through the controlled case endpoint', async () => {
     ApiService
 	      .mockResolvedValueOnce({
@@ -496,5 +610,203 @@ describe('ResponsesScreen', () => {
     render(<ResponsesScreen />);
 
     expect(await screen.findByText('No tiene permisos para consultar datos de este centro.')).toBeInTheDocument();
+  });
+
+  it('does not show administrative management for clinicians', async () => {
+    mockKeycloak.tokenParsed.realm_access.roles = ['ROLE_CLINICIAN'];
+    ApiService
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([
+          {
+            caseId: 20,
+            evaluationId: 21,
+            caseDisplayId: 'HURYC-C000020',
+            evaluationDisplayId: 'HURYC-C000020-E000021',
+            evaluationType: 'PRIMARY',
+            primaryEvaluation: true,
+            centerId: 'HURYC',
+            caseStatus: 'OPEN',
+            evaluationStatus: 'COMPLETED',
+            createdAt: '2026-06-01T09:00:00',
+            questionnaireResponseFhirId: 220,
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ item: [{ linkId: 'PAT_MA', answer: [{ valueCoding: { display: 'No' } }] }] }),
+      });
+
+    render(<ResponsesScreen />);
+
+    fireEvent.click(await screen.findByText('Ver'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Resumen de evaluación ecográfica')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Gestión administrativa')).not.toBeInTheDocument();
+  });
+
+  it('shows administrative actions for site coordinators and requires a reason', async () => {
+    ApiService
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([
+          {
+            caseId: 30,
+            evaluationId: 31,
+            caseDisplayId: 'HURYC-C000030',
+            evaluationDisplayId: 'HURYC-C000030-E000031',
+            evaluationType: 'PRIMARY',
+            primaryEvaluation: true,
+            centerId: 'HURYC',
+            caseStatus: 'OPEN',
+            evaluationStatus: 'COMPLETED',
+            createdAt: '2026-06-01T09:00:00',
+            questionnaireResponseFhirId: 230,
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ item: [{ linkId: 'PAT_MA', answer: [{ valueCoding: { display: 'No' } }] }] }),
+      });
+
+    render(<ResponsesScreen />);
+
+    fireEvent.click(await screen.findByText('Ver'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Gestión administrativa')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Excluir caso')).toBeInTheDocument();
+    expect(screen.getByText('Retirar caso')).toBeInTheDocument();
+    expect(screen.getByText('Bloquear evaluación')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Excluir caso'));
+
+    expect(screen.getByText('Confirmar cambio de estado')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar' })).toBeDisabled();
+  });
+
+  it('calls the case status endpoint and refreshes the list after excluding a case', async () => {
+    ApiService
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([
+          {
+            caseId: 40,
+            evaluationId: 41,
+            caseDisplayId: 'HURYC-C000040',
+            evaluationDisplayId: 'HURYC-C000040-E000041',
+            evaluationType: 'PRIMARY',
+            primaryEvaluation: true,
+            centerId: 'HURYC',
+            caseStatus: 'OPEN',
+            evaluationStatus: 'COMPLETED',
+            createdAt: '2026-06-01T09:00:00',
+            questionnaireResponseFhirId: 240,
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ item: [{ linkId: 'PAT_MA', answer: [{ valueCoding: { display: 'No' } }] }] }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({
+          caseId: 40,
+          previousStatus: 'OPEN',
+          newStatus: 'EXCLUDED',
+          reason: 'Caso excluido por no cumplir criterios.',
+          updated: true,
+        }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([
+          {
+            caseId: 40,
+            evaluationId: 41,
+            caseDisplayId: 'HURYC-C000040',
+            evaluationDisplayId: 'HURYC-C000040-E000041',
+            evaluationType: 'PRIMARY',
+            primaryEvaluation: true,
+            centerId: 'HURYC',
+            caseStatus: 'EXCLUDED',
+            evaluationStatus: 'COMPLETED',
+            createdAt: '2026-06-01T09:00:00',
+            questionnaireResponseFhirId: 240,
+          },
+        ]),
+      });
+
+    render(<ResponsesScreen />);
+
+    fireEvent.click(await screen.findByText('Ver'));
+    await screen.findByText('Gestión administrativa');
+    fireEvent.click(screen.getByText('Excluir caso'));
+    fireEvent.change(screen.getByLabelText('Motivo del cambio *'), { target: { value: 'Caso excluido por no cumplir criterios.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+
+    await waitFor(() => {
+      expect(ApiService).toHaveBeenCalledWith(
+        'token',
+        'POST',
+        '/app/cases/40/status',
+        {
+          targetStatus: 'EXCLUDED',
+          reason: 'Caso excluido por no cumplir criterios.',
+        }
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Excluido').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('shows a safe 403 message when administrative status change is rejected', async () => {
+    ApiService
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([
+          {
+            caseId: 50,
+            evaluationId: 51,
+            caseDisplayId: 'HURYC-C000050',
+            evaluationDisplayId: 'HURYC-C000050-E000051',
+            evaluationType: 'PRIMARY',
+            primaryEvaluation: true,
+            centerId: 'HURYC',
+            caseStatus: 'OPEN',
+            evaluationStatus: 'COMPLETED',
+            createdAt: '2026-06-01T09:00:00',
+            questionnaireResponseFhirId: 250,
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({ item: [{ linkId: 'PAT_MA', answer: [{ valueCoding: { display: 'No' } }] }] }),
+      })
+      .mockResolvedValueOnce({ status: 403 });
+
+    render(<ResponsesScreen />);
+
+    fireEvent.click(await screen.findByText('Ver'));
+    await screen.findByText('Gestión administrativa');
+    fireEvent.click(screen.getByText('Bloquear evaluación'));
+    fireEvent.change(screen.getByLabelText('Motivo del cambio *'), { target: { value: 'Bloqueo por revisión administrativa.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+
+    expect(await screen.findByText('No tiene permisos para cambiar este estado.')).toBeInTheDocument();
+    expect(screen.queryByText('123456')).not.toBeInTheDocument();
+    expect(screen.queryByText('patientPseudonym')).not.toBeInTheDocument();
+    expect(screen.queryByText('hash')).not.toBeInTheDocument();
   });
 });

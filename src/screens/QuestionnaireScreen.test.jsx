@@ -2,10 +2,17 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import QuestionnaireScreen from "./QuestionnaireScreen";
 import ApiService from "../services/ApiService";
+import { recordStudyUsageEvent } from "../services/studyUsageEventService";
 
 const mockNavigate = jest.fn();
 
 jest.mock("../services/ApiService", () => jest.fn());
+jest.mock("../services/studyUsageEventService", () => ({
+  recordStudyUsageEvent: jest.fn(),
+  STUDY_USAGE_EVENT_TYPES: {
+    questionnaireStarted: "QUESTIONNAIRE_STARTED",
+  },
+}));
 
 jest.mock("react-router-dom", () => ({
   ...jest.requireActual("react-router-dom"),
@@ -21,8 +28,23 @@ jest.mock("@react-keycloak/web", () => ({
   }),
 }));
 
-jest.mock("../components/QuestionnaireForm", () => () => <div>Formulario clínico renderizado</div>);
-jest.mock("../components/ResponsesProbability", () => () => <div>Resumen de probabilidad</div>);
+jest.mock("../components/QuestionnaireForm", () => (props) => (
+  <div>
+    <div>Formulario clínico renderizado</div>
+    <button type="button" onClick={() => props.onQuestionnaireInteraction?.([])}>
+      Disparar inicio
+    </button>
+    <button type="button" onClick={() => props.onQuestionnaireInteraction?.([{ linkId: "PAT_MA", answer: [{ valueCoding: { display: "Sí" } }] }])}>
+      Disparar cambio extra
+    </button>
+    <button type="button" onClick={() => props.event?.([{ linkId: "HOSPITAL_REF", answer: [{ valueString: "HURYC" }] }])}>
+      Continuar al resumen
+    </button>
+  </div>
+));
+jest.mock("../components/ResponsesProbability", () => (props) => (
+  <div>Resumen de probabilidad {props.studyUsageFlowId}</div>
+));
 
 const buildKeycloak = (roles = ["ROLE_SITE_COORDINATOR"], allowedCenters = ["HURYC"]) => ({
   token: "token",
@@ -38,6 +60,8 @@ describe("QuestionnaireScreen", () => {
     mockNavigate.mockReset();
     mockKeycloak = buildKeycloak();
     ApiService.mockReset();
+    recordStudyUsageEvent.mockReset();
+    recordStudyUsageEvent.mockResolvedValue({ id: 1 });
     ApiService.mockResolvedValue({
       status: 200,
       ok: true,
@@ -86,5 +110,25 @@ describe("QuestionnaireScreen", () => {
         screen.queryByText("Referencias de uso clínico y de privacidad para el registro ecográfico del estudio.")
       ).not.toBeInTheDocument();
     });
+  });
+
+  it("records QUESTIONNAIRE_STARTED only once and reuses the same flowId in the save flow", async () => {
+    render(<QuestionnaireScreen />);
+
+    expect(await screen.findByText("Formulario clínico renderizado")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Disparar inicio" }));
+    await userEvent.click(screen.getByRole("button", { name: "Disparar cambio extra" }));
+
+    expect(recordStudyUsageEvent).toHaveBeenCalledTimes(1);
+    const [, usagePayload] = recordStudyUsageEvent.mock.calls[0];
+    expect(usagePayload.eventType).toBe("QUESTIONNAIRE_STARTED");
+    expect(usagePayload.flowId).toBeTruthy();
+    expect(usagePayload.centerId).toBe("HURYC");
+    expect(usagePayload.metadata).toEqual({ source: "questionnaire_form" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Continuar al resumen" }));
+
+    expect(await screen.findByText(new RegExp(`Resumen de probabilidad ${usagePayload.flowId}`))).toBeInTheDocument();
   });
 });

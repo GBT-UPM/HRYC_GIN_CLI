@@ -33,7 +33,14 @@ import '../assets/css/ResponsesScreen.css';
 import { useKeycloak } from '@react-keycloak/web';
 import ApiService from '../services/ApiService';
 import { formatCodeStatusLabel, resolveDisplayStudyIdentifier, resolveStudyCodeDisplay } from '../utils/caseMetadata';
-import { formatCaseStatusLabel, formatEvaluationStatusLabel } from '../utils/caseStatus';
+import {
+    CASE_EVALUATION_STATUS,
+    CASE_RECORD_STATUS,
+    formatCaseStatusLabel,
+    formatEvaluationStatusLabel,
+    normalizeCaseStatus,
+    normalizeEvaluationStatus,
+} from '../utils/caseStatus';
 import { formatEvaluationTypeLabel } from '../utils/evaluationType';
 import { getCareSettingDisplay } from '../utils/careSetting';
 import {
@@ -43,11 +50,14 @@ import {
     getDefaultCenter,
     getPrimaryRoleLabel,
     isSiteCoordinator,
+    isStudyCoordinator,
 } from '../utils/auth';
 import { getCaseEvaluations } from '../services/caseEvaluationService';
+import { CASE_STATUS_ERROR_MESSAGES, updateCaseStatus, updateEvaluationStatus } from '../services/caseStatusService';
 import { upsertHistopathology } from '../services/histopathologyService';
 import StudyPageHeader from '../components/StudyPageHeader';
 import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS } from '../utils/ecoScore';
+import { formatRiskDisplay } from '../utils/riskDisplay';
 
 const tipoMap = {
     'sólida': 'sólido',
@@ -189,6 +199,11 @@ const ResponsesScreen = () => {
     const [histologySaving, setHistologySaving] = useState(false);
     const [histologyError, setHistologyError] = useState('');
     const [infoOpen, setInfoOpen] = useState(false);
+    const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+    const [pendingStatusAction, setPendingStatusAction] = useState(null);
+    const [statusReason, setStatusReason] = useState('');
+    const [statusActionError, setStatusActionError] = useState('');
+    const [statusActionSaving, setStatusActionSaving] = useState(false);
 
     const parseQuestionnaireResponses = (questionnaireResponse) => {
         try {
@@ -259,6 +274,10 @@ const ResponsesScreen = () => {
         isSiteCoordinator(keycloak) &&
         allowedCenters.includes(String(item.centerId || '').trim().toUpperCase())
     );
+    const canManageAdministrativeStatus = (item) => (
+        (isSiteCoordinator(keycloak) || isStudyCoordinator(keycloak)) &&
+        allowedCenters.includes(String(item.centerId || '').trim().toUpperCase())
+    );
     const hasStructuredHistology = (item) => Boolean(item.histologyStatus);
     const isHistologyApplicable = (item) => {
         if (item.hasAdnexalMass === false) {
@@ -277,6 +296,27 @@ const ResponsesScreen = () => {
         hasStructuredHistology(item) ? 'Actualizar histopatología del caso' : 'Registrar histopatología del caso'
     );
     const getRowActionKey = (item) => `${item.caseId || 'case'}:${item.evaluationId || 'legacy'}`;
+    const getCaseAdministrativeActions = (item) => {
+        const status = normalizeCaseStatus(item?.caseStatus);
+        if (![CASE_RECORD_STATUS.OPEN, CASE_RECORD_STATUS.READY_FOR_REVIEW].includes(status)) {
+            return [];
+        }
+        return [
+            { scope: 'case', targetStatus: CASE_RECORD_STATUS.EXCLUDED, label: 'Excluir caso', targetLabel: 'Excluido' },
+            { scope: 'case', targetStatus: CASE_RECORD_STATUS.WITHDRAWN, label: 'Retirar caso', targetLabel: 'Retirado' },
+            { scope: 'case', targetStatus: CASE_RECORD_STATUS.LOCKED, label: 'Bloquear caso', targetLabel: 'Bloqueado' },
+        ];
+    };
+    const getEvaluationAdministrativeActions = (item) => {
+        const status = normalizeEvaluationStatus(item?.evaluationStatus);
+        if (![CASE_EVALUATION_STATUS.COMPLETED, CASE_EVALUATION_STATUS.CORRECTED].includes(status)) {
+            return [];
+        }
+        return [
+            { scope: 'evaluation', targetStatus: CASE_EVALUATION_STATUS.EXCLUDED, label: 'Excluir evaluación', targetLabel: 'Excluida' },
+            { scope: 'evaluation', targetStatus: CASE_EVALUATION_STATUS.LOCKED, label: 'Bloquear evaluación', targetLabel: 'Bloqueada' },
+        ];
+    };
 
     const openHistologyModal = (item) => {
         setSelectedHistologyCase(item);
@@ -298,6 +338,23 @@ const ResponsesScreen = () => {
         setHistologyModalOpen(false);
         setSelectedHistologyCase(null);
         setHistologyError('');
+    };
+
+    const openStatusDialog = (action) => {
+        setPendingStatusAction(action);
+        setStatusReason('');
+        setStatusActionError('');
+        setStatusDialogOpen(true);
+    };
+
+    const closeStatusDialog = () => {
+        if (statusActionSaving) {
+            return;
+        }
+        setStatusDialogOpen(false);
+        setPendingStatusAction(null);
+        setStatusReason('');
+        setStatusActionError('');
     };
 
     const handleHistologyFieldChange = (field) => (event) => {
@@ -484,7 +541,7 @@ const ResponsesScreen = () => {
                 }
             }
             if (ecoScore.status === ECO_SCORE_STATUS.CALCULATED) {
-                report += `<div>La probabilidad de que la masa anexial sea maligna es de ${ecoScore.probability * 100}%.</div>`;
+                report += `<div>${ecoScore.text_score}</div>`;
             }
         }
         return report;
@@ -622,6 +679,7 @@ const ResponsesScreen = () => {
     const closeEvaluationModal = () => {
         setOpenModal(false);
         setSelectedEvaluationItem(null);
+        closeStatusDialog();
     };
 
     const handleRowClick = async (item) => {
@@ -632,6 +690,46 @@ const ResponsesScreen = () => {
             setOpenModal(true);
         } catch (error) {
             console.error("Error al obtener el cuestionario:", error);
+        }
+    };
+
+    const handleConfirmStatusChange = async () => {
+        if (!pendingStatusAction?.item?.caseId) {
+            return;
+        }
+        const trimmedReason = String(statusReason || '').trim();
+        if (!trimmedReason) {
+            return;
+        }
+
+        try {
+            setStatusActionSaving(true);
+            setStatusActionError('');
+            let response;
+            if (pendingStatusAction.scope === 'case') {
+                response = await updateCaseStatus(keycloak.token, pendingStatusAction.item.caseId, {
+                    targetStatus: pendingStatusAction.targetStatus,
+                    reason: trimmedReason,
+                });
+                setSelectedEvaluationItem((current) => current ? { ...current, caseStatus: response.newStatus } : current);
+            } else {
+                response = await updateEvaluationStatus(
+                    keycloak.token,
+                    pendingStatusAction.item.caseId,
+                    pendingStatusAction.item.evaluationId,
+                    {
+                        targetStatus: pendingStatusAction.targetStatus,
+                        reason: trimmedReason,
+                    }
+                );
+                setSelectedEvaluationItem((current) => current ? { ...current, evaluationStatus: response.newStatus } : current);
+            }
+            closeStatusDialog();
+            await fetchQuestionnaire();
+        } catch (error) {
+            setStatusActionError(error.message || CASE_STATUS_ERROR_MESSAGES.network);
+        } finally {
+            setStatusActionSaving(false);
         }
     };
 
@@ -796,9 +894,7 @@ const ResponsesScreen = () => {
                                 const codeLabel = getCodeStatus(item);
                                 const caseLabel = getCaseStatus(item);
                                 const evalLabel = getEvaluationStatus(item);
-                                const riskDisplay = !isNaN(parseFloat(item.risk))
-                                    ? (parseFloat(item.risk) * 100).toFixed(2) + '%'
-                                    : item.hasAdnexalMass === false ? 'No procede' : 'No calculado';
+                                const riskDisplay = formatRiskDisplay(item);
                                 const histologyChip = getHistologyChipProps(item);
 
                                 return (
@@ -1039,6 +1135,59 @@ const ResponsesScreen = () => {
                             <Box sx={{ bgcolor: '#F8FAFC', borderRadius: 1, p: 2, border: '1px solid #EEF2F6' }}>
                                 <span className="report" dangerouslySetInnerHTML={{ __html: generateReport() }} />
                             </Box>
+                            {selectedEvaluationItem && canManageAdministrativeStatus(selectedEvaluationItem) && (
+                                <>
+                                    <Typography variant="caption" sx={{ ...SECTION_LABEL_SX, mt: 2.5, display: 'block' }}>
+                                        Gestión administrativa
+                                    </Typography>
+                                    <Box sx={{ bgcolor: '#F8FAFC', borderRadius: 1, p: 2, border: '1px solid #EEF2F6' }}>
+                                        <Stack spacing={1.5}>
+                                            <Box>
+                                                <Typography variant="body2" sx={{ color: '#52616B', fontWeight: 600 }}>
+                                                    Estado actual del caso
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#1F2933' }}>
+                                                    {formatCaseStatusLabel(selectedEvaluationItem.caseStatus)}
+                                                </Typography>
+                                            </Box>
+                                            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                                                {getCaseAdministrativeActions(selectedEvaluationItem).map((action) => (
+                                                    <Button
+                                                        key={action.targetStatus}
+                                                        size="small"
+                                                        variant="outlined"
+                                                        sx={ACTION_BTN_SX}
+                                                        onClick={() => openStatusDialog({ ...action, item: selectedEvaluationItem })}
+                                                    >
+                                                        {action.label}
+                                                    </Button>
+                                                ))}
+                                            </Stack>
+                                            <Box>
+                                                <Typography variant="body2" sx={{ color: '#52616B', fontWeight: 600 }}>
+                                                    Estado actual de la evaluación
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#1F2933' }}>
+                                                    {formatEvaluationStatusLabel(selectedEvaluationItem.evaluationStatus)}
+                                                </Typography>
+                                            </Box>
+                                            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                                                {getEvaluationAdministrativeActions(selectedEvaluationItem).map((action) => (
+                                                    <Button
+                                                        key={action.targetStatus}
+                                                        size="small"
+                                                        variant="outlined"
+                                                        sx={ACTION_BTN_SX}
+                                                        onClick={() => openStatusDialog({ ...action, item: selectedEvaluationItem })}
+                                                    >
+                                                        {action.label}
+                                                    </Button>
+                                                ))}
+                                            </Stack>
+                                        </Stack>
+                                    </Box>
+                                </>
+                            )}
                         </>
                     ) : (
                         <Typography variant="body2" sx={{ color: '#52616B' }}>
@@ -1049,6 +1198,52 @@ const ResponsesScreen = () => {
                 <DialogActions sx={DIALOG_ACTIONS_SX}>
                     <Button variant="outlined" onClick={closeEvaluationModal} sx={SECONDARY_BTN_SX}>
                         Cerrar
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={statusDialogOpen}
+                onClose={closeStatusDialog}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{ sx: DIALOG_PAPER_SX }}
+            >
+                <DialogTitle sx={DIALOG_TITLE_SX}>
+                    Confirmar cambio de estado
+                </DialogTitle>
+                <DialogContent dividers sx={DIALOG_CONTENT_SX}>
+                    <Typography variant="body2" sx={{ color: '#52616B', mb: 2 }}>
+                        {pendingStatusAction
+                            ? `Va a cambiar el estado del ${pendingStatusAction.scope === 'case' ? 'caso' : 'evaluación'} a '${pendingStatusAction.targetLabel}'. Esta acción quedará auditada.`
+                            : ''}
+                    </Typography>
+                    <TextField
+                        label="Motivo del cambio *"
+                        value={statusReason}
+                        onChange={(event) => setStatusReason(event.target.value)}
+                        fullWidth
+                        multiline
+                        minRows={3}
+                        disabled={statusActionSaving}
+                    />
+                    {statusActionError && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                            {statusActionError}
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions sx={DIALOG_ACTIONS_SX}>
+                    <Button variant="outlined" onClick={closeStatusDialog} sx={SECONDARY_BTN_SX} disabled={statusActionSaving}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmStatusChange}
+                        sx={PRIMARY_BTN_SX}
+                        disabled={statusActionSaving || String(statusReason || '').trim().length === 0}
+                    >
+                        Confirmar
                     </Button>
                 </DialogActions>
             </Dialog>

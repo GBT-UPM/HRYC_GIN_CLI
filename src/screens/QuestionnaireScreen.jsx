@@ -4,7 +4,7 @@
 import { CategoryScale } from "chart.js";
 import Chart from "chart.js/auto";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useKeycloak } from '@react-keycloak/web';
 import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Stack, Typography } from "@mui/material";
 import { Close, InfoOutlined } from "@mui/icons-material";
@@ -18,6 +18,11 @@ import ResponsesProbability from "../components/ResponsesProbability";
 import { useNavigate } from "react-router-dom";
 import { getAllowedCenters, getCentersDisplayLabel, getPrimaryRoleLabel, isSiteCoordinator, isStudyCoordinator } from "../utils/auth";
 import { DEFAULT_CARE_SETTING, normalizeCareSetting } from "../utils/careSetting";
+import { mapCenterToCode } from "../utils/caseMetadata";
+import {
+  recordStudyUsageEvent,
+  STUDY_USAGE_EVENT_TYPES,
+} from "../services/studyUsageEventService";
 Chart.register(CategoryScale);
 
 const HEADER_PAPER_SX = {
@@ -82,6 +87,36 @@ export const generatePeriod = () => {
   return { start, end };
 };
 
+const findAnswerByLinkId = (answers = [], linkId) =>
+  answers.find((item) => item.linkId === linkId)?.answer?.[0] || null;
+
+const resolveQuestionnaireCenterId = (answers = []) => {
+  const answer = findAnswerByLinkId(answers, "HOSPITAL_REF");
+  return mapCenterToCode(answer?.valueString || answer?.valueCoding?.display || "");
+};
+
+const resolveHasAdnexalMass = (answers = []) => {
+  const answer = findAnswerByLinkId(answers, "PAT_MA");
+  if (!answer) {
+    return null;
+  }
+
+  const value = String(answer?.valueCoding?.display || answer?.valueCoding?.code || "").trim().toLowerCase();
+  if (!value) {
+    return null;
+  }
+
+  if (value === "sí" || value === "si" || value === "yes") {
+    return true;
+  }
+
+  if (value === "no") {
+    return false;
+  }
+
+  return null;
+};
+
 export default function QuestionnaireScreen() {
   const { keycloak, initialized } = useKeycloak();
   const token = keycloak?.token;
@@ -96,6 +131,9 @@ export default function QuestionnaireScreen() {
   const [careSetting, setCareSetting] = useState(DEFAULT_CARE_SETTING);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [studyUsageFlowId, setStudyUsageFlowId] = useState(() => uuidv4());
+  const hasRecordedQuestionnaireStartRef = useRef(false);
+  const isRecordingQuestionnaireStartRef = useRef(false);
 
 
   //const {probability,setProbality}=useState(false);
@@ -119,6 +157,12 @@ export default function QuestionnaireScreen() {
 
     return "Centro pendiente";
   }, [allowedCenters, keycloak]);
+
+  const resetStudyUsageSession = useCallback(() => {
+    setStudyUsageFlowId(uuidv4());
+    hasRecordedQuestionnaireStartRef.current = false;
+    isRecordingQuestionnaireStartRef.current = false;
+  }, []);
 
   const fetchQuestionnaire = useCallback(async () => {
     if (!token) {
@@ -206,6 +250,40 @@ export default function QuestionnaireScreen() {
     setQuestionnaireResponses((prev) => [...prev, questionnaireResponse]);
     setHasUnsavedChanges(true);
   };
+  const handleQuestionnaireInteraction = useCallback(async (answers = []) => {
+    if (!token || hasRecordedQuestionnaireStartRef.current || isRecordingQuestionnaireStartRef.current) {
+      return;
+    }
+
+    const derivedCenterId =
+      resolveQuestionnaireCenterId(answers) ||
+      (allowedCenters.length === 1 ? allowedCenters[0] : "");
+
+    if (!derivedCenterId) {
+      return;
+    }
+
+    isRecordingQuestionnaireStartRef.current = true;
+
+    try {
+      await recordStudyUsageEvent(token, {
+        eventType: STUDY_USAGE_EVENT_TYPES.questionnaireStarted,
+        flowId: studyUsageFlowId,
+        centerId: derivedCenterId,
+        careSettingCode: normalizeCareSetting(careSetting?.code || careSetting).code,
+        evaluationType: "PRIMARY",
+        hasAdnexalMass: resolveHasAdnexalMass(answers),
+        metadata: {
+          source: "questionnaire_form",
+        },
+      });
+      hasRecordedQuestionnaireStartRef.current = true;
+    } catch (error) {
+      console.error("[QuestionnaireScreen] No se pudo registrar QUESTIONNAIRE_STARTED:", error);
+    } finally {
+      isRecordingQuestionnaireStartRef.current = false;
+    }
+  }, [allowedCenters, careSetting, studyUsageFlowId, token]);
   const QBack = async (anwers) => {
     setQuestionnaireResponses([]);
     setResponses([]);
@@ -213,6 +291,7 @@ export default function QuestionnaireScreen() {
     setStudyPatientCode("");
     setCareSetting(DEFAULT_CARE_SETTING);
     setHasUnsavedChanges(false);
+    resetStudyUsageSession();
     // checkUserRoles();
 
     fetchQuestionnaire();
@@ -234,6 +313,7 @@ export default function QuestionnaireScreen() {
     setStudyPatientCode("");
     setCareSetting(DEFAULT_CARE_SETTING);
     setHasUnsavedChanges(false);
+    resetStudyUsageSession();
     // checkUserRoles();
   
     fetchQuestionnaire();
@@ -373,6 +453,7 @@ export default function QuestionnaireScreen() {
                 setCareSetting(normalizeCareSetting(nextCareSetting?.code || nextCareSetting))
               }
               onDirtyChange={setHasUnsavedChanges}
+              onQuestionnaireInteraction={handleQuestionnaireInteraction}
             />
 	        ) : (
 	          // <ResponsesSummary event={QBack} responses={responses} />
@@ -384,9 +465,11 @@ export default function QuestionnaireScreen() {
               studyPatientCode={studyPatientCode}
               canUseStudyPatientCode={isSiteCoordinator(keycloak)}
               careSetting={careSetting}
+              studyUsageFlowId={studyUsageFlowId}
               onCaseSaved={() => {
                 setStudyPatientCode("");
                 setHasUnsavedChanges(false);
+                resetStudyUsageSession();
               }}
             />
         )

@@ -56,7 +56,7 @@ const makeQR = (hospitalRef = 'HURYC') => ({
 const makeReport = (text = 'Descripción ecográfica de prueba') => ({
   text,
   score: 0.8,
-  text_score: 'La probabilidad de que la masa anexial sea maligna es de 80%.',
+  text_score: 'La probabilidad de que la masa anexial sea maligna es de 80.00 %.',
 });
 
 const pdfText = () =>
@@ -173,6 +173,7 @@ describe('generateClinicalReportPdf', () => {
 
     expect(pdfText()).toContain('ECO-SCORE');
     expect(pdfText()).toContain('La probabilidad de que la masa anexial sea maligna');
+    expect(pdfText()).toContain('80.00 %.');
   });
 
   it('does not include ECO-SCORE when includeProbability is false', () => {

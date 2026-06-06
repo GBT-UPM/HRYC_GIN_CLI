@@ -56,6 +56,7 @@ const QuestionnaireForm = ({
   careSettingCode = "UNKNOWN",
   onCareSettingChange = () => {},
   onDirtyChange = () => {},
+  onQuestionnaireInteraction = () => {},
 }) => {
   const [answers, setAnswers] = useState([]);
   const [error, setError] = useState("");
@@ -80,7 +81,11 @@ function getEnabledLinkIds(items, currentAnswers) {
 
   for (const item of items) {
     // Verificamos si este ítem está habilitado con sus condiciones
-    const thisItemEnabled = checkEnableWhen(item.enableWhen, currentAnswers);
+    const thisItemEnabled = checkEnableWhen(
+      item.enableWhen,
+      currentAnswers,
+      item.enableBehavior
+    );
 
     if (thisItemEnabled) {
       // Agregamos este linkId
@@ -100,6 +105,7 @@ function getEnabledLinkIds(items, currentAnswers) {
 
   const handleInputChange = (questionText,linkId, type, value,display) => {
     onDirtyChange(true);
+    let nextAnswersSnapshot = answers;
     setAnswers((prevAnswers) => {
       const existingAnswerIndex = prevAnswers.findIndex(
         (answer) => answer.linkId === linkId
@@ -151,10 +157,18 @@ function getEnabledLinkIds(items, currentAnswers) {
         enabledLinkIds.includes(ans.linkId) && !HIDDEN_LINK_IDS.has(ans.linkId)
       );
 
+      nextAnswersSnapshot = cleanedAnswers;
+
       return cleanedAnswers;
    
     });
 
+    onQuestionnaireInteraction(nextAnswersSnapshot, {
+      linkId,
+      questionText,
+      type,
+      display,
+    });
     setRequiredFieldsError("");
    
   };
@@ -162,10 +176,10 @@ function getEnabledLinkIds(items, currentAnswers) {
  * Determina si un ítem (y su descendencia) está habilitado,
  * evaluando sus condiciones enableWhen y la habilitación del padre.
  */
-function checkEnableWhen(enableWhen, currentAnswers) {
+function checkEnableWhen(enableWhen, currentAnswers, enableBehavior) {
   if (!enableWhen) return true;
 
-  return enableWhen.every((condition) => {
+  const matchesCondition = (condition) => {
     const answer = currentAnswers.find((a) => a.linkId === condition.question);
     // Si no hay respuesta para la pregunta que condiciona, no se cumple
     if (!answer) return false;
@@ -201,7 +215,13 @@ function checkEnableWhen(enableWhen, currentAnswers) {
       default:
         return false;
     }
-  });
+  };
+
+  if (enableBehavior === "any") {
+    return enableWhen.some(matchesCondition);
+  }
+
+  return enableWhen.every(matchesCondition);
 }
 
 const getAnswerDisplayValue = (linkId) => {
@@ -222,7 +242,7 @@ const getAnswerDisplayValue = (linkId) => {
    * Se llama en tiempo de render para saber si mostrar o no el ítem.
    */
 const isItemEnabled = (item) => {
-  return checkEnableWhen(item.enableWhen, answers);
+  return checkEnableWhen(item.enableWhen, answers, item.enableBehavior);
 };
 
 const getItemClassName = (item, extraClassName = "") => {
@@ -735,6 +755,10 @@ const renderInput = (item) => {
             onChange={(event) => {
               onTransientNhcChange(event.target.value);
               onDirtyChange(true);
+              onQuestionnaireInteraction(answers, {
+                linkId: "transient-nhc",
+                type: "string",
+              });
               if (event.target.value.trim()) {
                 setNhcError("");
                 if (error === NHC_REQUIRED_MESSAGE) {
@@ -771,6 +795,10 @@ const renderInput = (item) => {
 	              const selected = normalizeCareSetting(event.target.value);
 	              onCareSettingChange(selected);
 	              onDirtyChange(true);
+                onQuestionnaireInteraction(answers, {
+                  linkId: "care-setting",
+                  type: "choice",
+                });
 	            }}
 	            required
 	          >
@@ -794,6 +822,10 @@ const renderInput = (item) => {
               onChange={(event) => {
                 onStudyPatientCodeChange(event.target.value);
                 onDirtyChange(true);
+                onQuestionnaireInteraction(answers, {
+                  linkId: "study-patient-code",
+                  type: "string",
+                });
                 setStudyCodeError("");
                 if (error === STUDY_PARTICIPANT_ERROR_MESSAGES.conflict) {
                   setError("");

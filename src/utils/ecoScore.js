@@ -1,3 +1,5 @@
+import { formatProbabilityFromDecimal } from './riskDisplay';
+
 export const ECO_SCORE_STATUS = {
   CALCULATED: 'CALCULATED',
   NOT_APPLICABLE: 'NOT_APPLICABLE',
@@ -116,16 +118,6 @@ export const calculateEcoScore = (inputs = {}) => {
     };
   }
 
-  if (!isBlank(inputs.probabilityRequested) && isNo(inputs.probabilityRequested)) {
-    return {
-      status: ECO_SCORE_STATUS.NOT_REQUESTED,
-      probability: null,
-      score: null,
-      text_score: '',
-      missingVariables: [],
-    };
-  }
-
   const missingVariables = [];
   const contour = normalizeContour(inputs.contour);
   if (!contour) missingVariables.push(LINK_IDS.CONTOUR);
@@ -170,7 +162,7 @@ export const calculateEcoScore = (inputs = {}) => {
     status: ECO_SCORE_STATUS.CALCULATED,
     probability,
     score,
-    text_score: `La probabilidad de que la masa anexial sea maligna es de ${probability * 100}%.`,
+    text_score: `La probabilidad de que la masa anexial sea maligna es de ${formatProbabilityFromDecimal(probability, { withSpace: true })}.`,
     missingVariables: [],
   };
 };

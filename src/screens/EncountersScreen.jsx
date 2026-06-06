@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { Close, KeyboardArrowDown, KeyboardArrowUp } from '@mui/icons-material';
+import { v4 as uuidv4 } from 'uuid';
 import StudyPageHeader from '../components/StudyPageHeader';
 import '../assets/css/ResponsesScreen.css';
 import { useKeycloak } from '@react-keycloak/web';
@@ -19,6 +20,11 @@ import { formatEvaluationTypeLabel } from '../utils/evaluationType';
 import { canUseGlobalView, getAllowedCenters, getCentersDisplayLabel, getDefaultCenter, getPrimaryRoleLabel } from '../utils/auth';
 import { getCaseEvaluations } from '../services/caseEvaluationService';
 import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS } from '../utils/ecoScore';
+import { formatRiskDisplay } from '../utils/riskDisplay';
+import {
+    recordStudyUsageEvent,
+    STUDY_USAGE_EVENT_TYPES,
+} from '../services/studyUsageEventService';
 
 const getStatusChipSx = (label) => {
     const lc = (label || '').toLowerCase();
@@ -76,6 +82,15 @@ const DIALOG_TITLE_SX = {
     borderBottom: '1px solid #EEF2F6',
     pb: 1.5,
     pr: 6,
+};
+
+const createUsageFlowId = () => {
+    try {
+        const generatedId = typeof uuidv4 === 'function' ? uuidv4() : '';
+        return generatedId || `usage-${Date.now()}`;
+    } catch (error) {
+        return `usage-${Date.now()}`;
+    }
 };
 
 const DIALOG_CONTENT_SX = { px: 3, py: 2.5 };
@@ -247,11 +262,11 @@ const EncountersScreen = () => {
         });
         return Array.from(groups.entries()).map(([key, items]) => {
             const first = items[0] || {};
-            const riskValues = items
-                .map((item) => item.risk)
-                .filter((risk) => risk !== null && risk !== undefined && String(risk).trim() !== '');
             const hasAnyMass = items.some(hasAdnexalMass);
             const lesionLabels = Array.from(new Set(items.map(getLesionLabel)));
+            const riskLabels = items
+                .map((item) => formatRiskDisplay(item))
+                .filter((risk) => risk !== null && risk !== undefined && String(risk).trim() !== '');
             return {
                 key,
                 encounterId: first.encounterId || '',
@@ -268,8 +283,8 @@ const EncountersScreen = () => {
                 lesionLabels,
                 lesionSummary: lesionLabels.length > 3 ? `${lesionLabels.slice(0, 3).join('; ')} +${lesionLabels.length - 3}` : lesionLabels.join('; '),
                 evaluationsSummary: getEvaluationsSummary(items),
-                riskSummary: riskValues.length > 0
-                    ? riskValues.map((risk) => !isNaN(parseFloat(risk)) ? `${(parseFloat(risk) * 100).toFixed(2)}%` : risk).join(', ')
+                riskSummary: riskLabels.length > 0
+                    ? riskLabels.join(', ')
                     : hasAnyMass ? 'No calculado' : 'No procede',
                 lesions: items,
             };
@@ -308,6 +323,34 @@ const EncountersScreen = () => {
                 practitionerName: practitionerName || '',
                 careSettingDisplay: rowItem.careSettingDisplay || '',
                 studyPatientCode: studyIdentifier || '',
+            });
+
+            const numberOfMassesInEncounter = Array.isArray(rowItem.lesions)
+                ? rowItem.lesions.filter((item) => item?.hasAdnexalMass !== false).length
+                : responses.filter((response) => {
+                    const massAnswer = response?.item?.find((item) => item.linkId === 'PAT_MA')?.answer?.[0];
+                    const value = String(massAnswer?.valueCoding?.display || massAnswer?.valueCoding?.code || '').trim().toLowerCase();
+                    return value === 'sí' || value === 'si' || value === 'yes';
+                }).length;
+
+            void recordStudyUsageEvent(keycloak.token, {
+                eventType: STUDY_USAGE_EVENT_TYPES.reportGenerated,
+                flowId: createUsageFlowId(),
+                centerId: rowItem.centerId || null,
+                caseId: rowItem.caseId ?? null,
+                evaluationId: rowItem.evaluationId ?? null,
+                encounterId: rowItem.encounterId || null,
+                questionnaireResponseFhirId: rowItem.questionnaireResponseFhirId ?? null,
+                careSettingCode: rowItem.careSettingCode || null,
+                evaluationType: rowItem.evaluationType || null,
+                hasAdnexalMass: numberOfMassesInEncounter > 0,
+                numberOfMassesInEncounter,
+                metadata: {
+                    reportSource: 'encounters_screen',
+                    includesProbability: Boolean(includeProbability),
+                },
+            }).catch((usageError) => {
+                console.error('No se pudo registrar REPORT_GENERATED:', usageError);
             });
         } catch (error) {
             console.error('Error al generar el informe:', error);
@@ -889,9 +932,7 @@ const EncountersScreen = () => {
                                                                         : item.evaluationType === 'SECONDARY'
                                                                             ? 'Compartida con caso'
                                                                             : item.histology || item.histologyStatus || 'Pendiente';
-                                                                    const riskDisplay = !isNaN(parseFloat(item.risk))
-                                                                        ? `${(parseFloat(item.risk) * 100).toFixed(2)}%`
-                                                                        : hasAdnexalMass(item) ? 'No calculado' : 'No procede';
+                                                                    const riskDisplay = formatRiskDisplay(item);
                                                                     return (
                                                                         <TableRow key={item.evaluationId || item.caseId}>
                                                                             <TableCell>{item.caseDisplayId || '—'}</TableCell>

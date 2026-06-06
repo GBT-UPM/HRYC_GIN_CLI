@@ -3,13 +3,42 @@ import userEvent from "@testing-library/user-event";
 import { within } from "@testing-library/react";
 import ResponsesProbability from "./ResponsesProbability";
 import ApiService from "../services/ApiService";
-import { CASE_ERROR_MESSAGES } from "../services/caseService";
+import {
+  addSecondaryEvaluation,
+  CASE_ERROR_MESSAGES,
+  checkDuplicateCase,
+  createCase,
+} from "../services/caseService";
+import { upsertEcoScoreResult } from "../services/ecoScoreResultService";
+import { recordStudyUsageEvent } from "../services/studyUsageEventService";
 import LogoHRYC from "../assets/images/LogoHRYC.jpg";
 import Logo12oct from "../assets/images/Logo12oct.jpg";
 
 jest.mock("../services/ApiService", () => jest.fn());
+jest.mock("../services/caseService", () => ({
+  addSecondaryEvaluation: jest.fn(),
+  checkDuplicateCase: jest.fn(),
+  createCase: jest.fn(),
+  CASE_ERROR_MESSAGES: {
+    forbidden: "forbidden",
+    studyCodeConflict: "conflict",
+    unauthorized: "unauthorized",
+    network: "No se pudo guardar el caso. Revise la conexión e inténtelo de nuevo.",
+  },
+}));
+jest.mock("../services/ecoScoreResultService", () => ({
+  upsertEcoScoreResult: jest.fn(),
+}));
+jest.mock("../services/studyUsageEventService", () => ({
+  recordStudyUsageEvent: jest.fn(),
+  STUDY_USAGE_EVENT_TYPES: {
+    questionnaireSaved: "QUESTIONNAIRE_SAVED",
+    reportGenerated: "REPORT_GENERATED",
+  },
+}));
 
 const mockGenerateEncounter = jest.fn(() => ({ resourceType: "Encounter" }));
+const mockGenerateRiskAssessment = jest.fn(() => ({ resourceType: "RiskAssessment" }));
 const mockPdfInstance = {
   addImage: jest.fn(),
   setFont: jest.fn(),
@@ -65,7 +94,7 @@ jest.mock("../hooks/useImageStudyTemplate", () => ({
 
 jest.mock("../hooks/useRiskAssessmentTemplate", () => ({
   useRiskAssessmentTemplate: () => ({
-    generateRiskAssessment: jest.fn(() => ({ resourceType: "RiskAssessment" })),
+    generateRiskAssessment: mockGenerateRiskAssessment,
   }),
 }));
 
@@ -138,18 +167,23 @@ const renderComponent = (props = {}) => render(
     studyPatientCode="HURYC-0001"
     canUseStudyPatientCode
     careSetting={{ code: "EMERGENCY", display: "Urgencias" }}
+    studyUsageFlowId="flow-123"
     onCaseSaved={jest.fn()}
     {...props}
   />
 );
 
-const setupApi = ({ secondCaseResponse = okResponse({ questionnaireResponseFhirId: "qr-1" }) } = {}) => {
+const setupApi = ({ secondCaseResponse = { questionnaireResponseFhirId: "qr-1", evaluationId: 88 } } = {}) => {
   let createCaseCalls = 0;
-  ApiService.mockImplementation((token, method, endpoint, body) => {
-    if (endpoint === "/app/cases/check-duplicate") {
-      return Promise.resolve(okResponse({ matches: [] }));
+  checkDuplicateCase.mockResolvedValue({ matches: [] });
+  createCase.mockImplementation(() => {
+    createCaseCalls += 1;
+    if (createCaseCalls === 1) {
+      return Promise.reject(new Error(CASE_ERROR_MESSAGES.studyCodeConflict));
     }
-
+    return Promise.resolve(secondCaseResponse);
+  });
+  ApiService.mockImplementation((token, method, endpoint, body) => {
     if (endpoint === "/audit/register") {
       return Promise.resolve({ ok: true, status: 200 });
     }
@@ -164,11 +198,6 @@ const setupApi = ({ secondCaseResponse = okResponse({ questionnaireResponseFhirI
 
     if (endpoint === "/fhir/ImagingStudy") {
       return Promise.resolve({ ok: true, status: 200 });
-    }
-
-    if (endpoint === "/app/cases") {
-      createCaseCalls += 1;
-      return Promise.resolve(createCaseCalls === 1 ? conflictResponse() : secondCaseResponse);
     }
 
     if (endpoint === "/fhir/Observation" || endpoint === "/fhir/RiskAssessment") {
@@ -181,14 +210,13 @@ const setupApi = ({ secondCaseResponse = okResponse({ questionnaireResponseFhirI
 
 const setupDuplicateSecondaryApi = ({
   duplicateMatch,
-  secondaryResponse = okResponse({ questionnaireResponseFhirId: "qr-2" }),
-  independentResponse = okResponse({ questionnaireResponseFhirId: "qr-3" }),
+  secondaryResponse = { questionnaireResponseFhirId: "qr-2", evaluationId: 89 },
+  independentResponse = { questionnaireResponseFhirId: "qr-3", evaluationId: 90 },
 }) => {
+  checkDuplicateCase.mockResolvedValue({ matches: [duplicateMatch] });
+  addSecondaryEvaluation.mockResolvedValue(secondaryResponse);
+  createCase.mockResolvedValue(independentResponse);
   ApiService.mockImplementation((token, method, endpoint) => {
-    if (endpoint === "/app/cases/check-duplicate") {
-      return Promise.resolve(okResponse({ matches: [duplicateMatch] }));
-    }
-
     if (endpoint === "/audit/register") {
       return Promise.resolve({ ok: true, status: 200 });
     }
@@ -203,14 +231,6 @@ const setupDuplicateSecondaryApi = ({
 
     if (endpoint === "/fhir/ImagingStudy") {
       return Promise.resolve({ ok: true, status: 200 });
-    }
-
-    if (endpoint === "/app/cases/7/evaluations") {
-      return Promise.resolve(secondaryResponse);
-    }
-
-    if (endpoint === "/app/cases") {
-      return Promise.resolve(independentResponse);
     }
 
     if (endpoint === "/fhir/Observation" || endpoint === "/fhir/RiskAssessment") {
@@ -244,8 +264,17 @@ const submitInitialSave = async () => {
 describe("ResponsesProbability study code conflict flow", () => {
   beforeEach(() => {
     ApiService.mockReset();
+    createCase.mockReset();
+    addSecondaryEvaluation.mockReset();
+    checkDuplicateCase.mockReset();
+    recordStudyUsageEvent.mockReset();
+    recordStudyUsageEvent.mockResolvedValue({ id: 1 });
+    upsertEcoScoreResult.mockReset();
     mockGenerateEncounter.mockClear();
     mockGenerateEncounter.mockReturnValue({ resourceType: "Encounter" });
+    mockGenerateRiskAssessment.mockClear();
+    mockGenerateRiskAssessment.mockReturnValue({ resourceType: "RiskAssessment" });
+    upsertEcoScoreResult.mockResolvedValue({ id: 1 });
     Object.values(mockPdfInstance).forEach((value) => {
       if (typeof value === "function" && value.mockClear) {
         value.mockClear();
@@ -313,10 +342,11 @@ describe("ResponsesProbability study code conflict flow", () => {
   });
 
   const setupPdfApi = () => {
+    checkDuplicateCase.mockResolvedValue({ matches: [] });
+    createCase.mockResolvedValue({ questionnaireResponseFhirId: "qr-1", evaluationId: 88 });
     ApiService.mockImplementation((token, method, endpoint) => {
-      if (endpoint === "/app/cases/check-duplicate") return Promise.resolve(okResponse({ matches: [] }));
       if (["/audit/register", "/fhir/Patient/check-or-create", "/fhir/Encounter", "/fhir/ImagingStudy"].includes(endpoint)) return Promise.resolve({ ok: true, status: 200 });
-      if (["/app/cases", "/fhir/Observation", "/fhir/RiskAssessment"].includes(endpoint)) return Promise.resolve(okResponse({ questionnaireResponseFhirId: "qr-1" }));
+      if (["/fhir/Observation", "/fhir/RiskAssessment"].includes(endpoint)) return Promise.resolve(okResponse({ questionnaireResponseFhirId: "qr-1" }));
       return Promise.resolve(okResponse({}));
     });
   };
@@ -420,16 +450,16 @@ describe("ResponsesProbability study code conflict flow", () => {
 
     await waitFor(() => expect(event).toHaveBeenCalled());
 
-    const createCaseCalls = ApiService.mock.calls.filter((call) => call[2] === "/app/cases");
+    const createCaseCalls = createCase.mock.calls;
     expect(createCaseCalls).toHaveLength(2);
-    expect(createCaseCalls[0][3].studyPatientCode).toBe("HURYC-0001");
-    expect(createCaseCalls[0][3].careSettingCode).toBe("EMERGENCY");
-    expect(createCaseCalls[0][3].careSettingDisplay).toBe("Urgencias");
-    expect(createCaseCalls[1][3].studyPatientCode).toBe("HURYC-0002");
-    expect(JSON.stringify(createCaseCalls[1][3].questionnaireResponse)).not.toContain("EMERGENCY");
-    expect(JSON.stringify(createCaseCalls[1][3].questionnaireResponse)).not.toContain("HURYC-0002");
-    expect(JSON.stringify(createCaseCalls[1][3].questionnaireResponse)).not.toContain("PAT_CODIGO");
-    expect(JSON.stringify(createCaseCalls[1][3].questionnaireResponse)).not.toContain("PAT_NHC");
+    expect(createCaseCalls[0][1].studyPatientCode).toBe("HURYC-0001");
+    expect(createCaseCalls[0][1].careSettingCode).toBe("EMERGENCY");
+    expect(createCaseCalls[0][1].careSettingDisplay).toBe("Urgencias");
+    expect(createCaseCalls[1][1].studyPatientCode).toBe("HURYC-0002");
+    expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("EMERGENCY");
+    expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("HURYC-0002");
+    expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("PAT_CODIGO");
+    expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("PAT_NHC");
     expect(ApiService.mock.calls.filter((call) => call[2] === "/fhir/Patient/check-or-create")).toHaveLength(1);
     expect(window.localStorage.getItem("123456")).toBeNull();
     expect(window.sessionStorage.getItem("123456")).toBeNull();
@@ -446,11 +476,11 @@ describe("ResponsesProbability study code conflict flow", () => {
 
     await waitFor(() => expect(event).toHaveBeenCalled());
 
-    const createCaseCalls = ApiService.mock.calls.filter((call) => call[2] === "/app/cases");
+    const createCaseCalls = createCase.mock.calls;
     expect(createCaseCalls).toHaveLength(2);
-    expect(createCaseCalls[1][3]).not.toHaveProperty("studyPatientCode");
-    expect(createCaseCalls[1][3].nhc).toBe("123456");
-    expect(JSON.stringify(createCaseCalls[1][3].questionnaireResponse)).not.toContain("123456");
+    expect(createCaseCalls[1][1].studyPatientCode).toBeUndefined();
+    expect(createCaseCalls[1][1].nhc).toBe("123456");
+    expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("123456");
   });
 
   it("passes metadata centerId to Encounter generation", async () => {
@@ -488,9 +518,14 @@ describe("ResponsesProbability study code conflict flow", () => {
 
     await waitFor(() => expect(event).toHaveBeenCalled());
 
-    const secondaryCall = ApiService.mock.calls.find((call) => call[2] === "/app/cases/7/evaluations");
-    expect(secondaryCall[3].studyPatientCode).toBe("HURYC-0001");
-    expect(JSON.stringify(secondaryCall[3].questionnaireResponse)).not.toContain("PAT_CODIGO");
+    expect(addSecondaryEvaluation).toHaveBeenCalledWith(
+      "token",
+      "7",
+      expect.objectContaining({
+        studyPatientCode: "HURYC-0001",
+      })
+    );
+    expect(JSON.stringify(addSecondaryEvaluation.mock.calls[0][2].questionnaireResponse)).not.toContain("PAT_CODIGO");
   });
 
   it("shows the redesigned duplicate modal without exposing NHC or pseudonym fields", async () => {
@@ -549,8 +584,7 @@ describe("ResponsesProbability study code conflict flow", () => {
 
     await waitFor(() => expect(event).toHaveBeenCalled());
 
-    const secondaryCall = ApiService.mock.calls.find((call) => call[2] === "/app/cases/7/evaluations");
-    expect(secondaryCall[3]).not.toHaveProperty("studyPatientCode");
+    expect(addSecondaryEvaluation.mock.calls[0][2].studyPatientCode).toBeUndefined();
   });
 
   it("keeps the close controls working in the duplicate modal", async () => {
@@ -594,7 +628,7 @@ describe("ResponsesProbability study code conflict flow", () => {
 
     await waitFor(() => expect(event).toHaveBeenCalled());
 
-    const createCaseCalls = ApiService.mock.calls.filter((call) => call[2] === "/app/cases");
+    const createCaseCalls = createCase.mock.calls;
     expect(createCaseCalls).toHaveLength(1);
   });
 
@@ -637,18 +671,25 @@ describe("no-mass questionnaire (PAT_MA = No)", () => {
   };
 
   const setupNoMassApi = () => {
+    createCase.mockResolvedValue({ questionnaireResponseFhirId: "qr-no-mass-1", evaluationId: 88 });
     ApiService.mockImplementation((token, method, endpoint) => {
-      if (endpoint === "/app/cases/check-duplicate") return Promise.resolve(okResponse({ matches: [] }));
       if (["/audit/register", "/fhir/Patient/check-or-create", "/fhir/Encounter", "/fhir/ImagingStudy"].includes(endpoint)) return Promise.resolve({ ok: true, status: 200 });
-      if (["/app/cases", "/fhir/Observation", "/fhir/RiskAssessment"].includes(endpoint)) return Promise.resolve(okResponse({ questionnaireResponseFhirId: "qr-no-mass-1" }));
+      if (["/fhir/Observation", "/fhir/RiskAssessment"].includes(endpoint)) return Promise.resolve(okResponse({ questionnaireResponseFhirId: "qr-no-mass-1" }));
       return Promise.resolve(okResponse({}));
     });
   };
 
   beforeEach(() => {
     ApiService.mockReset();
+    createCase.mockReset();
+    addSecondaryEvaluation.mockReset();
+    checkDuplicateCase.mockReset();
+    upsertEcoScoreResult.mockReset();
     mockGenerateEncounter.mockClear();
     mockGenerateEncounter.mockReturnValue({ resourceType: "Encounter" });
+    mockGenerateRiskAssessment.mockClear();
+    mockGenerateRiskAssessment.mockReturnValue({ resourceType: "RiskAssessment" });
+    upsertEcoScoreResult.mockResolvedValue({ id: 1 });
     Object.values(mockPdfInstance).forEach((v) => {
       if (typeof v === "function" && v.mockClear) v.mockClear();
     });
@@ -689,8 +730,7 @@ describe("no-mass questionnaire (PAT_MA = No)", () => {
 
     await waitFor(() => expect(event).toHaveBeenCalled());
 
-    const duplicateCalls = ApiService.mock.calls.filter((c) => c[2] === "/app/cases/check-duplicate");
-    expect(duplicateCalls).toHaveLength(0);
+    expect(checkDuplicateCase).not.toHaveBeenCalled();
   });
 
   it("calls createCase and completes the save for a no-mass questionnaire", async () => {
@@ -706,7 +746,7 @@ describe("no-mass questionnaire (PAT_MA = No)", () => {
 
     await waitFor(() => expect(event).toHaveBeenCalled());
 
-    const createCaseCalls = ApiService.mock.calls.filter((c) => c[2] === "/app/cases");
+    const createCaseCalls = createCase.mock.calls;
     expect(createCaseCalls).toHaveLength(1);
   });
 
@@ -735,6 +775,20 @@ describe("no-mass questionnaire (PAT_MA = No)", () => {
 });
 
 describe("probability inclusion modal content and behaviour", () => {
+  const setupPdfFlowApi = () => {
+    checkDuplicateCase.mockResolvedValue({ matches: [] });
+    createCase.mockResolvedValue({ questionnaireResponseFhirId: "qr-1", evaluationId: 88 });
+    ApiService.mockImplementation((token, method, endpoint) => {
+      if (["/audit/register", "/fhir/Patient/check-or-create", "/fhir/Encounter", "/fhir/ImagingStudy"].includes(endpoint)) {
+        return Promise.resolve({ ok: true, status: 200 });
+      }
+      if (["/fhir/Observation", "/fhir/RiskAssessment"].includes(endpoint)) {
+        return Promise.resolve(okResponse({ questionnaireResponseFhirId: "qr-1" }));
+      }
+      return Promise.resolve(okResponse({}));
+    });
+  };
+
   const calculableEcoScoreItems = [
     { linkId: "MA_PROB", answer: [{ valueCoding: { display: "Sí" } }] },
     { linkId: "MA_Q_CONTORNO", answer: [{ valueCoding: { display: "Regular" } }] },
@@ -749,10 +803,29 @@ describe("probability inclusion modal content and behaviour", () => {
       ...calculableEcoScoreItems,
     ],
   };
+  const responseWithScoreAndProbabilityNo = {
+    ...questionnaireResponse,
+    item: [
+      ...questionnaireResponse.item,
+      ...calculableEcoScoreItems.map((item) =>
+        item.linkId === "MA_PROB"
+          ? { ...item, answer: [{ valueCoding: { display: "No" } }] }
+          : item
+      ),
+    ],
+  };
 
   beforeEach(() => {
     ApiService.mockReset();
+    createCase.mockReset();
+    addSecondaryEvaluation.mockReset();
+    checkDuplicateCase.mockReset();
+    recordStudyUsageEvent.mockReset();
+    recordStudyUsageEvent.mockResolvedValue({ id: 1 });
+    upsertEcoScoreResult.mockReset();
     mockGenerateEncounter.mockClear();
+    mockGenerateRiskAssessment.mockClear();
+    upsertEcoScoreResult.mockResolvedValue({ id: 1 });
     Object.values(mockPdfInstance).forEach((v) => {
       if (typeof v === "function" && v.mockClear) v.mockClear();
     });
@@ -816,5 +889,90 @@ describe("probability inclusion modal content and behaviour", () => {
       expect(screen.queryByText("Incluir probabilidad en el informe")).not.toBeInTheDocument();
     });
     expect(screen.queryByText("Confirmar guardado del cuestionario")).not.toBeInTheDocument();
+  });
+
+  it("shows the probability modal when ECO-SCORE is calculable even if MA_PROB is No", async () => {
+    renderComponent({ responses: [responseWithScoreAndProbabilityNo] });
+    await screen.findAllByText("Masa anexial #1");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar e Imprimir" }));
+
+    expect(await screen.findByText("Incluir probabilidad en el informe")).toBeInTheDocument();
+  });
+
+  it("creates RiskAssessment when MA_PROB is No but ECO-SCORE is calculated", async () => {
+    setupPdfFlowApi();
+    const event = jest.fn();
+    renderComponent({ event, responses: [responseWithScoreAndProbabilityNo] });
+
+    await screen.findAllByText("Masa anexial #1");
+    await userEvent.type(screen.getByRole("textbox"), "Conclusión clínica");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar e Imprimir" }));
+    await userEvent.click(await screen.findByRole("button", { name: "No incluir" }));
+    expect(await screen.findByText("Confirmar guardado del cuestionario")).toBeInTheDocument();
+
+    const saveButtons = screen.getAllByRole("button", { name: "Guardar" });
+    await userEvent.click(saveButtons[saveButtons.length - 1]);
+
+    await waitFor(() => expect(event).toHaveBeenCalled());
+
+    expect(mockGenerateRiskAssessment).toHaveBeenCalled();
+    expect(ApiService.mock.calls.some((call) => call[2] === "/fhir/RiskAssessment")).toBe(true);
+    expect(screen.queryByText("Incluir probabilidad en el informe")).not.toBeInTheDocument();
+  });
+
+  it("records saved and generated-report usage events with the same flowId and without sensitive payloads", async () => {
+    setupPdfFlowApi();
+    createCase.mockResolvedValue({
+      caseId: 11,
+      evaluationId: 88,
+      encounterFhirId: "enc-usage-1",
+      questionnaireResponseFhirId: 501,
+      careSettingCode: "EMERGENCY",
+    });
+
+    const event = jest.fn();
+    renderComponent({ event, responses: [responseWithScore], studyUsageFlowId: "flow-usage-1" });
+
+    await screen.findAllByText("Masa anexial #1");
+    await userEvent.type(screen.getByRole("textbox"), "Conclusión clínica");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar e Imprimir" }));
+    await userEvent.click(await screen.findByRole("button", { name: "No incluir" }));
+
+    const saveButtons = screen.getAllByRole("button", { name: "Guardar" });
+    await userEvent.click(saveButtons[saveButtons.length - 1]);
+
+    await waitFor(() => expect(event).toHaveBeenCalled());
+
+    expect(recordStudyUsageEvent).toHaveBeenCalledTimes(2);
+    const usagePayloads = recordStudyUsageEvent.mock.calls.map(([, payload]) => payload);
+
+    expect(usagePayloads[0]).toMatchObject({
+      eventType: "QUESTIONNAIRE_SAVED",
+      flowId: "flow-usage-1",
+      centerId: "HURYC",
+      caseId: 11,
+      evaluationId: 88,
+      encounterId: "enc-usage-1",
+      questionnaireResponseFhirId: 501,
+      metadata: {
+        source: "questionnaire_save_flow",
+      },
+    });
+    expect(usagePayloads[1]).toMatchObject({
+      eventType: "REPORT_GENERATED",
+      flowId: "flow-usage-1",
+      encounterId: "enc-usage-1",
+      metadata: {
+        reportSource: "questionnaire_save_flow",
+        includesProbability: false,
+      },
+    });
+
+    const serializedPayloads = JSON.stringify(usagePayloads);
+    expect(serializedPayloads).not.toContain("123456");
+    expect(serializedPayloads).not.toContain("patientPseudonym");
+    expect(serializedPayloads).not.toContain("hash");
+    expect(serializedPayloads).not.toContain("PAT_NHC");
+    expect(serializedPayloads).not.toContain("\"item\"");
   });
 });

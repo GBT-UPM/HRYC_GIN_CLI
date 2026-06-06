@@ -29,6 +29,7 @@ describe('ecoScore', () => {
     expect(result.status).toBe(ECO_SCORE_STATUS.CALCULATED);
     expect(result.score).toBe('0.9763');
     expect(result.probability).toBeCloseTo(0.9763, 4);
+    expect(result.text_score).toBe('La probabilidad de que la masa anexial sea maligna es de 97.63 %.');
   });
 
   it('normalizes Ninguno score labels', () => {
@@ -92,6 +93,26 @@ describe('ecoScore', () => {
     expect(result.score).toBe('0.9763');
   });
 
+  it('returns CALCULATED when MA_PROB is Sí and variables are complete', () => {
+    const result = calculateEcoScore({
+      ...completeInputs,
+      probabilityRequested: 'Sí',
+    });
+
+    expect(result.status).toBe(ECO_SCORE_STATUS.CALCULATED);
+    expect(result.score).toBe('0.9763');
+  });
+
+  it('returns CALCULATED when MA_PROB is No and variables are complete', () => {
+    const result = calculateEcoScore({
+      ...completeInputs,
+      probabilityRequested: 'No',
+    });
+
+    expect(result.status).toBe(ECO_SCORE_STATUS.CALCULATED);
+    expect(result.score).toBe('0.9763');
+  });
+
   it('returns NOT_CALCULABLE when a required variable is missing', () => {
     const result = calculateEcoScore({
       ...completeInputs,
@@ -131,6 +152,31 @@ describe('ecoScore', () => {
     expect(result.status).toBe(ECO_SCORE_STATUS.NOT_CALCULABLE);
     expect(result.score).toBeNull();
     expect(result.probability).toBeNull();
+  });
+
+  it('does not let MA_PROB = No bypass missing variables', () => {
+    const result = calculateEcoScore({
+      hasMass: 'Sí',
+      probabilityRequested: 'No',
+      contour: 'Irregular',
+      shadow: 'No',
+      solidAreaPresent: 'Sí',
+      solidAreaVascularization: '',
+      papillaPresent: 'No',
+      papillaVascularization: '',
+    });
+
+    expect(result.status).toBe(ECO_SCORE_STATUS.NOT_CALCULABLE);
+    expect(result.missingVariables).toContain('MA_Q_AS_VASC');
+  });
+
+  it('does not emit NOT_REQUESTED when MA_PROB is No', () => {
+    const result = calculateEcoScore({
+      ...completeInputs,
+      probabilityRequested: 'No',
+    });
+
+    expect(result.status).not.toBe(ECO_SCORE_STATUS.NOT_REQUESTED);
   });
 
   it('normalizes accents and casing', () => {

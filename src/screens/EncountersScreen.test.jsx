@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EncountersScreen from './EncountersScreen';
 import ApiService from '../services/ApiService';
+import { recordStudyUsageEvent } from '../services/studyUsageEventService';
 
 let mockKeycloak;
 const searchLabel = 'Buscar por código de estudio, fecha, centro, ámbito, lesión o ecografista…';
@@ -22,6 +23,15 @@ jest.mock('@react-keycloak/web', () => ({
 }));
 
 jest.mock('../services/ApiService', () => jest.fn());
+jest.mock('../services/studyUsageEventService', () => ({
+  recordStudyUsageEvent: jest.fn(),
+  STUDY_USAGE_EVENT_TYPES: {
+    reportGenerated: 'REPORT_GENERATED',
+  },
+}));
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'flow-encounters-1'),
+}));
 const mockEncountersPdfDoc = {
   addImage: jest.fn(),
   setFont: jest.fn(),
@@ -65,6 +75,8 @@ jest.mock('jspdf', () => ({
 describe('EncountersScreen', () => {
   beforeEach(() => {
     ApiService.mockReset();
+    recordStudyUsageEvent.mockReset();
+    recordStudyUsageEvent.mockResolvedValue({ id: 1 });
     Object.values(mockEncountersPdfDoc).forEach((v) => {
       if (typeof v === 'function' && v.mockClear) v.mockClear();
     });
@@ -216,6 +228,116 @@ describe('EncountersScreen', () => {
     expect(screen.getByText('HURYC-C000021-E000023')).toBeInTheDocument();
     expect(screen.getAllByText('Derecho · Ovario').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('Izquierdo · Ovario').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('records REPORT_GENERATED from the encounters screen without sensitive payloads', async () => {
+    ApiService
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([
+          {
+            caseId: 2,
+            evaluationId: 10,
+            encounterId: 'enc-10',
+            caseDisplayId: 'H12O-C000002',
+            evaluationDisplayId: 'H12O-C000002-E000010',
+            evaluationType: 'SECONDARY',
+            centerId: 'H12O',
+            careSettingCode: 'INPATIENT',
+            careSettingDisplay: 'Hospitalización',
+            hasAdnexalMass: true,
+            questionnaireResponseFhirId: 102,
+            observerInitials: 'XYZ',
+            createdAt: '2026-05-31T10:00:00',
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({
+          resourceType: 'QuestionnaireResponse',
+          item: calculableEcoScoreItems,
+        }),
+      });
+
+    render(<EncountersScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Encuentro enc-10/)).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByLabelText('Imprimir informe'));
+    await userEvent.click(await screen.findByRole('button', { name: 'No incluir' }));
+
+    await waitFor(() => expect(recordStudyUsageEvent).toHaveBeenCalled());
+
+    expect(recordStudyUsageEvent).toHaveBeenCalledWith('token', expect.objectContaining({
+      eventType: 'REPORT_GENERATED',
+      flowId: expect.any(String),
+      centerId: 'H12O',
+      caseId: 2,
+      evaluationId: 10,
+      encounterId: 'enc-10',
+      questionnaireResponseFhirId: 102,
+      careSettingCode: 'INPATIENT',
+      evaluationType: 'SECONDARY',
+      metadata: {
+        reportSource: 'encounters_screen',
+        includesProbability: false,
+      },
+    }));
+
+    const serializedPayload = JSON.stringify(recordStudyUsageEvent.mock.calls[0][1]);
+    expect(serializedPayload).not.toContain('123456');
+    expect(serializedPayload).not.toContain('patientPseudonym');
+    expect(serializedPayload).not.toContain('hash');
+    expect(serializedPayload).not.toContain('"item"');
+  });
+
+  it('formats ECO-SCORE percentage consistently in encounter summary and detail', async () => {
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ([
+        {
+          caseId: 40,
+          evaluationId: 41,
+          encounterId: 'enc-risk',
+          caseDisplayId: 'HURYC-C000040',
+          evaluationDisplayId: 'HURYC-C000040-E000041',
+          evaluationType: 'PRIMARY',
+          primaryEvaluation: true,
+          centerId: 'HURYC',
+          codeStatus: 'CODE_ASSIGNED',
+          caseStatus: 'OPEN',
+          evaluationStatus: 'COMPLETED',
+          studyPatientCode: 'HURYC-0040',
+          lateralityDisplay: 'Derecho',
+          anatomicalStructureDisplay: 'Ovario',
+          careSettingDisplay: 'Urgencias',
+          hasAdnexalMass: true,
+          risk: '0.4593',
+          ecoScoreProbabilityPercent: 45.93,
+          observerInitials: 'ABC',
+          createdAt: '2026-06-05T10:00:00',
+          questionnaireResponseFhirId: 401,
+        },
+      ]),
+    });
+
+    render(<EncountersScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Encuentro enc-risk/)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('45.93%')).toBeInTheDocument();
+    expect(screen.queryByText('4593.00%')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ver' }));
+
+    expect(screen.getByText('Casos y evaluaciones del encuentro')).toBeInTheDocument();
+    expect(screen.getAllByText('45.93%').length).toBeGreaterThan(0);
+    expect(screen.queryByText('4593.00%')).not.toBeInTheDocument();
   });
 
   it('keeps two different encounters as two rows and searches associated detail fields', async () => {

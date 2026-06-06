@@ -23,19 +23,27 @@ import {
 } from '../utils/caseMetadata';
 import { DEFAULT_CARE_SETTING, getCareSettingDisplay, normalizeCareSetting } from '../utils/careSetting';
 import { generateClinicalReportPdf } from '../utils/pdfReport';
-import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS } from '../utils/ecoScore';
+import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS, extractEcoScoreInputs } from '../utils/ecoScore';
+import { formatProbabilityFromDecimal } from '../utils/riskDisplay';
 import {
   addSecondaryEvaluation,
   checkDuplicateCase,
   createCase,
   CASE_ERROR_MESSAGES,
 } from '../services/caseService';
+import { upsertEcoScoreResult } from '../services/ecoScoreResultService';
+import {
+  recordStudyUsageEvent,
+  STUDY_USAGE_EVENT_TYPES,
+} from '../services/studyUsageEventService';
 
   const tipoMap = {
     'sólida': 'sólido',
     'quística': 'quístico',
     'sólido-quística': 'sólido-quístico'
   };
+
+const ECO_SCORE_FORMULA_VERSION = "ECO_SCORE_V1";
 
 const getDuplicateMatches = (duplicateResult) => {
   if (Array.isArray(duplicateResult)) return duplicateResult;
@@ -82,6 +90,7 @@ const ResponsesProbability = ({
   studyPatientCode = "",
   canUseStudyPatientCode = false,
   careSetting = DEFAULT_CARE_SETTING,
+  studyUsageFlowId = "",
   onCaseSaved = () => {},
 }) => {
   const normalizedCareSetting = normalizeCareSetting(careSetting?.code || careSetting);
@@ -433,6 +442,24 @@ const ResponsesProbability = ({
     setIsDuplicateModalOpen(false);
   };
 
+  const countMassesInResponses = useCallback(
+    (preparedResponses = []) => preparedResponses.filter((item) => item?.metadata?.hasAdnexalMass).length,
+    []
+  );
+
+  const safelyRecordStudyUsageEvent = useCallback(async (payload) => {
+    if (!keycloak.token) {
+      return null;
+    }
+
+    try {
+      return await recordStudyUsageEvent(keycloak.token, payload);
+    } catch (usageError) {
+      console.error("No se pudo registrar el evento de uso:", usageError);
+      return null;
+    }
+  }, [keycloak.token]);
+
   const buildPreparedQuestionnaireResponses = () => {
     return responses.map((qResponse) => {
       const sanitizedQuestionnaireResponse = sanitizeQuestionnaireResponse(qResponse);
@@ -678,6 +705,7 @@ const ResponsesProbability = ({
       const contextCenterId = preparedResponses[startIndex]?.metadata?.centerId || preparedResponses[0]?.metadata?.centerId;
       const context = persistenceContext || await createPersistenceContext(contextCenterId, normalizedCareSetting.code);
       const { patientId, encId, imgStuId } = context;
+      const savedUsageContext = [];
       const requestStudyPatientCode =
         canUseStudyPatientCode && studyPatientCodeOverride !== null
           ? String((studyPatientCodeOverride ?? studyPatientCode) || "").trim()
@@ -728,18 +756,67 @@ const ResponsesProbability = ({
               });
 
           const questionnaireResponseId = caseResponse.questionnaireResponseFhirId;
+          const evaluationId = caseResponse.evaluationId;
           if (!questionnaireResponseId) {
             throw new Error("El backend no devolvió questionnaireResponseFhirId.");
+          }
+          if (!evaluationId) {
+            throw new Error("El backend no devolvió evaluationId.");
           }
 
           const obsId = generateId();
           const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
           await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
+          let riskAssessmentFhirId = null;
           if (reports[index]?.ecoScoreStatus === ECO_SCORE_STATUS.CALCULATED) {
             const riskId = generateId();
-            const RiskAssessment = generateRiskAssessment(riskId, encId, patientId, null, reports[index].score, "", questionnaireResponseId)
+            const RiskAssessment = generateRiskAssessment(
+              riskId,
+              encId,
+              patientId,
+              null,
+              reports[index].probability,
+              "",
+              questionnaireResponseId
+            );
             await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
+            riskAssessmentFhirId = riskId;
           }
+          await upsertEcoScoreResult(keycloak.token, evaluationId, {
+            questionnaireResponseFhirId: questionnaireResponseId,
+            riskAssessmentFhirId,
+            status: reports[index]?.ecoScoreStatus,
+            probability: reports[index]?.ecoScoreStatus === ECO_SCORE_STATUS.CALCULATED
+              ? reports[index].probability
+              : null,
+            probabilityPercent: reports[index]?.ecoScoreStatus === ECO_SCORE_STATUS.CALCULATED
+              ? Number((reports[index].probability * 100).toFixed(2))
+              : null,
+            formulaVersion: ECO_SCORE_FORMULA_VERSION,
+            missingVariables: reports[index]?.missingEcoScoreVariables || [],
+            inputSummary: extractEcoScoreInputs(preparedResponse.questionnaireResponse),
+          });
+
+          const usagePayload = {
+            eventType: STUDY_USAGE_EVENT_TYPES.questionnaireSaved,
+            flowId: studyUsageFlowId,
+            centerId: preparedResponse.metadata.centerId,
+            caseId: caseResponse.caseId,
+            evaluationId,
+            encounterId: caseResponse.encounterFhirId || encId,
+            questionnaireResponseFhirId: questionnaireResponseId,
+            careSettingCode: caseResponse.careSettingCode || normalizedCareSetting.code,
+            evaluationType: decision?.type === "secondary" ? "SECONDARY" : "PRIMARY",
+            hasAdnexalMass: preparedResponse.metadata.hasAdnexalMass,
+            numberOfMassesInEncounter: countMassesInResponses(preparedResponses),
+            ecoScoreStatus: reports[index]?.ecoScoreStatus || null,
+            metadata: {
+              source: "questionnaire_save_flow",
+            },
+          };
+
+          savedUsageContext.push(usagePayload);
+          await safelyRecordStudyUsageEvent(usagePayload);
         } catch (error) {
           if (error.message === CASE_ERROR_MESSAGES.studyCodeConflict) {
             openStudyCodeConflictModal(
@@ -763,7 +840,11 @@ const ResponsesProbability = ({
       }
 
       if (options?.shouldPrint) {
-        generatePdf(options.includeProbability);
+        await generatePdf(options.includeProbability, {
+          encounterId: context.encId,
+          savedUsageContext,
+          preparedResponses,
+        });
       }
       if (successMessage) {
         setSaveMessage(successMessage);
@@ -781,7 +862,7 @@ const ResponsesProbability = ({
     }
   };
 
-  const generatePdf = (includeProbability) => {
+  const generatePdf = async (includeProbability, usageContext = {}) => {
     try {
       generateClinicalReportPdf({
         responses,
@@ -792,6 +873,31 @@ const ResponsesProbability = ({
         practitionerName: sessionStorage.getItem('practitionerName') || '',
         careSettingDisplay: normalizedCareSetting.display || '',
         studyPatientCode: effectiveStudyPatientCode || '',
+      });
+
+      const singleSavedContext = usageContext.savedUsageContext?.length === 1
+        ? usageContext.savedUsageContext[0]
+        : null;
+      await safelyRecordStudyUsageEvent({
+        eventType: STUDY_USAGE_EVENT_TYPES.reportGenerated,
+        flowId: studyUsageFlowId || null,
+        centerId: singleSavedContext?.centerId || reportCenterId || null,
+        caseId: singleSavedContext?.caseId ?? null,
+        evaluationId: singleSavedContext?.evaluationId ?? null,
+        encounterId: usageContext.encounterId || singleSavedContext?.encounterId || encounterId || null,
+        questionnaireResponseFhirId: singleSavedContext?.questionnaireResponseFhirId ?? null,
+        careSettingCode: normalizedCareSetting.code,
+        evaluationType: singleSavedContext?.evaluationType || null,
+        hasAdnexalMass:
+          usageContext.preparedResponses?.some((item) => item?.metadata?.hasAdnexalMass) ?? mass,
+        numberOfMassesInEncounter:
+          usageContext.preparedResponses?.filter((item) => item?.metadata?.hasAdnexalMass).length ??
+          reportMassCount,
+        ecoScoreStatus: singleSavedContext?.ecoScoreStatus || null,
+        metadata: {
+          reportSource: "questionnaire_save_flow",
+          includesProbability: Boolean(includeProbability),
+        },
       });
     } catch (error) {
       console.error('Error al generar el informe:', error);
@@ -873,7 +979,7 @@ const ResponsesProbability = ({
           {report.ecoScoreStatus === ECO_SCORE_STATUS.CALCULATED && (
             <section className="parts responses-review-section responses-score-box">
               <span className='tlabel'>Probabilidad de malignidad</span>
-              <span className='text' dangerouslySetInnerHTML={{ __html: ((report.score ?? 0)* 100).toFixed(2) + '%' }} />
+              <span className='text'>{formatProbabilityFromDecimal(report.probability ?? report.score, { withSpace: true })}</span>
               <p className="responses-score-box__note">
                 <em>
                   (Rodríguez-Rubio C, Vegas-Viedma S, Del Olmo-Reillo M, Quintana-Zapata P, Sancho-Sauco J, Pablos-Antona MJ, Alcázar JL, Pelayo-Delgado I. ECO-SCORE: Development of a New Ultrasound Score for the Study of Cystic and Solid-Cystic Adnexal Masses Based on Imaging Characteristics. Biomedicines. 2025 Jan 29;13(2):317. doi: 10.3390/biomedicines13020317. PMID: 40002730; PMCID: PMC11852474)
@@ -1221,6 +1327,7 @@ ResponsesProbability.propTypes = {
       display: PropTypes.string,
     }),
   ]),
+  studyUsageFlowId: PropTypes.string,
   onCaseSaved: PropTypes.func,
 };
 
