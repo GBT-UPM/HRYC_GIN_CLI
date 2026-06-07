@@ -32,6 +32,9 @@ export const isStudyCoordinator = (keycloak) => hasRole(keycloak, "ROLE_STUDY_CO
 
 export const isAdmin = (keycloak) => hasRole(keycloak, "ROLE_ADMIN");
 
+export const canRegisterQuestionnaire = (keycloak) =>
+  isClinician(keycloak) || isSiteCoordinator(keycloak);
+
 export const getPrimaryRoleLabel = (keycloak) => {
   if (isSiteCoordinator(keycloak)) {
     return "Coordinador de centro";

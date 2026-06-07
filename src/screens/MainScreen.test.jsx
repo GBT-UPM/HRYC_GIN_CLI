@@ -144,6 +144,101 @@ describe('MainScreen', () => {
     await waitFor(() => {
       expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/study-dashboard/stats', {});
     });
+
+    expect(screen.queryByText('Nuevo cuestionario')).not.toBeInTheDocument();
+    expect(screen.getByText('Casos y evaluaciones')).toBeInTheDocument();
+    expect(screen.getByText('Citas / encuentros')).toBeInTheDocument();
+    expect(screen.getByText('Exportaciones científicas')).toBeInTheDocument();
+  });
+
+  it('shows questionnaire registration card for clinicians', async () => {
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ({ participantsCount: 0, encountersCount: 0, ultrasoundRecordsCount: 0, adnexalMassesCount: 0 }),
+    });
+
+    render(
+      <MainScreen
+        keycloak={{
+          token: 'token',
+          tokenParsed: {
+            realm_access: { roles: ['ROLE_CLINICIAN'] },
+            allowed_centers: ['HURYC'],
+          },
+        }}
+        practitionerName="Dra. Test"
+        isAdmin={false}
+      />
+    );
+
+    expect(await screen.findByText('Nuevo cuestionario')).toBeInTheDocument();
+  });
+
+  it('shows questionnaire registration card for site coordinators', async () => {
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ({ participantsCount: 0, encountersCount: 0, ultrasoundRecordsCount: 0, adnexalMassesCount: 0 }),
+    });
+
+    render(
+      <MainScreen
+        keycloak={{
+          token: 'token',
+          tokenParsed: {
+            realm_access: { roles: ['ROLE_SITE_COORDINATOR'] },
+            allowed_centers: ['HURYC'],
+          },
+        }}
+        practitionerName="Dra. Test"
+        isAdmin={false}
+      />
+    );
+
+    expect(await screen.findByText('Nuevo cuestionario')).toBeInTheDocument();
+  });
+
+  it('shows questionnaire registration for mixed study coordinator and clinician users', async () => {
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ({ participantsCount: 0, encountersCount: 0, ultrasoundRecordsCount: 0, adnexalMassesCount: 0 }),
+    });
+
+    render(
+      <MainScreen
+        keycloak={{
+          token: 'token',
+          tokenParsed: {
+            realm_access: { roles: ['ROLE_STUDY_COORDINATOR', 'ROLE_CLINICIAN'] },
+            allowed_centers: ['HURYC'],
+          },
+        }}
+        practitionerName="Dra. Test"
+        isAdmin={false}
+      />
+    );
+
+    expect(await screen.findByText('Nuevo cuestionario')).toBeInTheDocument();
+  });
+
+  it('does not show questionnaire registration for admin-only users', async () => {
+    render(
+      <MainScreen
+        keycloak={{
+          token: 'token',
+          tokenParsed: {
+            realm_access: { roles: ['ROLE_ADMIN'] },
+            allowed_centers: ['HURYC'],
+          },
+        }}
+        practitionerName="Dra. Test"
+        isAdmin={false}
+      />
+    );
+
+    expect(await screen.findByText('Usuario sin centro asignado.')).toBeInTheDocument();
+    expect(ApiService).not.toHaveBeenCalled();
+    expect(screen.queryByText('Nuevo cuestionario')).not.toBeInTheDocument();
+    expect(screen.getByText('Casos y evaluaciones')).toBeInTheDocument();
   });
 
   it('shows missing center message and does not query global endpoint', async () => {

@@ -33,6 +33,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ApiService from "../services/ApiService";
 import {
+  canRegisterQuestionnaire,
   canUseGlobalView,
   getAllowedCenters,
   getCentersDisplayLabel,
@@ -90,6 +91,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
   const isGlobalView = canUseGlobalView(keycloak);
   const roleLabel = getPrimaryRoleLabel(keycloak);
   const centersLabel = getCentersDisplayLabel(keycloak);
+  const canUseQuestionnaireRegistration = canRegisterQuestionnaire(keycloak);
   const canManagePendingParticipants = isSiteCoordinator(keycloak);
   const canExportScientificData = isSiteCoordinator(keycloak) || isStudyCoordinator(keycloak);
   const shouldSelectCenter = !isGlobalView && allowedCenters.length > 1;
@@ -207,14 +209,16 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
   ];
 
   const actionCards = [
-    {
-      title: "Nuevo cuestionario",
-      text: "Registrar un nuevo caso ecográfico estructurado.",
-      button: "Iniciar",
-      icon: <PostAdd fontSize="small" />,
-      onClick: handleNewPatientClick,
-      disabled: !token,
-    },
+    ...(canUseQuestionnaireRegistration
+      ? [{
+        title: "Nuevo cuestionario",
+        text: "Registrar un nuevo caso ecográfico estructurado.",
+        button: "Iniciar",
+        icon: <PostAdd fontSize="small" />,
+        onClick: handleNewPatientClick,
+        disabled: !token,
+      }]
+      : []),
     {
       title: "Casos y evaluaciones",
       text: "Consultar ECO-SCORE, evaluaciones e histopatología.",

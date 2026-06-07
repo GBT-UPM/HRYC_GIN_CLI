@@ -22,6 +22,7 @@ jest.mock("../services/caseService", () => ({
   CASE_ERROR_MESSAGES: {
     forbidden: "forbidden",
     studyCodeConflict: "conflict",
+    studyConsentRequired: "Debe confirmarse la participación en el estudio antes de guardar el caso.",
     unauthorized: "unauthorized",
     network: "No se pudo guardar el caso. Revise la conexión e inténtelo de nuevo.",
   },
@@ -168,6 +169,9 @@ const renderComponent = (props = {}) => render(
     canUseStudyPatientCode
     careSetting={{ code: "EMERGENCY", display: "Urgencias" }}
     studyUsageFlowId="flow-123"
+    studyConsentConfirmed
+    consentVersion="MIA_STUDY_CONSENT_V1"
+    consentConfirmedAt="2026-06-07T08:30:00.000Z"
     onCaseSaved={jest.fn()}
     {...props}
   />
@@ -455,7 +459,11 @@ describe("ResponsesProbability study code conflict flow", () => {
     expect(createCaseCalls[0][1].studyPatientCode).toBe("HURYC-0001");
     expect(createCaseCalls[0][1].careSettingCode).toBe("EMERGENCY");
     expect(createCaseCalls[0][1].careSettingDisplay).toBe("Urgencias");
+    expect(createCaseCalls[0][1].studyConsentConfirmed).toBe(true);
+    expect(createCaseCalls[0][1].consentVersion).toBe("MIA_STUDY_CONSENT_V1");
     expect(createCaseCalls[1][1].studyPatientCode).toBe("HURYC-0002");
+    expect(createCaseCalls[1][1].studyConsentConfirmed).toBe(true);
+    expect(createCaseCalls[1][1].consentVersion).toBe("MIA_STUDY_CONSENT_V1");
     expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("EMERGENCY");
     expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("HURYC-0002");
     expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("PAT_CODIGO");
@@ -523,6 +531,8 @@ describe("ResponsesProbability study code conflict flow", () => {
       "7",
       expect.objectContaining({
         studyPatientCode: "HURYC-0001",
+        studyConsentConfirmed: true,
+        consentVersion: "MIA_STUDY_CONSENT_V1",
       })
     );
     expect(JSON.stringify(addSecondaryEvaluation.mock.calls[0][2].questionnaireResponse)).not.toContain("PAT_CODIGO");
@@ -585,6 +595,8 @@ describe("ResponsesProbability study code conflict flow", () => {
     await waitFor(() => expect(event).toHaveBeenCalled());
 
     expect(addSecondaryEvaluation.mock.calls[0][2].studyPatientCode).toBeUndefined();
+    expect(addSecondaryEvaluation.mock.calls[0][2].studyConsentConfirmed).toBe(true);
+    expect(addSecondaryEvaluation.mock.calls[0][2].consentVersion).toBe("MIA_STUDY_CONSENT_V1");
   });
 
   it("keeps the close controls working in the duplicate modal", async () => {
@@ -649,6 +661,17 @@ describe("ResponsesProbability study code conflict flow", () => {
     expect(await screen.findByText("El caso seleccionado ya tiene código de estudio asignado: SP-100.")).toBeInTheDocument();
     const duplicateSection = screen.getByRole("heading", { name: "Caso coincidente" }).closest("section");
     expect(within(duplicateSection).getByText("Código SP-100")).toBeInTheDocument();
+  });
+
+  it("does not save when study participation has not been confirmed", async () => {
+    renderComponent({ studyConsentConfirmed: false, consentVersion: "" });
+
+    await screen.findAllByText("Masa anexial #1");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(await screen.findByText("Debe confirmarse la participación en el estudio antes de guardar el caso.")).toBeInTheDocument();
+    expect(createCase).not.toHaveBeenCalled();
+    expect(addSecondaryEvaluation).not.toHaveBeenCalled();
   });
 });
 

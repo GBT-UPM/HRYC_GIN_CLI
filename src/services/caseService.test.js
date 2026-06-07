@@ -19,6 +19,12 @@ const errorResponse = (status) => ({
   status,
 });
 
+const errorResponseWithMessage = (status, message) => ({
+  ok: false,
+  status,
+  json: jest.fn().mockResolvedValue({ message }),
+});
+
 describe("caseService", () => {
   beforeEach(() => {
     ApiService.mockReset();
@@ -65,6 +71,8 @@ describe("caseService", () => {
       studyPatientCode: "HURYC-0001",
       careSettingCode: "EMERGENCY",
       careSettingDisplay: "Urgencias",
+      studyConsentConfirmed: true,
+      consentVersion: "MIA_STUDY_CONSENT_V1",
       questionnaireResponse: {
         item: [
           { linkId: "PAT_NHC", answer: [{ valueString: "123" }] },
@@ -87,6 +95,8 @@ describe("caseService", () => {
       studyPatientCode: "HURYC-0001",
       careSettingCode: "EMERGENCY",
       careSettingDisplay: "Urgencias",
+      studyConsentConfirmed: true,
+      consentVersion: "MIA_STUDY_CONSENT_V1",
     });
     expect(JSON.stringify(payload.questionnaireResponse)).not.toContain("PAT_NHC");
     expect(JSON.stringify(payload.questionnaireResponse)).not.toContain("PAT_NOMBRE");
@@ -129,6 +139,8 @@ describe("caseService", () => {
       careSettingCode: "INPATIENT",
       careSettingDisplay: "Hospitalización",
       studyPatientCode: "HURYC-0001",
+      studyConsentConfirmed: true,
+      consentVersion: "MIA_STUDY_CONSENT_V1",
       questionnaireResponse: {
         item: [
           { linkId: "PAT_CODIGO", answer: [{ valueString: "STUDY-1" }] },
@@ -141,8 +153,30 @@ describe("caseService", () => {
     expect(ApiService.mock.calls[0][3].careSettingCode).toBe("INPATIENT");
     expect(ApiService.mock.calls[0][3].careSettingDisplay).toBe("Hospitalización");
     expect(ApiService.mock.calls[0][3].studyPatientCode).toBe("HURYC-0001");
+    expect(ApiService.mock.calls[0][3].studyConsentConfirmed).toBe(true);
+    expect(ApiService.mock.calls[0][3].consentVersion).toBe("MIA_STUDY_CONSENT_V1");
     expect(JSON.stringify(ApiService.mock.calls[0][3].questionnaireResponse)).not.toContain("PAT_CODIGO");
     expect(JSON.stringify(ApiService.mock.calls[0][3].questionnaireResponse)).not.toContain("PAT_NHC");
+  });
+
+  it("maps 400 study consent validation to a safe message", async () => {
+    ApiService.mockResolvedValue(errorResponseWithMessage(400, "STUDY_CONSENT_REQUIRED"));
+
+    await expect(
+      createCase("token", {
+        centerId: "HURYC",
+        nhc: "transient",
+        lateralityCode: "RIGHT",
+        lateralityDisplay: "Derecho",
+        anatomicalStructureCode: "OVARY",
+        anatomicalStructureDisplay: "Ovario",
+        encounterId: "enc-1",
+        observerInitials: "ABC",
+        studyConsentConfirmed: true,
+        consentVersion: "MIA_STUDY_CONSENT_V1",
+        questionnaireResponse: { item: [] },
+      })
+    ).rejects.toThrow(CASE_ERROR_MESSAGES.studyConsentRequired);
   });
 
   it("maps 409 study code conflicts to a safe message", async () => {

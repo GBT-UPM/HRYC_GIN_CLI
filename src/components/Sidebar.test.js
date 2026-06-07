@@ -19,6 +19,7 @@ describe("Sidebar", () => {
     );
 
     expect(screen.queryByText("Participantes pendientes")).not.toBeInTheDocument();
+    expect(screen.queryByText("Trazabilidad del estudio")).not.toBeInTheDocument();
   });
 
   it("shows pending participants menu for site coordinators", () => {
@@ -32,9 +33,10 @@ describe("Sidebar", () => {
     );
 
     expect(screen.getByText("Participantes pendientes")).toBeInTheDocument();
+    expect(screen.getByText("Trazabilidad del estudio")).toBeInTheDocument();
   });
 
-  it("does not show pending participants menu for study coordinators", () => {
+  it("does not show pending participants menu but keeps study audit for study coordinators", () => {
     render(
       <Sidebar
         sidebarOpen
@@ -45,5 +47,6 @@ describe("Sidebar", () => {
     );
 
     expect(screen.queryByText("Participantes pendientes")).not.toBeInTheDocument();
+    expect(screen.getByText("Trazabilidad del estudio")).toBeInTheDocument();
   });
 });

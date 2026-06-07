@@ -30,12 +30,28 @@ describe("TopNavigation", () => {
 
     expect(screen.getByText("Pendientes")).toBeInTheDocument();
     expect(screen.getByText("Exportaciones")).toBeInTheDocument();
+    expect(screen.getByText("Trazabilidad")).toBeInTheDocument();
   });
 
   it("shows exports but not pending participants for study coordinators", () => {
     renderNavigation(["ROLE_STUDY_COORDINATOR"]);
 
     expect(screen.getByText("Exportaciones")).toBeInTheDocument();
+    expect(screen.getByText("Trazabilidad")).toBeInTheDocument();
+    expect(screen.queryByText("Nuevo cuestionario")).not.toBeInTheDocument();
     expect(screen.queryByText("Pendientes")).not.toBeInTheDocument();
+  });
+
+  it("does not show questionnaire registration for admin-only users", () => {
+    renderNavigation(["ROLE_ADMIN"]);
+
+    expect(screen.queryByText("Nuevo cuestionario")).not.toBeInTheDocument();
+    expect(screen.getByText("Casos y evaluaciones")).toBeInTheDocument();
+  });
+
+  it("shows questionnaire registration for mixed study coordinator and clinician users", () => {
+    renderNavigation(["ROLE_STUDY_COORDINATOR", "ROLE_CLINICIAN"]);
+
+    expect(screen.getByText("Nuevo cuestionario")).toBeInTheDocument();
   });
 });

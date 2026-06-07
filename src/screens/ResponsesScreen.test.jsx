@@ -373,6 +373,70 @@ describe('ResponsesScreen', () => {
     expect(screen.queryByText(/4593\.00%/)).not.toBeInTheDocument();
   });
 
+  it('shows study participation metadata in the evaluation summary modal', async () => {
+    ApiService
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([
+          {
+            caseId: 4,
+            evaluationId: 14,
+            caseDisplayId: 'HURYC-C000004',
+            evaluationDisplayId: 'HURYC-C000004-E000014',
+            evaluationType: 'PRIMARY',
+            primaryEvaluation: true,
+            centerId: 'HURYC',
+            codeStatus: 'CODE_ASSIGNED',
+            caseStatus: 'OPEN',
+            evaluationStatus: 'COMPLETED',
+            hasAdnexalMass: true,
+            lateralityDisplay: 'Derecho',
+            anatomicalStructureDisplay: 'Ovario',
+            studyConsentConfirmed: true,
+            consentVersion: 'MIA_STUDY_CONSENT_V1',
+            consentConfirmedAt: '2026-06-07T08:30:00',
+            createdAt: '2026-06-01T09:00:00',
+            questionnaireResponseFhirId: 105,
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ({
+          item: [
+            { linkId: 'PAT_MA', answer: [{ valueCoding: { display: 'Sí' } }] },
+            { linkId: 'MA_TIPO', answer: [{ valueCoding: { display: 'Sólida' } }] },
+            { linkId: 'MA_ESTRUCTURA', answer: [{ valueCoding: { display: 'Ovario' } }] },
+            { linkId: 'MA_LADO', answer: [{ valueCoding: { display: 'Derecho' } }] },
+            { linkId: 'MA_M1', answer: [{ valueDecimal: 10 }] },
+            { linkId: 'MA_M2', answer: [{ valueDecimal: 20 }] },
+            { linkId: 'MA_M3', answer: [{ valueDecimal: 30 }] },
+            { linkId: 'MA_CONTENIDO', answer: [{ valueCoding: { display: 'Líquido' } }] },
+            { linkId: 'MA_SOL_CONTORNO', answer: [{ valueCoding: { display: 'Regular' } }] },
+            { linkId: 'MA_SOL_VASC', answer: [{ valueCoding: { display: 'Ninguno (score color 1)' } }] },
+          ],
+        }),
+      });
+
+    render(<ResponsesScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('HURYC-C000004-E000014')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Ver'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Resumen de evaluación ecográfica')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Participacion en estudio')).toBeInTheDocument();
+    expect(screen.getByText('Confirmada')).toBeInTheDocument();
+    expect(screen.getByText('Version consentimiento')).toBeInTheDocument();
+    expect(screen.getByText('MIA_STUDY_CONSENT_V1')).toBeInTheDocument();
+    expect(screen.getByText('Fecha confirmacion')).toBeInTheDocument();
+  });
+
   it('submits histopathology through the controlled case endpoint', async () => {
     ApiService
 	      .mockResolvedValueOnce({

@@ -13,6 +13,7 @@ import ResponsesScreen from "./screens/ResponsesScreen";
 import DownloadScreen from "./screens/DownloadScreen";
 import EncountersScreen from "./screens/EncountersScreen";
 import PendingParticipantsScreen from "./screens/PendingParticipantsScreen";
+import StudyAuditScreen from "./screens/StudyAuditScreen";
 
 
 
@@ -128,6 +129,7 @@ function App() {
           <Route path="/download" element={<DownloadScreen />} />
           <Route path="/encounters" element={<EncountersScreen />} />
           <Route path="/study-participants/pending" element={<PendingParticipantsScreen />} />
+          <Route path="/study-audit" element={<StudyAuditScreen />} />
         </Route>
 
         {/* Otras rutas que no usen Layout, si deseas */}

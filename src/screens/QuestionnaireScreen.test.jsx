@@ -56,6 +56,14 @@ const buildKeycloak = (roles = ["ROLE_SITE_COORDINATOR"], allowedCenters = ["HUR
 });
 
 describe("QuestionnaireScreen", () => {
+  const confirmStudyConsent = async (label = "Si, consentimiento confirmado") => {
+    await userEvent.click(screen.getByRole("radio", { name: label }));
+    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await waitFor(() => {
+      expect(screen.queryByText("Confirmacion de participacion en el estudio")).not.toBeInTheDocument();
+    });
+  };
+
   beforeEach(() => {
     mockNavigate.mockReset();
     mockKeycloak = buildKeycloak();
@@ -76,9 +84,17 @@ describe("QuestionnaireScreen", () => {
     });
   });
 
+  it("shows the mandatory participation confirmation modal before rendering the form", () => {
+    render(<QuestionnaireScreen />);
+
+    expect(screen.getByText("Confirmacion de participacion en el estudio")).toBeInTheDocument();
+    expect(screen.queryByText("Formulario clínico renderizado")).not.toBeInTheDocument();
+  });
+
   it("shows the institutional questionnaire header and info button", async () => {
     render(<QuestionnaireScreen />);
 
+    await confirmStudyConsent();
     expect(await screen.findByText("Formulario clínico renderizado")).toBeInTheDocument();
     expect(screen.getByText("Nuevo cuestionario ecográfico")).toBeInTheDocument();
     expect(
@@ -89,9 +105,41 @@ describe("QuestionnaireScreen", () => {
     expect(screen.getByText("Coordinador de centro")).toBeInTheDocument();
   });
 
+  it("does not render the questionnaire form for study coordinators without registration role", () => {
+    mockKeycloak = buildKeycloak(["ROLE_STUDY_COORDINATOR"], ["HURYC"]);
+
+    render(<QuestionnaireScreen />);
+
+    expect(screen.getByText("No autorizado")).toBeInTheDocument();
+    expect(
+      screen.getByText("No tiene permisos para registrar nuevos cuestionarios o casos desde esta interfaz.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Formulario clínico renderizado")).not.toBeInTheDocument();
+    expect(ApiService).not.toHaveBeenCalled();
+  });
+
+  it("allows registration for mixed study coordinator and clinician users", async () => {
+    mockKeycloak = buildKeycloak(["ROLE_STUDY_COORDINATOR", "ROLE_CLINICIAN"], ["HURYC"]);
+
+    render(<QuestionnaireScreen />);
+
+    await confirmStudyConsent();
+    expect(await screen.findByText("Formulario clínico renderizado")).toBeInTheDocument();
+  });
+
+  it("does not render the questionnaire form for admin-only users", () => {
+    mockKeycloak = buildKeycloak(["ROLE_ADMIN"], ["HURYC"]);
+
+    render(<QuestionnaireScreen />);
+
+    expect(screen.getByText("No autorizado")).toBeInTheDocument();
+    expect(screen.queryByText("Formulario clínico renderizado")).not.toBeInTheDocument();
+  });
+
   it("opens and closes the questionnaire information modal", async () => {
     render(<QuestionnaireScreen />);
 
+    await confirmStudyConsent();
     expect(await screen.findByText("Formulario clínico renderizado")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Información del cuestionario" }));
 
@@ -112,9 +160,33 @@ describe("QuestionnaireScreen", () => {
     });
   });
 
+  it("does not open the questionnaire when participation is not confirmed", async () => {
+    render(<QuestionnaireScreen />);
+
+    await userEvent.click(screen.getByLabelText("No confirmado / no incluir en el estudio"));
+    expect(screen.getByRole("button", { name: "Volver al inicio" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Volver al inicio" }));
+
+    expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+    expect(screen.queryByText("Formulario clínico renderizado")).not.toBeInTheDocument();
+    expect(recordStudyUsageEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns to start when cancelling the consent modal", async () => {
+    render(<QuestionnaireScreen />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+    expect(screen.queryByText("Formulario clínico renderizado")).not.toBeInTheDocument();
+  });
+
   it("records QUESTIONNAIRE_STARTED only once and reuses the same flowId in the save flow", async () => {
     render(<QuestionnaireScreen />);
 
+    expect(recordStudyUsageEvent).not.toHaveBeenCalled();
+    await confirmStudyConsent();
     expect(await screen.findByText("Formulario clínico renderizado")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Disparar inicio" }));

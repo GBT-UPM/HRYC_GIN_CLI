@@ -5,6 +5,7 @@ import {
   getPrimaryRoleLabel,
   getUserRoles,
   canUseGlobalView,
+  canRegisterQuestionnaire,
   isClinician,
   isSiteCoordinator,
   isStudyCoordinator,
@@ -70,6 +71,29 @@ describe("auth helpers", () => {
     expect(isSiteCoordinator(keycloak)).toBe(true);
     expect(isStudyCoordinator(keycloak)).toBe(true);
     expect(isAdmin(keycloak)).toBe(true);
+  });
+
+  it("allows questionnaire registration only for clinicians or site coordinators", () => {
+    expect(
+      canRegisterQuestionnaire({
+        tokenParsed: { realm_access: { roles: ["ROLE_CLINICIAN"] } },
+      })
+    ).toBe(true);
+    expect(
+      canRegisterQuestionnaire({
+        tokenParsed: { realm_access: { roles: ["ROLE_SITE_COORDINATOR"] } },
+      })
+    ).toBe(true);
+    expect(
+      canRegisterQuestionnaire({
+        tokenParsed: { realm_access: { roles: ["ROLE_STUDY_COORDINATOR"] } },
+      })
+    ).toBe(false);
+    expect(
+      canRegisterQuestionnaire({
+        tokenParsed: { realm_access: { roles: ["ROLE_ADMIN"] } },
+      })
+    ).toBe(false);
   });
 
   it("gets primary role label for clinicians", () => {

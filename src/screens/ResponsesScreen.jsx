@@ -205,6 +205,17 @@ const ResponsesScreen = () => {
     const [statusActionError, setStatusActionError] = useState('');
     const [statusActionSaving, setStatusActionSaving] = useState(false);
 
+    const formatConsentConfirmationDate = (value) => {
+        if (!value) {
+            return "No disponible";
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return "No disponible";
+        }
+        return date.toLocaleString("es-ES");
+    };
+
     const parseQuestionnaireResponses = (questionnaireResponse) => {
         try {
             const parsed = typeof questionnaireResponse === 'string'
@@ -1135,6 +1146,41 @@ const ResponsesScreen = () => {
                             <Box sx={{ bgcolor: '#F8FAFC', borderRadius: 1, p: 2, border: '1px solid #EEF2F6' }}>
                                 <span className="report" dangerouslySetInnerHTML={{ __html: generateReport() }} />
                             </Box>
+                            {selectedEvaluationItem && (
+                                <>
+                                    <Typography variant="caption" sx={{ ...SECTION_LABEL_SX, mt: 2.5, display: 'block' }}>
+                                        Contexto del estudio
+                                    </Typography>
+                                    <Box sx={{ bgcolor: '#F8FAFC', borderRadius: 1, p: 2, border: '1px solid #EEF2F6' }}>
+                                        <Stack spacing={1.25}>
+                                            <Box>
+                                                <Typography variant="body2" sx={{ color: '#52616B', fontWeight: 600 }}>
+                                                    Participacion en estudio
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#1F2933' }}>
+                                                    {selectedEvaluationItem.studyConsentConfirmed ? 'Confirmada' : 'No disponible'}
+                                                </Typography>
+                                            </Box>
+                                            <Box>
+                                                <Typography variant="body2" sx={{ color: '#52616B', fontWeight: 600 }}>
+                                                    Version consentimiento
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#1F2933' }}>
+                                                    {selectedEvaluationItem.consentVersion || 'No disponible'}
+                                                </Typography>
+                                            </Box>
+                                            <Box>
+                                                <Typography variant="body2" sx={{ color: '#52616B', fontWeight: 600 }}>
+                                                    Fecha confirmacion
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#1F2933' }}>
+                                                    {formatConsentConfirmationDate(selectedEvaluationItem.consentConfirmedAt)}
+                                                </Typography>
+                                            </Box>
+                                        </Stack>
+                                    </Box>
+                                </>
+                            )}
                             {selectedEvaluationItem && canManageAdministrativeStatus(selectedEvaluationItem) && (
                                 <>
                                     <Typography variant="caption" sx={{ ...SECTION_LABEL_SX, mt: 2.5, display: 'block' }}>

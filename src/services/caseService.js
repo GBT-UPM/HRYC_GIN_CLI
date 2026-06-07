@@ -4,6 +4,7 @@ import { sanitizeQuestionnaireResponse } from "../utils/privacy";
 export const CASE_ERROR_MESSAGES = {
   forbidden: "No tiene permisos para realizar esta acción en este centro.",
   studyCodeConflict: "El código de estudio ya está asignado a otra participante del mismo centro.",
+  studyConsentRequired: "Debe confirmarse la participación en el estudio antes de guardar el caso.",
   unauthorized: "La sesión ha caducado. Vuelva a iniciar sesión.",
   network: "No se pudo guardar el caso. Revise la conexión e inténtelo de nuevo.",
 };
@@ -20,6 +21,19 @@ const parseJsonResponse = async (response) => {
 
     if (response.status === 409) {
       throw new Error(CASE_ERROR_MESSAGES.studyCodeConflict);
+    }
+
+    if (response.status === 400 && typeof response.json === "function") {
+      try {
+        const errorBody = await response.json();
+        if (String(errorBody?.message || "").includes("STUDY_CONSENT_REQUIRED")) {
+          throw new Error(CASE_ERROR_MESSAGES.studyConsentRequired);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === CASE_ERROR_MESSAGES.studyConsentRequired) {
+          throw error;
+        }
+      }
     }
 
     throw new Error(`Error en la respuesta: ${response.status}`);
@@ -62,6 +76,8 @@ export const createCase = async (
     studyPatientCode,
     careSettingCode,
     careSettingDisplay,
+    studyConsentConfirmed,
+    consentVersion,
   }
 ) => {
   const body = {
@@ -79,6 +95,8 @@ export const createCase = async (
     observerInitials,
     careSettingCode,
     careSettingDisplay,
+    studyConsentConfirmed,
+    consentVersion,
   };
 
   if (studyPatientCode) {
@@ -100,6 +118,8 @@ export const addSecondaryEvaluation = async (
     careSettingCode,
     careSettingDisplay,
     studyPatientCode,
+    studyConsentConfirmed,
+    consentVersion,
   }
 ) => {
   const body = {
@@ -108,6 +128,8 @@ export const addSecondaryEvaluation = async (
     observerInitials,
     careSettingCode,
     careSettingDisplay,
+    studyConsentConfirmed,
+    consentVersion,
   };
 
   if (studyPatientCode) {

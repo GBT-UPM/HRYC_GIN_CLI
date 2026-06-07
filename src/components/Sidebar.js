@@ -7,10 +7,12 @@ import React from 'react';
 import HomeIcon from '@mui/icons-material/Home';
 import DownloadIcon from '@mui/icons-material/Download';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
-import { isSiteCoordinator } from '../utils/auth';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import { isSiteCoordinator, isStudyCoordinator } from '../utils/auth';
 
 const Sidebar = ({ sidebarOpen, toggleSidebar, download, keycloak }) => {
     const canManageStudyParticipants = isSiteCoordinator(keycloak);
+    const canUseStudyAudit = isSiteCoordinator(keycloak) || isStudyCoordinator(keycloak);
 
     return (
         <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
@@ -41,6 +43,18 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, download, keycloak }) => {
                         </li>
                     </ul>
                 </div>
+                {canUseStudyAudit && (
+                    <div className="sidebar-section">
+                        <ul>
+                            <li>
+                                <a href="/study-audit">
+                                    <FactCheckIcon sx={{ fontSize: 18, verticalAlign: 'middle', marginRight: 1 }} />
+                                    Trazabilidad del estudio
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                )}
                 {canManageStudyParticipants && (
                     <div className="sidebar-section">
                         <ul>

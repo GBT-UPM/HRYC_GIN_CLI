@@ -92,6 +92,9 @@ const ResponsesProbability = ({
   careSetting = DEFAULT_CARE_SETTING,
   studyUsageFlowId = "",
   onCaseSaved = () => {},
+  studyConsentConfirmed = false,
+  consentVersion = "",
+  consentConfirmedAt = "",
 }) => {
   const normalizedCareSetting = normalizeCareSetting(careSetting?.code || careSetting);
   const [reports, setReports] = useState([]);
@@ -575,6 +578,11 @@ const ResponsesProbability = ({
   };
 
   const beginCaseSave = async (options) => {
+    if (studyConsentConfirmed !== true || !String(consentVersion || "").trim()) {
+      setError(CASE_ERROR_MESSAGES.studyConsentRequired);
+      return;
+    }
+
     const nhc = transientNhc.trim();
     if (!nhc) {
       setError("Debe introducir el NHC para continuar.");
@@ -738,6 +746,8 @@ const ResponsesProbability = ({
                 careSettingCode: normalizedCareSetting.code,
                 careSettingDisplay: normalizedCareSetting.display,
                 studyPatientCode: requestStudyPatientCode || undefined,
+                studyConsentConfirmed: true,
+                consentVersion,
               })
             : await createCase(keycloak.token, {
                 centerId: preparedResponse.metadata.centerId,
@@ -753,6 +763,8 @@ const ResponsesProbability = ({
                 studyPatientCode: requestStudyPatientCode || undefined,
                 careSettingCode: normalizedCareSetting.code,
                 careSettingDisplay: normalizedCareSetting.display,
+                studyConsentConfirmed: true,
+                consentVersion,
               });
 
           const questionnaireResponseId = caseResponse.questionnaireResponseFhirId;
@@ -1109,6 +1121,22 @@ const ResponsesProbability = ({
                       <span className="save-confirmation-field__value">{normalizedCareSetting.display}</span>
                     </div>
                     <div className="save-confirmation-field">
+                      <span className="save-confirmation-field__label">Participación en estudio</span>
+                      <span className="save-confirmation-field__value">
+                        {studyConsentConfirmed ? "Confirmada" : "No confirmada"}
+                      </span>
+                    </div>
+                    <div className="save-confirmation-field">
+                      <span className="save-confirmation-field__label">Versión consentimiento</span>
+                      <span className="save-confirmation-field__value">{consentVersion || "No disponible"}</span>
+                    </div>
+                    <div className="save-confirmation-field">
+                      <span className="save-confirmation-field__label">Confirmación realizada</span>
+                      <span className="save-confirmation-field__value">
+                        {consentConfirmedAt ? new Date(consentConfirmedAt).toLocaleString("es-ES") : "No disponible"}
+                      </span>
+                    </div>
+                    <div className="save-confirmation-field">
                       <span className="save-confirmation-field__label">Código de estudio</span>
                       <span className={`responses-review-chip ${hasStudyCode ? "responses-review-chip--neutral" : "responses-review-chip--pending"}`}>
                         {codeLabel}
@@ -1329,6 +1357,9 @@ ResponsesProbability.propTypes = {
   ]),
   studyUsageFlowId: PropTypes.string,
   onCaseSaved: PropTypes.func,
+  studyConsentConfirmed: PropTypes.bool,
+  consentVersion: PropTypes.string,
+  consentConfirmedAt: PropTypes.string,
 };
 
 export default ResponsesProbability;

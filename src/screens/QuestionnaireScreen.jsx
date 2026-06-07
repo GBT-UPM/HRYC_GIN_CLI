@@ -6,7 +6,7 @@ import Chart from "chart.js/auto";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useKeycloak } from '@react-keycloak/web';
-import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, IconButton, Paper, Radio, RadioGroup, Stack, Typography } from "@mui/material";
 import { Close, InfoOutlined } from "@mui/icons-material";
 import ApiService from "../services/ApiService";
 
@@ -16,13 +16,14 @@ import { v4 as uuidv4 } from "uuid";
 
 import ResponsesProbability from "../components/ResponsesProbability";
 import { useNavigate } from "react-router-dom";
-import { getAllowedCenters, getCentersDisplayLabel, getPrimaryRoleLabel, isSiteCoordinator, isStudyCoordinator } from "../utils/auth";
+import { canRegisterQuestionnaire, getAllowedCenters, getCentersDisplayLabel, getPrimaryRoleLabel, isSiteCoordinator, isStudyCoordinator } from "../utils/auth";
 import { DEFAULT_CARE_SETTING, normalizeCareSetting } from "../utils/careSetting";
 import { mapCenterToCode } from "../utils/caseMetadata";
 import {
   recordStudyUsageEvent,
   STUDY_USAGE_EVENT_TYPES,
 } from "../services/studyUsageEventService";
+import { STUDY_CONSENT_VERSION } from "../constants/studyConsent";
 Chart.register(CategoryScale);
 
 const HEADER_PAPER_SX = {
@@ -46,6 +47,21 @@ const DIALOG_TITLE_SX = {
   borderBottom: "1px solid #EEF2F6",
   pb: 1.5,
   pr: 6,
+};
+
+const PRIMARY_BTN_SX = {
+  textTransform: "none",
+  fontWeight: 700,
+  backgroundColor: "#1E3A5F",
+  "&:hover": { backgroundColor: "#173050" },
+};
+
+const SECONDARY_BTN_SX = {
+  textTransform: "none",
+  fontWeight: 600,
+  borderColor: "#D9E2EC",
+  color: "#1E3A5F",
+  "&:hover": { borderColor: "#2F5D7C", backgroundColor: "#F5F7FA" },
 };
 
 const INFO_ROWS = [
@@ -132,6 +148,8 @@ export default function QuestionnaireScreen() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [studyUsageFlowId, setStudyUsageFlowId] = useState(() => uuidv4());
+  const [consentDecision, setConsentDecision] = useState("");
+  const [studyConsent, setStudyConsent] = useState(null);
   const hasRecordedQuestionnaireStartRef = useRef(false);
   const isRecordingQuestionnaireStartRef = useRef(false);
 
@@ -140,6 +158,8 @@ export default function QuestionnaireScreen() {
   const [probability, setProbality] = useState(false);
   const navigate = useNavigate();
   const allowedCenters = useMemo(() => getAllowedCenters(keycloak), [keycloak]);
+  const canUseQuestionnaireRegistration = useMemo(() => canRegisterQuestionnaire(keycloak), [keycloak]);
+  const studyConsentConfirmed = Boolean(studyConsent?.studyConsentConfirmed);
   const roleLabel = useMemo(() => getPrimaryRoleLabel(keycloak), [keycloak]);
   const centersLabel = useMemo(() => getCentersDisplayLabel(keycloak), [keycloak]);
   const visibleScopeLabel = useMemo(() => {
@@ -163,6 +183,25 @@ export default function QuestionnaireScreen() {
     hasRecordedQuestionnaireStartRef.current = false;
     isRecordingQuestionnaireStartRef.current = false;
   }, []);
+
+  const exitQuestionnaireFlow = useCallback(() => {
+    navigate("/", { replace: true });
+  }, [navigate]);
+
+  const handleConsentContinue = useCallback(() => {
+    if (consentDecision === "confirmed") {
+      setStudyConsent({
+        studyConsentConfirmed: true,
+        consentConfirmedAt: new Date().toISOString(),
+        consentVersion: STUDY_CONSENT_VERSION,
+      });
+      return;
+    }
+
+    if (consentDecision === "not_confirmed") {
+      exitQuestionnaireFlow();
+    }
+  }, [consentDecision, exitQuestionnaireFlow]);
 
   const fetchQuestionnaire = useCallback(async () => {
     if (!token) {
@@ -303,6 +342,12 @@ export default function QuestionnaireScreen() {
   }
 
   useEffect(() => {
+    if (!canUseQuestionnaireRegistration) {
+      return;
+    }
+    if (!studyConsentConfirmed) {
+      return;
+    }
     if (!initialized || !keycloak?.authenticated || !token) {
       return;
     }
@@ -318,9 +363,12 @@ export default function QuestionnaireScreen() {
   
     fetchQuestionnaire();
   
-  }, [initialized, keycloak?.authenticated, token, setResponses, setQuestionnaireResponses, fetchQuestionnaire]);
+  }, [canUseQuestionnaireRegistration, studyConsentConfirmed, initialized, keycloak?.authenticated, token, setResponses, setQuestionnaireResponses, resetStudyUsageSession, fetchQuestionnaire]);
 
   useEffect(() => {
+    if (!canUseQuestionnaireRegistration) {
+      return undefined;
+    }
     const handleBeforeUnload = (event) => {
       if (!hasUnsavedChanges) {
         return undefined;
@@ -334,10 +382,87 @@ export default function QuestionnaireScreen() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [canUseQuestionnaireRegistration, hasUnsavedChanges]);
+
+  if (!canUseQuestionnaireRegistration) {
+    return (
+      <Paper elevation={0} sx={{ p: 3, border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF" }}>
+        <Typography variant="h5" sx={{ color: "#1F2933", fontWeight: 800, mb: 1 }}>
+          No autorizado
+        </Typography>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          No tiene permisos para registrar nuevos cuestionarios o casos desde esta interfaz.
+        </Alert>
+        <Typography variant="body2" sx={{ color: "#52616B" }}>
+          El registro clínico está disponible solo para usuarios con rol clínico o coordinador de centro.
+        </Typography>
+      </Paper>
+    );
+  }
 
   return (
     <Box sx={{ px: 0, py: 0 }}>
+      <Dialog
+        open={!studyConsentConfirmed}
+        onClose={exitQuestionnaireFlow}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: DIALOG_PAPER_SX }}
+      >
+        <DialogTitle sx={DIALOG_TITLE_SX}>
+          Confirmacion de participacion en el estudio
+        </DialogTitle>
+        <DialogContent dividers sx={{ px: 2.5, py: 1.75 }}>
+          <Stack spacing={2}>
+            <Box>
+              <Typography variant="body1" sx={{ color: "#1F2933", fontWeight: 700, mb: 0.5 }}>
+                Confirme la participacion antes de iniciar el registro ecografico.
+              </Typography>
+              <Typography variant="body2" sx={{ color: "#52616B", lineHeight: 1.5 }}>
+                Antes de iniciar el cuestionario, confirme que la paciente ha aceptado participar en el estudio y que
+                el consentimiento se ha gestionado conforme al protocolo del centro.
+              </Typography>
+            </Box>
+
+            <RadioGroup
+              aria-label="Confirmacion de participacion en el estudio"
+              name="study-consent-confirmation"
+              value={consentDecision}
+              onChange={(event) => setConsentDecision(event.target.value)}
+            >
+              <FormControlLabel
+                value="confirmed"
+                control={<Radio />}
+                label="Si, consentimiento confirmado"
+              />
+              <FormControlLabel
+                value="not_confirmed"
+                control={<Radio />}
+                label="No confirmado / no incluir en el estudio"
+              />
+            </RadioGroup>
+
+            <Alert severity={consentDecision === "not_confirmed" ? "warning" : "info"}>
+              Esta confirmacion no sustituye al consentimiento informado formal. Si existe duda o no se ha confirmado
+              la participacion, no debe registrarse el caso en la base del estudio.
+            </Alert>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 2.5, py: 1.25 }}>
+          <Button onClick={exitQuestionnaireFlow} variant="outlined" sx={SECONDARY_BTN_SX}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleConsentContinue}
+            variant="contained"
+            disabled={!consentDecision}
+            sx={PRIMARY_BTN_SX}
+          >
+            {consentDecision === "not_confirmed" ? "Volver al inicio" : "Continuar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Paper elevation={0} sx={HEADER_PAPER_SX}>
         <Stack spacing={1.5}>
           <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
@@ -466,6 +591,9 @@ export default function QuestionnaireScreen() {
               canUseStudyPatientCode={isSiteCoordinator(keycloak)}
               careSetting={careSetting}
               studyUsageFlowId={studyUsageFlowId}
+              studyConsentConfirmed={studyConsent?.studyConsentConfirmed === true}
+              consentVersion={studyConsent?.consentVersion || ""}
+              consentConfirmedAt={studyConsent?.consentConfirmedAt || ""}
               onCaseSaved={() => {
                 setStudyPatientCode("");
                 setHasUnsavedChanges(false);
