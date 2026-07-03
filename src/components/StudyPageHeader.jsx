@@ -15,6 +15,7 @@ const StudyPageHeader = ({
     infoButtonLabel = 'Información de la vista',
 }) => (
     <Paper
+        className="study-page-header"
         elevation={0}
         sx={{
             p: { xs: 2, md: 2.5 },

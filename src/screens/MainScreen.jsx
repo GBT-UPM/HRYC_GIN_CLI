@@ -267,6 +267,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
     <Box sx={{ px: 0, py: 0 }}>
       {/* Bloque superior compacto */}
       <Paper
+        className="study-page-header"
         elevation={0}
         sx={{
           p: { xs: 2, md: 2.5 },
@@ -414,6 +415,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
         {metricCards.map(({ label, icon, count, subtext }, index) => (
           <Grid2 size={{ xs: 12, sm: 6, lg: 3 }} key={index} sx={{ display: "flex" }}>
             <Paper
+              className="clinical-card"
               elevation={0}
               sx={{
                 flex: 1,
@@ -470,6 +472,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
           {actionCards.map((action) => (
             <Grid2 key={action.title} size={{ xs: 12, sm: 6, md: 4 }} sx={{ display: "flex" }}>
               <Paper
+                className="clinical-card"
                 elevation={0}
                 sx={{
                   p: 2,

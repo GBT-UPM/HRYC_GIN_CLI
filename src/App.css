@@ -1,11 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
+
 :root {
-  --mia-primary: #1E3A5F;
-  --mia-secondary: #2F5D7C;
-  --mia-background: #F5F7FA;
-  --mia-paper: #FFFFFF;
-  --mia-text-primary: #1F2933;
-  --mia-text-secondary: #52616B;
-  --mia-border: #D9E2EC;
+  /* Clinical Precision design system */
+  --color-primary: #1b365d;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #d9e2ff;
+  --color-on-primary-container: #001945;
+  --color-surface: #f8f9ff;
+  --color-on-surface: #191c20;
+  --color-surface-variant: #e0e2ec;
+  --color-on-surface-variant: #44474e;
+  --color-surface-dim: #cbdbf5;
+  --color-surface-container: #eff4ff;
+  --color-surface-container-low: #eff4ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-outline: #74777f;
+  --color-outline-variant: #c4c6d0;
+  --color-error: #ba1a1a;
+  --color-success: #2e6c00;
+  --font-main: 'Hanken Grotesk', 'Segoe UI', sans-serif;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+  --shadow-md: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+
+  /* Backwards-compatible aliases for existing components. */
+  --mia-primary: var(--color-primary);
+  --mia-secondary: #385780;
+  --mia-background: var(--color-surface);
+  --mia-paper: var(--color-surface-container-lowest);
+  --mia-text-primary: var(--color-on-surface);
+  --mia-text-secondary: var(--color-on-surface-variant);
+  --mia-border: var(--color-outline-variant);
 }
 
 * {
@@ -16,6 +43,14 @@ body {
   margin: 0;
   background: var(--mia-background);
   color: var(--mia-text-primary);
+  font-family: var(--font-main);
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
 }
 
 .App {
@@ -28,9 +63,9 @@ body {
   top: 0;
   z-index: 1100;
   background: var(--mia-primary);
-  color: #fff;
+  color: var(--color-on-primary);
   border-bottom: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.16);
+  box-shadow: var(--shadow-sm);
 }
 
 .header-inner {
@@ -82,7 +117,7 @@ body {
 
 .institution-section span {
   border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.88);
   font-size: 0.75rem;
   font-weight: 700;
@@ -153,7 +188,7 @@ body {
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.42);
   padding: 8px 13px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-weight: 700;
   white-space: nowrap;
@@ -167,7 +202,7 @@ body {
   position: sticky;
   top: 68px;
   z-index: 1000;
-  background: #fff;
+  background: var(--color-surface-container-lowest);
   border-bottom: 1px solid var(--mia-border);
 }
 
@@ -201,7 +236,8 @@ body {
 
 .top-navigation-link.active {
   color: var(--mia-primary);
-  border-bottom-color: var(--mia-secondary);
+  border-bottom-color: var(--color-primary);
+  font-weight: 700;
 }
 
 .main-content {
@@ -214,6 +250,130 @@ body {
 .report div {
   margin-bottom: 10px;
   text-align: justify;
+}
+
+/* Shared cards and page headers */
+.clinical-card,
+.study-page-header,
+.clinical-search,
+.clinical-table {
+  background: var(--color-surface-container-lowest) !important;
+  border: 1px solid var(--color-outline-variant) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.clinical-card,
+.study-page-header {
+  box-shadow: 0 1px 2px rgba(0, 25, 69, 0.05) !important;
+}
+
+.study-page-header .MuiTypography-h5 {
+  color: var(--color-primary) !important;
+  font-weight: 700 !important;
+}
+
+.study-page-header .MuiTypography-body2 {
+  color: var(--color-on-surface-variant) !important;
+}
+
+.clinical-card {
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.clinical-card:hover {
+  border-color: var(--color-outline) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.clinical-search {
+  background: var(--color-surface-container-low) !important;
+}
+
+/* Form controls */
+.MuiOutlinedInput-root {
+  background: var(--color-surface-container-lowest);
+  border-radius: var(--radius-sm) !important;
+}
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--color-primary) !important;
+  border-width: 2px;
+}
+
+.MuiInputLabel-root.Mui-focused {
+  color: var(--color-primary) !important;
+}
+
+.MuiButton-root {
+  border-radius: var(--radius-sm) !important;
+  font-family: var(--font-main) !important;
+}
+
+.MuiButton-containedPrimary {
+  background: var(--color-primary) !important;
+  color: var(--color-on-primary) !important;
+}
+
+.MuiButton-containedPrimary:hover {
+  background: var(--color-on-primary-container) !important;
+}
+
+.MuiButton-outlinedPrimary {
+  border-color: var(--color-outline-variant) !important;
+  color: var(--color-primary) !important;
+}
+
+.MuiChip-root {
+  border-radius: var(--radius-sm) !important;
+  font-family: var(--font-main) !important;
+}
+
+/* Clinical registry table */
+.clinical-table {
+  overflow: hidden;
+}
+
+.clinical-table .MuiTableHead-root .MuiTableCell-root {
+  background: var(--color-surface-container) !important;
+  color: var(--color-primary) !important;
+  border-bottom: 2px solid var(--color-outline-variant) !important;
+  font-weight: 700;
+}
+
+.clinical-table .MuiTableCell-root {
+  border-bottom-color: var(--color-surface-variant);
+}
+
+.clinical-table .MuiTableBody-root .MuiTableRow-root:nth-of-type(even) {
+  background: #fbfcff;
+}
+
+.clinical-table .MuiTableBody-root .MuiTableRow-root:hover {
+  background: var(--color-surface-container-low) !important;
+}
+
+.clinical-identifier {
+  color: var(--color-on-primary-container) !important;
+  font-family: 'SFMono-Regular', Consolas, monospace !important;
+  letter-spacing: 0.015em;
+}
+
+/* Structured clinical dialogs */
+.clinical-dialog .MuiDialog-paper {
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.clinical-dialog .MuiDialogTitle-root {
+  color: var(--color-primary) !important;
+  background: var(--color-surface-container-low);
+  border-bottom-color: var(--color-outline-variant) !important;
+}
+
+.clinical-dialog .MuiDialogActions-root {
+  background: var(--color-surface-container-lowest);
+  border-top-color: var(--color-outline-variant) !important;
 }
 
 @media (max-width: 1100px) {
