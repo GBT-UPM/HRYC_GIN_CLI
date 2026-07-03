@@ -284,8 +284,8 @@ const PendingParticipantsScreen = () => {
     <Box sx={{ px: 0, py: 0 }}>
       {/* Encabezado institucional */}
       <StudyPageHeader
-        title="Participantes pendientes"
-        subtitle="Casos registrados pendientes de asignación de código de estudio por el coordinador de centro."
+        title="Pendientes e incidencias de código"
+        subtitle="Registros legacy o incidencias que requieren revisión administrativa del código de estudio."
         visibleScopeLabel={visibleScopeLabel}
         roleLabel={roleLabel}
         centersLabel={centersLabel}
@@ -304,9 +304,9 @@ const PendingParticipantsScreen = () => {
         <DialogContent dividers sx={{ px: 2.5, py: 1.5 }}>
           <Stack spacing={0}>
             {[
-              ["Participantes visibles", "Participantes con código de estudio pendiente de asignación en este centro."],
-              ["Quién puede asignar", "Solo coordinadores de centro autorizados para el centro activo."],
-              ["Código pendiente", "El participante ha sido registrado pero aún no tiene código de estudio asignado."],
+              ["Participantes visibles", "Participantes legacy o con incidencia de código en este centro."],
+              ["Quién puede asignar", "Solo coordinadores de centro autorizados para el centro activo, en flujo de incidencia."],
+              ["Código pendiente", "Los nuevos registros deberían recibir código automáticamente; si aparece aquí, requiere revisión."],
               ["Código de estudio", "Sustituye al identificador local (NHC) para la seudonimización del participante."],
               ["NHC", "Se usa únicamente en el momento de asignación para localizar al participante. No se almacena ni se muestra."],
               ["Pseudonimización", "Los datos mostrados no incluyen identificativos directos del paciente."],
@@ -578,7 +578,7 @@ const PendingParticipantsScreen = () => {
         </DialogTitle>
         <DialogContent sx={DIALOG_CONTENT_SX}>
           <Typography variant="body2" sx={{ color: "#52616B", fontSize: "0.84rem", mb: 1.5 }}>
-            Información del caso pendiente de asignación de código de estudio.
+            Información del caso con código pendiente o incidencia administrativa.
           </Typography>
           <Stack spacing={1.5}>
             <Box sx={DETAIL_SECTION_SX}>

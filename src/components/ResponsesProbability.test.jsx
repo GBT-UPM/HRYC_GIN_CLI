@@ -177,16 +177,16 @@ const renderComponent = (props = {}) => render(
   />
 );
 
-const setupApi = ({ secondCaseResponse = { questionnaireResponseFhirId: "qr-1", evaluationId: 88 } } = {}) => {
-  let createCaseCalls = 0;
+const setupApi = ({
+  caseResponse = {
+    questionnaireResponseFhirId: "qr-1",
+    evaluationId: 88,
+    studyPatientCode: "HURYC-000001",
+    studyCodeAssignmentMode: "GENERATED",
+  },
+} = {}) => {
   checkDuplicateCase.mockResolvedValue({ matches: [] });
-  createCase.mockImplementation(() => {
-    createCaseCalls += 1;
-    if (createCaseCalls === 1) {
-      return Promise.reject(new Error(CASE_ERROR_MESSAGES.studyCodeConflict));
-    }
-    return Promise.resolve(secondCaseResponse);
-  });
+  createCase.mockResolvedValue(caseResponse);
   ApiService.mockImplementation((token, method, endpoint, body) => {
     if (endpoint === "/audit/register") {
       return Promise.resolve({ ok: true, status: 200 });
@@ -214,8 +214,18 @@ const setupApi = ({ secondCaseResponse = { questionnaireResponseFhirId: "qr-1", 
 
 const setupDuplicateSecondaryApi = ({
   duplicateMatch,
-  secondaryResponse = { questionnaireResponseFhirId: "qr-2", evaluationId: 89 },
-  independentResponse = { questionnaireResponseFhirId: "qr-3", evaluationId: 90 },
+  secondaryResponse = {
+    questionnaireResponseFhirId: "qr-2",
+    evaluationId: 89,
+    studyPatientCode: "HURYC-000001",
+    studyCodeAssignmentMode: "REUSED",
+  },
+  independentResponse = {
+    questionnaireResponseFhirId: "qr-3",
+    evaluationId: 90,
+    studyPatientCode: "HURYC-000001",
+    studyCodeAssignmentMode: "REUSED",
+  },
 }) => {
   checkDuplicateCase.mockResolvedValue({ matches: [duplicateMatch] });
   addSecondaryEvaluation.mockResolvedValue(secondaryResponse);
@@ -265,7 +275,11 @@ const submitInitialSave = async () => {
   await userEvent.click(saveButtons[saveButtons.length - 1]);
 };
 
-describe("ResponsesProbability study code conflict flow", () => {
+const continueAfterSave = async () => {
+  await userEvent.click(await screen.findByRole("button", { name: "Continuar" }));
+};
+
+describe("ResponsesProbability automatic study code flow", () => {
   beforeEach(() => {
     ApiService.mockReset();
     createCase.mockReset();
@@ -308,20 +322,45 @@ describe("ResponsesProbability study code conflict flow", () => {
     expect(screen.getByRole("textbox")).toBeInTheDocument();
   });
 
-  it("keeps clinical data visible and opens administrative conflict actions on 409", async () => {
+  it("saves with automatic study code assignment and keeps manual code out of payloads", async () => {
     setupApi();
     const event = jest.fn();
     renderComponent({ event });
 
     await submitInitialSave();
 
-    expect(await screen.findByText(CASE_ERROR_MESSAGES.studyCodeConflict)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Corregir código de estudio" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Guardar sin código y dejar pendiente" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Cancelar" })).toBeInTheDocument();
-    expect(screen.getAllByText("Masa anexial #1").length).toBeGreaterThan(0);
-    expect(screen.getByDisplayValue("Conclusión clínica")).toBeInTheDocument();
+    expect(await screen.findByText("Caso guardado correctamente")).toBeInTheDocument();
+    expect(screen.getByText("Código de estudio asignado")).toBeInTheDocument();
+    expect(screen.getByText("HURYC-000001")).toBeInTheDocument();
+    expect(screen.getByText("Nuevo")).toBeInTheDocument();
+    expect(screen.getByText(/registre esta información en el circuito definido por el centro/i)).toBeInTheDocument();
     expect(event).not.toHaveBeenCalled();
+    await continueAfterSave();
+    expect(event).toHaveBeenCalled();
+
+    expect(createCase).toHaveBeenCalledTimes(1);
+    expect(createCase.mock.calls[0][1].studyPatientCode).toBeUndefined();
+    expect(createCase.mock.calls[0][1].careSettingCode).toBe("EMERGENCY");
+    expect(createCase.mock.calls[0][1].careSettingDisplay).toBe("Urgencias");
+    expect(createCase.mock.calls[0][1].studyConsentConfirmed).toBe(true);
+    expect(createCase.mock.calls[0][1].consentVersion).toBe("MIA_STUDY_CONSENT_V1");
+    expect(JSON.stringify(createCase.mock.calls[0][1].questionnaireResponse)).not.toContain("PAT_CODIGO");
+    expect(JSON.stringify(createCase.mock.calls[0][1].questionnaireResponse)).not.toContain("PAT_NHC");
+  });
+
+  it("copies only the assigned study code", async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    setupApi();
+    renderComponent();
+
+    await submitInitialSave();
+    await screen.findByText("HURYC-000001");
+    await userEvent.click(screen.getByRole("button", { name: "Copiar código" }));
+
+    expect(writeText).toHaveBeenCalledWith("HURYC-000001");
+    expect(writeText).not.toHaveBeenCalledWith(expect.stringContaining("123456"));
+    expect(await screen.findByText("Código copiado")).toBeInTheDocument();
   });
 
   it("shows the clinical save confirmation summary without exposing the real NHC", async () => {
@@ -335,7 +374,7 @@ describe("ResponsesProbability study code conflict flow", () => {
     expect(screen.getByText("Contexto del estudio")).toBeInTheDocument();
     expect(screen.getByText("Datos de comprobación")).toBeInTheDocument();
     expect(screen.getByText("Cuestionario")).toBeInTheDocument();
-    expect(screen.getAllByText("Pendiente").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/se asignará automáticamente/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("NHC informado").length).toBeGreaterThan(0);
     expect(screen.getAllByText("1 masa").length).toBeGreaterThan(0);
     expect(screen.queryByText("123456")).not.toBeInTheDocument();
@@ -347,7 +386,12 @@ describe("ResponsesProbability study code conflict flow", () => {
 
   const setupPdfApi = () => {
     checkDuplicateCase.mockResolvedValue({ matches: [] });
-    createCase.mockResolvedValue({ questionnaireResponseFhirId: "qr-1", evaluationId: 88 });
+    createCase.mockResolvedValue({
+      questionnaireResponseFhirId: "qr-1",
+      evaluationId: 88,
+      studyPatientCode: "HURYC-000001",
+      studyCodeAssignmentMode: "GENERATED",
+    });
     ApiService.mockImplementation((token, method, endpoint) => {
       if (["/audit/register", "/fhir/Patient/check-or-create", "/fhir/Encounter", "/fhir/ImagingStudy"].includes(endpoint)) return Promise.resolve({ ok: true, status: 200 });
       if (["/fhir/Observation", "/fhir/RiskAssessment"].includes(endpoint)) return Promise.resolve(okResponse({ questionnaireResponseFhirId: "qr-1" }));
@@ -362,6 +406,10 @@ describe("ResponsesProbability study code conflict flow", () => {
     expect(await screen.findByText("Confirmar guardado del cuestionario")).toBeInTheDocument();
     const saveButtons = screen.getAllByRole("button", { name: "Guardar" });
     await userEvent.click(saveButtons[saveButtons.length - 1]);
+    expect(await screen.findByText("Caso guardado correctamente")).toBeInTheDocument();
+    expect(screen.getByText("HURYC-000001")).toBeInTheDocument();
+    expect(event).not.toHaveBeenCalled();
+    await continueAfterSave();
     await waitFor(() => expect(event).toHaveBeenCalled());
   };
 
@@ -440,59 +488,8 @@ describe("ResponsesProbability study code conflict flow", () => {
     expect(uiText).not.toContain("Río Hortega");
   });
 
-  it("retries with a corrected top-level studyPatientCode and keeps it out of QuestionnaireResponse", async () => {
-    setupApi();
-    const event = jest.fn();
-    renderComponent({ event });
-
-    await submitInitialSave();
-    await screen.findByText(CASE_ERROR_MESSAGES.studyCodeConflict);
-
-    await userEvent.clear(screen.getByLabelText("Nuevo código de estudio"));
-    await userEvent.type(screen.getByLabelText("Nuevo código de estudio"), "HURYC-0002");
-    await userEvent.click(screen.getByRole("button", { name: "Reintentar guardado" }));
-
-    await waitFor(() => expect(event).toHaveBeenCalled());
-
-    const createCaseCalls = createCase.mock.calls;
-    expect(createCaseCalls).toHaveLength(2);
-    expect(createCaseCalls[0][1].studyPatientCode).toBe("HURYC-0001");
-    expect(createCaseCalls[0][1].careSettingCode).toBe("EMERGENCY");
-    expect(createCaseCalls[0][1].careSettingDisplay).toBe("Urgencias");
-    expect(createCaseCalls[0][1].studyConsentConfirmed).toBe(true);
-    expect(createCaseCalls[0][1].consentVersion).toBe("MIA_STUDY_CONSENT_V1");
-    expect(createCaseCalls[1][1].studyPatientCode).toBe("HURYC-0002");
-    expect(createCaseCalls[1][1].studyConsentConfirmed).toBe(true);
-    expect(createCaseCalls[1][1].consentVersion).toBe("MIA_STUDY_CONSENT_V1");
-    expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("EMERGENCY");
-    expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("HURYC-0002");
-    expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("PAT_CODIGO");
-    expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("PAT_NHC");
-    expect(ApiService.mock.calls.filter((call) => call[2] === "/fhir/Patient/check-or-create")).toHaveLength(1);
-    expect(window.localStorage.getItem("123456")).toBeNull();
-    expect(window.sessionStorage.getItem("123456")).toBeNull();
-  });
-
-  it("retries without studyPatientCode when saving as pending", async () => {
-    setupApi();
-    const event = jest.fn();
-    renderComponent({ event });
-
-    await submitInitialSave();
-    await screen.findByText(CASE_ERROR_MESSAGES.studyCodeConflict);
-    await userEvent.click(screen.getByRole("button", { name: "Guardar sin código y dejar pendiente" }));
-
-    await waitFor(() => expect(event).toHaveBeenCalled());
-
-    const createCaseCalls = createCase.mock.calls;
-    expect(createCaseCalls).toHaveLength(2);
-    expect(createCaseCalls[1][1].studyPatientCode).toBeUndefined();
-    expect(createCaseCalls[1][1].nhc).toBe("123456");
-    expect(JSON.stringify(createCaseCalls[1][1].questionnaireResponse)).not.toContain("123456");
-  });
-
   it("passes metadata centerId to Encounter generation", async () => {
-    setupApi({ secondCaseResponse: okResponse({ questionnaireResponseFhirId: "qr-1" }) });
+    setupApi({ caseResponse: { questionnaireResponseFhirId: "qr-1", evaluationId: 88 } });
     renderComponent({ studyPatientCode: "" });
 
     await submitInitialSave();
@@ -506,7 +503,7 @@ describe("ResponsesProbability study code conflict flow", () => {
     );
   });
 
-  it("includes studyPatientCode in secondary evaluation payload for site coordinators", async () => {
+  it("does not include studyPatientCode in secondary evaluation payload", async () => {
     setupDuplicateSecondaryApi({
       duplicateMatch: {
         caseId: 7,
@@ -521,20 +518,23 @@ describe("ResponsesProbability study code conflict flow", () => {
 
     await submitInitialSave();
 
-    expect(await screen.findByText("Se añadirá una evaluación secundaria al caso existente y se asignará el código de estudio indicado.")).toBeInTheDocument();
+    expect(await screen.findByText("Se añadirá una evaluación secundaria al caso existente y el backend asignará el código de estudio automáticamente si procede.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Añadir como nueva evaluación" }));
 
+    expect(await screen.findByText("Código de estudio reutilizado")).toBeInTheDocument();
+    expect(screen.getByText("HURYC-000001")).toBeInTheDocument();
+    await continueAfterSave();
     await waitFor(() => expect(event).toHaveBeenCalled());
 
     expect(addSecondaryEvaluation).toHaveBeenCalledWith(
       "token",
       "7",
       expect.objectContaining({
-        studyPatientCode: "HURYC-0001",
         studyConsentConfirmed: true,
         consentVersion: "MIA_STUDY_CONSENT_V1",
       })
     );
+    expect(addSecondaryEvaluation.mock.calls[0][2].studyPatientCode).toBeUndefined();
     expect(JSON.stringify(addSecondaryEvaluation.mock.calls[0][2].questionnaireResponse)).not.toContain("PAT_CODIGO");
   });
 
@@ -592,6 +592,8 @@ describe("ResponsesProbability study code conflict flow", () => {
     expect(await screen.findByRole("button", { name: "Añadir como nueva evaluación" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Añadir como nueva evaluación" }));
 
+    expect(await screen.findByText("Código de estudio reutilizado")).toBeInTheDocument();
+    await continueAfterSave();
     await waitFor(() => expect(event).toHaveBeenCalled());
 
     expect(addSecondaryEvaluation.mock.calls[0][2].studyPatientCode).toBeUndefined();
@@ -638,6 +640,8 @@ describe("ResponsesProbability study code conflict flow", () => {
     await submitInitialSave();
     await userEvent.click(await screen.findByRole("button", { name: "Crear caso independiente" }));
 
+    expect(await screen.findByText("Caso guardado correctamente")).toBeInTheDocument();
+    await continueAfterSave();
     await waitFor(() => expect(event).toHaveBeenCalled());
 
     const createCaseCalls = createCase.mock.calls;
@@ -694,7 +698,12 @@ describe("no-mass questionnaire (PAT_MA = No)", () => {
   };
 
   const setupNoMassApi = () => {
-    createCase.mockResolvedValue({ questionnaireResponseFhirId: "qr-no-mass-1", evaluationId: 88 });
+    createCase.mockResolvedValue({
+      questionnaireResponseFhirId: "qr-no-mass-1",
+      evaluationId: 88,
+      studyPatientCode: "HURYC-000002",
+      studyCodeAssignmentMode: "GENERATED",
+    });
     ApiService.mockImplementation((token, method, endpoint) => {
       if (["/audit/register", "/fhir/Patient/check-or-create", "/fhir/Encounter", "/fhir/ImagingStudy"].includes(endpoint)) return Promise.resolve({ ok: true, status: 200 });
       if (["/fhir/Observation", "/fhir/RiskAssessment"].includes(endpoint)) return Promise.resolve(okResponse({ questionnaireResponseFhirId: "qr-no-mass-1" }));
@@ -751,6 +760,9 @@ describe("no-mass questionnaire (PAT_MA = No)", () => {
     const saveButtons = screen.getAllByRole("button", { name: "Guardar" });
     await userEvent.click(saveButtons[saveButtons.length - 1]);
 
+    expect(await screen.findByText("Código de estudio asignado")).toBeInTheDocument();
+    expect(screen.getByText("HURYC-000002")).toBeInTheDocument();
+    await continueAfterSave();
     await waitFor(() => expect(event).toHaveBeenCalled());
 
     expect(checkDuplicateCase).not.toHaveBeenCalled();
@@ -767,6 +779,8 @@ describe("no-mass questionnaire (PAT_MA = No)", () => {
     const saveButtons = screen.getAllByRole("button", { name: "Guardar" });
     await userEvent.click(saveButtons[saveButtons.length - 1]);
 
+    expect(await screen.findByText("Código de estudio asignado")).toBeInTheDocument();
+    await continueAfterSave();
     await waitFor(() => expect(event).toHaveBeenCalled());
 
     const createCaseCalls = createCase.mock.calls;
@@ -800,7 +814,12 @@ describe("no-mass questionnaire (PAT_MA = No)", () => {
 describe("probability inclusion modal content and behaviour", () => {
   const setupPdfFlowApi = () => {
     checkDuplicateCase.mockResolvedValue({ matches: [] });
-    createCase.mockResolvedValue({ questionnaireResponseFhirId: "qr-1", evaluationId: 88 });
+    createCase.mockResolvedValue({
+      questionnaireResponseFhirId: "qr-1",
+      evaluationId: 88,
+      studyPatientCode: "HURYC-000001",
+      studyCodeAssignmentMode: "GENERATED",
+    });
     ApiService.mockImplementation((token, method, endpoint) => {
       if (["/audit/register", "/fhir/Patient/check-or-create", "/fhir/Encounter", "/fhir/ImagingStudy"].includes(endpoint)) {
         return Promise.resolve({ ok: true, status: 200 });
@@ -936,6 +955,8 @@ describe("probability inclusion modal content and behaviour", () => {
     const saveButtons = screen.getAllByRole("button", { name: "Guardar" });
     await userEvent.click(saveButtons[saveButtons.length - 1]);
 
+    expect(await screen.findByText("Código de estudio asignado")).toBeInTheDocument();
+    await continueAfterSave();
     await waitFor(() => expect(event).toHaveBeenCalled());
 
     expect(mockGenerateRiskAssessment).toHaveBeenCalled();
@@ -951,6 +972,8 @@ describe("probability inclusion modal content and behaviour", () => {
       encounterFhirId: "enc-usage-1",
       questionnaireResponseFhirId: 501,
       careSettingCode: "EMERGENCY",
+      studyPatientCode: "HURYC-000001",
+      studyCodeAssignmentMode: "GENERATED",
     });
 
     const event = jest.fn();
@@ -964,6 +987,8 @@ describe("probability inclusion modal content and behaviour", () => {
     const saveButtons = screen.getAllByRole("button", { name: "Guardar" });
     await userEvent.click(saveButtons[saveButtons.length - 1]);
 
+    expect(await screen.findByText("Código de estudio asignado")).toBeInTheDocument();
+    await continueAfterSave();
     await waitFor(() => expect(event).toHaveBeenCalled());
 
     expect(recordStudyUsageEvent).toHaveBeenCalledTimes(2);

@@ -4,6 +4,7 @@ import {
   CASE_ERROR_MESSAGES,
   checkDuplicateCase,
   createCase,
+  searchCasesByNhc,
 } from "./caseService";
 
 jest.mock("./ApiService");
@@ -56,6 +57,32 @@ describe("caseService", () => {
     });
   });
 
+  it("searches cases by NHC with POST body and no URL interpolation", async () => {
+    ApiService.mockResolvedValue(okResponse({ found: true, cases: [] }));
+
+    await searchCasesByNhc("token", {
+      centerId: "HURYC",
+      nhc: "123456",
+    });
+
+    expect(ApiService).toHaveBeenCalledWith("token", "POST", "/app/cases/search-by-nhc", {
+      centerId: "HURYC",
+      nhc: "123456",
+    });
+    expect(ApiService.mock.calls[0][2]).not.toContain("123456");
+  });
+
+  it("maps NHC search 404 to a safe message", async () => {
+    ApiService.mockResolvedValue(errorResponse(404));
+
+    await expect(
+      searchCasesByNhc("token", {
+        centerId: "HURYC",
+        nhc: "123456",
+      })
+    ).rejects.toThrow("No se encontró participante/caso pendiente para el NHC introducido en este centro.");
+  });
+
   it("calls create case endpoint without sensitive questionnaire items", async () => {
     ApiService.mockResolvedValue(okResponse({ caseId: 1, evaluationId: 1, questionnaireResponseFhirId: 123 }));
 
@@ -68,7 +95,6 @@ describe("caseService", () => {
       anatomicalStructureDisplay: "Ovario",
       encounterId: "enc-1",
       observerInitials: "ABC",
-      studyPatientCode: "HURYC-0001",
       careSettingCode: "EMERGENCY",
       careSettingDisplay: "Urgencias",
       studyConsentConfirmed: true,
@@ -92,7 +118,6 @@ describe("caseService", () => {
       lateralityDisplay: "Derecho",
       anatomicalStructureCode: "OVARY",
       anatomicalStructureDisplay: "Ovario",
-      studyPatientCode: "HURYC-0001",
       careSettingCode: "EMERGENCY",
       careSettingDisplay: "Urgencias",
       studyConsentConfirmed: true,
@@ -102,6 +127,7 @@ describe("caseService", () => {
     expect(JSON.stringify(payload.questionnaireResponse)).not.toContain("PAT_NOMBRE");
     expect(JSON.stringify(payload.questionnaireResponse)).not.toContain("PAT_CODIGO");
     expect(JSON.stringify(payload.questionnaireResponse)).not.toContain("HURYC-0001");
+    expect(payload.studyPatientCode).toBeUndefined();
     expect(payload.nhc).not.toBe("STUDY-1");
     expect(payload.hasAdnexalMass).toBe(true);
   });
@@ -138,7 +164,6 @@ describe("caseService", () => {
       observerInitials: "ABC",
       careSettingCode: "INPATIENT",
       careSettingDisplay: "Hospitalización",
-      studyPatientCode: "HURYC-0001",
       studyConsentConfirmed: true,
       consentVersion: "MIA_STUDY_CONSENT_V1",
       questionnaireResponse: {
@@ -152,7 +177,7 @@ describe("caseService", () => {
     expect(ApiService.mock.calls[0][2]).toBe("/app/cases/1/evaluations");
     expect(ApiService.mock.calls[0][3].careSettingCode).toBe("INPATIENT");
     expect(ApiService.mock.calls[0][3].careSettingDisplay).toBe("Hospitalización");
-    expect(ApiService.mock.calls[0][3].studyPatientCode).toBe("HURYC-0001");
+    expect(ApiService.mock.calls[0][3].studyPatientCode).toBeUndefined();
     expect(ApiService.mock.calls[0][3].studyConsentConfirmed).toBe(true);
     expect(ApiService.mock.calls[0][3].consentVersion).toBe("MIA_STUDY_CONSENT_V1");
     expect(JSON.stringify(ApiService.mock.calls[0][3].questionnaireResponse)).not.toContain("PAT_CODIGO");

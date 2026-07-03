@@ -52,6 +52,7 @@ import {
     isSiteCoordinator,
     isStudyCoordinator,
 } from '../utils/auth';
+import { searchCasesByNhc } from '../services/caseService';
 import { getCaseEvaluations } from '../services/caseEvaluationService';
 import { CASE_STATUS_ERROR_MESSAGES, updateCaseStatus, updateEvaluationStatus } from '../services/caseStatusService';
 import { upsertHistopathology } from '../services/histopathologyService';
@@ -164,6 +165,85 @@ const SECONDARY_BTN_SX = {
     '&:hover': { borderColor: '#2F5D7C', backgroundColor: '#F5F7FA' },
 };
 
+const CASE_SEARCH_SECTION_SX = {
+    border: '1px solid #D9E2EC',
+    borderRadius: 2,
+    backgroundColor: '#FFFFFF',
+    p: { xs: 1.75, sm: 2 },
+};
+
+const CASE_SEARCH_RESULT_TH_SX = {
+    ...TH_SX,
+    backgroundColor: '#EEF5FA',
+    borderBottom: '1px solid #D6E0EA',
+    py: 1,
+};
+
+const CASE_SEARCH_PRIMARY_BTN_SX = {
+    ...PRIMARY_BTN_SX,
+    color: '#FFFFFF',
+    border: '1px solid #1E3A5F',
+    boxShadow: 'none',
+    '&:hover': {
+        backgroundColor: '#173050',
+        borderColor: '#173050',
+        boxShadow: 'none',
+    },
+    '&:focus-visible': {
+        outline: '3px solid #BFD7EA',
+        outlineOffset: 2,
+    },
+    '&.Mui-disabled': {
+        backgroundColor: '#E6ECF2',
+        borderColor: '#CDD6E0',
+        color: '#6B7C8F',
+    },
+};
+
+const CASE_SEARCH_SECONDARY_BTN_SX = {
+    textTransform: 'none',
+    fontWeight: 700,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#BFD7EA',
+    color: '#1E3A5F',
+    '&:hover': {
+        backgroundColor: '#F0F7FC',
+        borderColor: '#2F5D7C',
+        color: '#1E3A5F',
+    },
+    '&:focus-visible': {
+        outline: '3px solid #BFD7EA',
+        outlineOffset: 2,
+    },
+    '&.Mui-disabled': {
+        backgroundColor: '#F4F7FA',
+        borderColor: '#D9E2EC',
+        color: '#7B8794',
+    },
+};
+
+const CASE_SEARCH_NEUTRAL_BTN_SX = {
+    textTransform: 'none',
+    fontWeight: 600,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D9E2EC',
+    color: '#3E4C59',
+    '&:hover': {
+        backgroundColor: '#F5F7FA',
+        borderColor: '#CBD5E1',
+        color: '#1F2933',
+    },
+    '&:focus-visible': {
+        outline: '3px solid #D9E2EC',
+        outlineOffset: 2,
+    },
+    '&.Mui-disabled': {
+        backgroundColor: '#F5F7FA',
+        borderColor: '#E1E8F0',
+        color: '#9AA5B1',
+    },
+};
+
 const ResponsesScreen = () => {
     const { keycloak, initialized } = useKeycloak();
     const allowedCenters = getAllowedCenters(keycloak);
@@ -198,6 +278,15 @@ const ResponsesScreen = () => {
     });
     const [histologySaving, setHistologySaving] = useState(false);
     const [histologyError, setHistologyError] = useState('');
+    const [caseSearchOpen, setCaseSearchOpen] = useState(false);
+    const [caseSearchForm, setCaseSearchForm] = useState({
+        centerId: getDefaultCenter(keycloak),
+        nhc: '',
+    });
+    const [caseSearchLoading, setCaseSearchLoading] = useState(false);
+    const [caseSearchError, setCaseSearchError] = useState('');
+    const [caseSearchResult, setCaseSearchResult] = useState(null);
+    const [selectedSearchCaseId, setSelectedSearchCaseId] = useState('');
     const [infoOpen, setInfoOpen] = useState(false);
     const [statusDialogOpen, setStatusDialogOpen] = useState(false);
     const [pendingStatusAction, setPendingStatusAction] = useState(null);
@@ -289,6 +378,10 @@ const ResponsesScreen = () => {
         (isSiteCoordinator(keycloak) || isStudyCoordinator(keycloak)) &&
         allowedCenters.includes(String(item.centerId || '').trim().toUpperCase())
     );
+    const canSearchCasesByNhc = (
+        (isSiteCoordinator(keycloak) || isStudyCoordinator(keycloak)) &&
+        allowedCenters.length > 0
+    );
     const hasStructuredHistology = (item) => Boolean(item.histologyStatus);
     const isHistologyApplicable = (item) => {
         if (item.hasAdnexalMass === false) {
@@ -349,6 +442,86 @@ const ResponsesScreen = () => {
         setHistologyModalOpen(false);
         setSelectedHistologyCase(null);
         setHistologyError('');
+    };
+
+    const openCaseSearchModal = () => {
+        setCaseSearchForm({
+            centerId: selectedCenter || getDefaultCenter(keycloak) || allowedCenters[0] || '',
+            nhc: '',
+        });
+        setCaseSearchError('');
+        setCaseSearchResult(null);
+        setSelectedSearchCaseId('');
+        setCaseSearchOpen(true);
+    };
+
+    const closeCaseSearchModal = () => {
+        if (caseSearchLoading) {
+            return;
+        }
+        setCaseSearchOpen(false);
+        setCaseSearchForm((current) => ({ ...current, nhc: '' }));
+        setCaseSearchError('');
+        setCaseSearchResult(null);
+        setSelectedSearchCaseId('');
+    };
+
+    const handleCaseSearchFieldChange = (field) => (event) => {
+        setCaseSearchForm((current) => ({
+            ...current,
+            [field]: event.target.value,
+        }));
+    };
+
+    const toHistologyCaseFromSearch = (caseItem) => ({
+        ...caseItem,
+        centerId: caseSearchResult?.centerId || caseSearchForm.centerId,
+        studyPatientCode: caseSearchResult?.studyPatientCode || null,
+        codeStatus: caseSearchResult?.studyPatientCode ? 'CODE_ASSIGNED' : 'PENDING_CODE',
+        histologyStatus: caseItem.histologyStatus || 'PENDING',
+        primaryEvaluation: true,
+        hasAdnexalMass: true,
+    });
+
+    const getSelectedSearchCase = () => {
+        const cases = caseSearchResult?.cases || [];
+        if (cases.length === 1) {
+            return cases[0];
+        }
+        return cases.find((item) => String(item.caseId) === String(selectedSearchCaseId));
+    };
+
+    const handleSearchCasesByNhc = async () => {
+        try {
+            setCaseSearchLoading(true);
+            setCaseSearchError('');
+            setCaseSearchResult(null);
+            setSelectedSearchCaseId('');
+            const result = await searchCasesByNhc(keycloak.token, {
+                centerId: caseSearchForm.centerId,
+                nhc: caseSearchForm.nhc,
+            });
+            setCaseSearchResult(result);
+            if ((result?.cases || []).length === 1) {
+                setSelectedSearchCaseId(String(result.cases[0].caseId));
+            }
+        } catch (error) {
+            setCaseSearchError(error.message || 'No se pudo buscar el caso para histopatología.');
+        } finally {
+            setCaseSearchForm((current) => ({ ...current, nhc: '' }));
+            setCaseSearchLoading(false);
+        }
+    };
+
+    const handleOpenHistologyFromSearch = () => {
+        const selectedCase = getSelectedSearchCase();
+        if (!selectedCase) {
+            return;
+        }
+        setCaseSearchOpen(false);
+        setCaseSearchForm((current) => ({ ...current, nhc: '' }));
+        setCaseSearchError('');
+        openHistologyModal(toHistologyCaseFromSearch(selectedCase));
     };
 
     const openStatusDialog = (action) => {
@@ -779,8 +952,8 @@ const ResponsesScreen = () => {
                             ["Casos visibles", isGlobalView ? "Todos los centros (vista global)" : `Centros: ${centersLabel}`],
                             ["Evaluación primaria", "Primera evaluación ecográfica registrada para el caso."],
                             ["Evaluación secundaria", "Evaluación adicional sobre el mismo caso (segundo observador)."],
-                            ["Código pendiente", "El caso aún no tiene código de estudio asignado."],
-                            ["Código asignado", "El caso tiene código de estudio asignado por el coordinador de centro."],
+                            ["Código pendiente", "Estado legacy o incidencia; los nuevos registros deberían recibir código automáticamente."],
+                            ["Código asignado", "El caso tiene código de estudio asignado automáticamente por centro y participante."],
                             ["Estado abierto", "Caso activo en seguimiento clínico."],
                             ["Evaluación completada", "El formulario ecográfico del caso está registrado."],
                             ["Histopatología", "Se registra desde este listado, asociada al caso. Solo coordinadores de centro autorizados."],
@@ -825,6 +998,19 @@ const ResponsesScreen = () => {
                 <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
                 </Alert>
+            )}
+
+            {canSearchCasesByNhc && (
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
+                    <Button
+                        variant="outlined"
+                        onClick={openCaseSearchModal}
+                        startIcon={<SearchIcon />}
+                        sx={SECONDARY_BTN_SX}
+                    >
+                        Buscar caso por NHC
+                    </Button>
+                </Box>
             )}
 
             {/* Card de búsqueda */}
@@ -1081,6 +1267,222 @@ const ResponsesScreen = () => {
                     />
                 </Box>
             </Paper>
+
+            <Dialog
+                open={caseSearchOpen}
+                onClose={closeCaseSearchModal}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{ sx: DIALOG_PAPER_SX }}
+            >
+                <DialogTitle sx={DIALOG_TITLE_SX}>
+                    <Box>
+                        <Typography component="span" sx={{ display: 'block', fontWeight: 800, color: '#1F2933', fontSize: '1.05rem' }}>
+                            Buscar caso para histopatología
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#52616B', fontWeight: 500, mt: 0.5, maxWidth: 680 }}>
+                            Localice los casos asociados a una paciente para completar o revisar la información histopatológica.
+                        </Typography>
+                    </Box>
+                    <IconButton
+                        onClick={closeCaseSearchModal}
+                        size="small"
+                        aria-label="Cerrar"
+                        sx={{ position: 'absolute', right: 12, top: 12, color: '#52616B' }}
+                    >
+                        <Close fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={DIALOG_CONTENT_SX}>
+                    <Stack spacing={2}>
+                        <Alert
+                            severity="info"
+                            sx={{
+                                border: '1px solid #BFD7EA',
+                                backgroundColor: '#F0F7FC',
+                                color: '#1E3A5F',
+                                '& .MuiAlert-icon': { color: '#2F5D7C' },
+                            }}
+                        >
+                            El NHC se utilizará únicamente para localizar los casos asociados a la paciente. No se almacenará, no se mostrará y no se incluirá en exportaciones.
+                        </Alert>
+                        <Box sx={CASE_SEARCH_SECTION_SX}>
+                            <Typography sx={SECTION_LABEL_SX}>Datos de búsqueda</Typography>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'flex-start' }}>
+                                <FormControl size="small" fullWidth>
+                                    <InputLabel id="case-search-center-label">Centro</InputLabel>
+                                    <Select
+                                        labelId="case-search-center-label"
+                                        label="Centro"
+                                        value={caseSearchForm.centerId}
+                                        onChange={handleCaseSearchFieldChange('centerId')}
+                                    >
+                                        {allowedCenters.map((center) => (
+                                            <MenuItem key={center} value={center}>{center}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                <TextField
+                                    label="NHC"
+                                    placeholder="Introduzca NHC"
+                                    value={caseSearchForm.nhc}
+                                    onChange={handleCaseSearchFieldChange('nhc')}
+                                    size="small"
+                                    fullWidth
+                                    autoComplete="off"
+                                />
+                                <Button
+                                    variant={caseSearchResult ? 'outlined' : 'contained'}
+                                    onClick={handleSearchCasesByNhc}
+                                    disabled={caseSearchLoading || !caseSearchForm.centerId || !caseSearchForm.nhc.trim()}
+                                    data-testid={caseSearchResult ? 'case-search-new-search-button' : 'case-search-submit-button'}
+                                    sx={{
+                                        ...(caseSearchResult ? CASE_SEARCH_SECONDARY_BTN_SX : CASE_SEARCH_PRIMARY_BTN_SX),
+                                        minWidth: { xs: '100%', sm: 120 },
+                                        height: 40,
+                                    }}
+                                >
+                                    {caseSearchResult ? 'Nueva búsqueda' : 'Buscar'}
+                                </Button>
+                            </Stack>
+                        </Box>
+                        {caseSearchError && (
+                            <Alert severity="warning">
+                                No se pudo completar la búsqueda. Revise los datos introducidos o inténtelo de nuevo.
+                            </Alert>
+                        )}
+                        {caseSearchResult && (
+                            <Box sx={{ ...CASE_SEARCH_SECTION_SX, overflow: 'hidden' }}>
+                                <Box sx={{ mb: 1.5 }}>
+                                    <Typography sx={SECTION_LABEL_SX}>Resultado de la búsqueda</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 800, color: '#1F2933' }}>
+                                        {caseSearchResult.numberOfCases === 1
+                                            ? '1 caso encontrado'
+                                            : `${caseSearchResult.numberOfCases} casos encontrados. Seleccione un caso para registrar la histopatología.`}
+                                    </Typography>
+                                    {caseSearchResult.cases?.length > 0 && (
+                                        <Typography variant="body2" sx={{ color: '#52616B', mt: 0.5 }}>
+                                            Revise lateralidad, estructura y fecha antes de registrar histología.
+                                        </Typography>
+                                    )}
+                                </Box>
+                                {caseSearchResult.cases?.length > 0 ? (
+                                    <TableContainer sx={{ border: '1px solid #E1E8F0', borderRadius: 1, overflowX: 'auto' }}>
+                                        <Table size="small">
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell sx={CASE_SEARCH_RESULT_TH_SX}>Código de estudio</TableCell>
+                                                    <TableCell sx={CASE_SEARCH_RESULT_TH_SX}>Caso</TableCell>
+                                                    <TableCell sx={CASE_SEARCH_RESULT_TH_SX}>Lesión</TableCell>
+                                                    <TableCell sx={CASE_SEARCH_RESULT_TH_SX}>Ámbito</TableCell>
+                                                    <TableCell sx={CASE_SEARCH_RESULT_TH_SX}>Fecha</TableCell>
+                                                    <TableCell sx={CASE_SEARCH_RESULT_TH_SX}>Histología</TableCell>
+                                                    <TableCell sx={CASE_SEARCH_RESULT_TH_SX}>Evaluaciones</TableCell>
+                                                    <TableCell sx={CASE_SEARCH_RESULT_TH_SX} align="right">Acción</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {caseSearchResult.cases.map((item) => {
+                                                    const selected = String(selectedSearchCaseId) === String(item.caseId);
+                                                    const histologyChip = getHistologyChipProps(toHistologyCaseFromSearch(item));
+                                                    return (
+                                                        <TableRow
+                                                            key={item.caseId}
+                                                            hover
+                                                            selected={selected}
+                                                            onClick={() => setSelectedSearchCaseId(String(item.caseId))}
+                                                            sx={{
+                                                                cursor: 'pointer',
+                                                                backgroundColor: selected ? '#F0F7FC' : 'inherit',
+                                                                boxShadow: selected ? 'inset 3px 0 0 #2F5D7C' : 'none',
+                                                                '& td': { py: 1.15, px: 1.5, borderBottomColor: '#EEF2F6' },
+                                                            }}
+                                                        >
+                                                            <TableCell>
+                                                                <Chip
+                                                                    label={caseSearchResult.studyPatientCode || 'Sin código'}
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    sx={{ fontSize: '0.72rem', borderColor: '#BFD7EA', color: '#1E3A5F', backgroundColor: '#F8FBFD' }}
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell>{item.caseDisplayId || '—'}</TableCell>
+                                                            <TableCell>{[item.lateralityDisplay, item.anatomicalStructureDisplay].filter(Boolean).join(' · ') || '—'}</TableCell>
+                                                            <TableCell>{item.careSettingDisplay || getCareSettingDisplay(item.careSettingCode)}</TableCell>
+                                                            <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'}</TableCell>
+                                                            <TableCell>
+                                                                <Chip
+                                                                    label={histologyChip.label === 'Compartida con caso' ? 'Histología disponible en otro caso' : histologyChip.label}
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    sx={{ fontSize: '0.72rem', ...histologyChip.sx }}
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell>{item.numberOfEvaluations ?? 0}</TableCell>
+                                                            <TableCell align="right">
+                                                                <Button
+                                                                    size="small"
+                                                                    variant={selected ? 'contained' : 'outlined'}
+                                                                    sx={selected ? { ...CASE_SEARCH_PRIMARY_BTN_SX, py: 0.35, px: 1.25 } : ACTION_BTN_SX}
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        setSelectedSearchCaseId(String(item.caseId));
+                                                                    }}
+                                                                >
+                                                                    {selected ? 'Seleccionado' : 'Seleccionar'}
+                                                                </Button>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                ) : (
+                                    <Box sx={{ px: 2, py: 2, border: '1px dashed #CBD5E1', borderRadius: 1, backgroundColor: '#F8FAFC' }}>
+                                        <Typography variant="body2" sx={{ color: '#52616B', fontWeight: 600 }}>
+                                            No se encontraron casos asociados al NHC introducido en este centro.
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={DIALOG_ACTIONS_SX}>
+                    <Button
+                        variant="outlined"
+                        onClick={closeCaseSearchModal}
+                        disabled={caseSearchLoading}
+                        data-testid="case-search-cancel-button"
+                        sx={CASE_SEARCH_NEUTRAL_BTN_SX}
+                    >
+                        Cancelar
+                    </Button>
+                    {!caseSearchResult && (
+                        <Button
+                            variant="contained"
+                            onClick={handleSearchCasesByNhc}
+                            disabled={caseSearchLoading || !caseSearchForm.centerId || !caseSearchForm.nhc.trim()}
+                            data-testid="case-search-footer-submit-button"
+                            sx={CASE_SEARCH_PRIMARY_BTN_SX}
+                        >
+                            Buscar
+                        </Button>
+                    )}
+                    {caseSearchResult?.cases?.length > 0 && (
+                        <Button
+                            variant="contained"
+                            onClick={handleOpenHistologyFromSearch}
+                            disabled={!getSelectedSearchCase() || !canManageHistopathology(toHistologyCaseFromSearch(getSelectedSearchCase()))}
+                            data-testid="case-search-register-histology-button"
+                            sx={CASE_SEARCH_PRIMARY_BTN_SX}
+                        >
+                            Registrar histología
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
 
             {/* Dialog: resumen de evaluación ecográfica */}
             <Dialog

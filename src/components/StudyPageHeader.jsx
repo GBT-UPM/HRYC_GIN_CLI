@@ -5,14 +5,14 @@ import { InfoOutlined } from '@mui/icons-material';
 
 const StudyPageHeader = ({
     title,
-    subtitle,
+    subtitle = '',
     visibleScopeLabel,
-    roleLabel,
-    centersLabel,
-    recordCount,
-    extraChips,
+    roleLabel = '',
+    centersLabel = '',
+    recordCount = null,
+    extraChips = [],
     onInfoClick,
-    infoButtonLabel,
+    infoButtonLabel = 'Información de la vista',
 }) => (
     <Paper
         elevation={0}
@@ -106,15 +106,6 @@ StudyPageHeader.propTypes = {
     extraChips: PropTypes.arrayOf(PropTypes.string),
     onInfoClick: PropTypes.func.isRequired,
     infoButtonLabel: PropTypes.string,
-};
-
-StudyPageHeader.defaultProps = {
-    subtitle: '',
-    roleLabel: '',
-    centersLabel: '',
-    recordCount: null,
-    extraChips: [],
-    infoButtonLabel: 'Información de la vista',
 };
 
 export default StudyPageHeader;

@@ -260,7 +260,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
     ["Exportaciones disponibles", canExportScientificData ? "CSV, XLSX" : "No disponibles para este rol"],
     ["Datos identificativos", "No incluidos en exportación científica"],
     ["Histopatología", "Gestionada desde «Casos y evaluaciones»"],
-    ["Código de estudio", "Asignado por coordinador de centro"],
+    ["Código de estudio", "Asignado automáticamente al guardar"],
   ];
 
   return (

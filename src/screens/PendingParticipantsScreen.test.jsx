@@ -214,7 +214,7 @@ describe("PendingParticipantsScreen", () => {
 
     expect(await screen.findByText("Detalle del participante pendiente")).toBeInTheDocument();
     expect(
-      screen.getByText("Información del caso pendiente de asignación de código de estudio.")
+      screen.getByText("Información del caso con código pendiente o incidencia administrativa.")
     ).toBeInTheDocument();
     expect(screen.getByText("Identificación del caso")).toBeInTheDocument();
     expect(screen.getByText("Información clínica")).toBeInTheDocument();

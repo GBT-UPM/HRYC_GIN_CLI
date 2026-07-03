@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
 import ResponsesScreen from './ResponsesScreen';
 import ApiService from '../services/ApiService';
 
@@ -666,6 +666,207 @@ describe('ResponsesScreen', () => {
     expect(await screen.findByText('No tiene permisos para registrar histopatología en este centro.')).toBeInTheDocument();
     expect(screen.queryByText('123456')).not.toBeInTheDocument();
     expect(screen.queryByText('patientPseudonym')).not.toBeInTheDocument();
+  });
+
+  it('shows the safe NHC search modal only to authorized coordinators', async () => {
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ([]),
+    });
+
+    render(<ResponsesScreen />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Buscar caso por NHC' }));
+
+    expect(screen.getByText('Buscar caso para histopatología')).toBeInTheDocument();
+    expect(screen.getByText('Localice los casos asociados a una paciente para completar o revisar la información histopatológica.')).toBeInTheDocument();
+    expect(screen.getByText('El NHC se utilizará únicamente para localizar los casos asociados a la paciente. No se almacenará, no se mostrará y no se incluirá en exportaciones.')).toBeInTheDocument();
+    expect(screen.getByText('Datos de búsqueda')).toBeInTheDocument();
+    expect(screen.getByTestId('case-search-cancel-button')).toHaveClass('MuiButton-outlined');
+    expect(screen.getByTestId('case-search-submit-button')).toHaveClass('MuiButton-contained');
+    expect(screen.getByTestId('case-search-footer-submit-button')).toHaveClass('MuiButton-contained');
+
+    ApiService.mockReset();
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ([]),
+    });
+    mockKeycloak.tokenParsed.realm_access.roles = ['ROLE_CLINICIAN'];
+    render(<ResponsesScreen />);
+
+    await waitFor(() => {
+      expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/cases/evaluations?centerId=HURYC', {});
+    });
+    expect(screen.queryByRole('button', { name: 'Buscar caso por NHC' })).not.toBeInTheDocument();
+  });
+
+  it('searches cases by NHC with POST body and clears the NHC after success', async () => {
+    ApiService
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          found: true,
+          studyParticipantId: 14,
+          studyPatientCode: 'HURYC-0001',
+          centerId: 'HURYC',
+          numberOfCases: 1,
+          cases: [
+            {
+              caseId: 33,
+              caseDisplayId: 'HURYC-C000033',
+              caseStatus: 'OPEN',
+              lateralityDisplay: 'Derecho',
+              anatomicalStructureDisplay: 'Ovario',
+              careSettingCode: 'EMERGENCY',
+              careSettingDisplay: 'Urgencias',
+              createdAt: '2026-06-08T10:30:00',
+              histologyStatus: 'PENDING',
+              histologyDiagnosis: null,
+              numberOfEvaluations: 1,
+            },
+          ],
+        }),
+      });
+
+    render(<ResponsesScreen />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Buscar caso por NHC' }));
+    fireEvent.change(screen.getByLabelText('NHC'), { target: { value: '123456' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Buscar' })[0]);
+
+    await waitFor(() => {
+      expect(ApiService).toHaveBeenCalledWith('token', 'POST', '/app/cases/search-by-nhc', {
+        centerId: 'HURYC',
+        nhc: '123456',
+      });
+    });
+
+    expect(await screen.findByText('HURYC-C000033')).toBeInTheDocument();
+    expect(screen.getByText('Resultado de la búsqueda')).toBeInTheDocument();
+    expect(screen.getByText('1 caso encontrado')).toBeInTheDocument();
+    expect(screen.getByTestId('case-search-new-search-button')).toHaveClass('MuiButton-outlined');
+    expect(screen.getByTestId('case-search-new-search-button')).toBeDisabled();
+    expect(screen.getByTestId('case-search-register-histology-button')).toHaveClass('MuiButton-contained');
+    expect(screen.getByTestId('case-search-register-histology-button')).not.toBeDisabled();
+    expect(ApiService.mock.calls[1][2]).not.toContain('123456');
+    expect(screen.getByLabelText('NHC')).toHaveValue('');
+    expect(screen.queryByText('123456')).not.toBeInTheDocument();
+    expect(screen.queryByText('patientPseudonym')).not.toBeInTheDocument();
+    expect(screen.queryByText('hash')).not.toBeInTheDocument();
+  });
+
+  it('clears NHC on close and does not include it in error messages', async () => {
+    ApiService
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([]),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      });
+
+    render(<ResponsesScreen />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Buscar caso por NHC' }));
+    fireEvent.change(screen.getByLabelText('NHC'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    await waitForElementToBeRemoved(() => screen.queryByText('Buscar caso para histopatología'));
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar caso por NHC' }));
+
+    expect(screen.getByLabelText('NHC')).toHaveValue('');
+
+    fireEvent.change(screen.getByLabelText('NHC'), { target: { value: '123456' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Buscar' })[0]);
+
+    expect(await screen.findByText('No se pudo completar la búsqueda. Revise los datos introducidos o inténtelo de nuevo.')).toBeInTheDocument();
+    expect(screen.getByLabelText('NHC')).toHaveValue('');
+    expect(screen.queryByText('123456')).not.toBeInTheDocument();
+  });
+
+  it('requires selecting one of multiple NHC search results before opening histology for the right case', async () => {
+    ApiService
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          found: true,
+          studyParticipantId: 14,
+          studyPatientCode: 'HURYC-0001',
+          centerId: 'HURYC',
+          numberOfCases: 2,
+          cases: [
+            {
+              caseId: 33,
+              caseDisplayId: 'HURYC-C000033',
+              caseStatus: 'OPEN',
+              lateralityDisplay: 'Derecho',
+              anatomicalStructureDisplay: 'Ovario',
+              careSettingCode: 'EMERGENCY',
+              careSettingDisplay: 'Urgencias',
+              createdAt: '2026-06-08T10:30:00',
+              histologyStatus: 'PENDING',
+              numberOfEvaluations: 1,
+            },
+            {
+              caseId: 34,
+              caseDisplayId: 'HURYC-C000034',
+              caseStatus: 'OPEN',
+              lateralityDisplay: 'Izquierdo',
+              anatomicalStructureDisplay: 'Trompa',
+              careSettingCode: 'OUTPATIENT',
+              careSettingDisplay: 'Consulta externa',
+              createdAt: '2026-06-09T10:30:00',
+              histologyStatus: 'PENDING',
+              numberOfEvaluations: 2,
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          caseId: 34,
+          histologyStatus: 'AVAILABLE',
+        }),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        json: async () => ([]),
+      });
+
+    render(<ResponsesScreen />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Buscar caso por NHC' }));
+    fireEvent.change(screen.getByLabelText('NHC'), { target: { value: '123456' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Buscar' })[0]);
+
+    await screen.findByText('HURYC-C000034');
+    expect(screen.getByText('2 casos encontrados. Seleccione un caso para registrar la histopatología.')).toBeInTheDocument();
+    const registerButton = screen.getByRole('button', { name: 'Registrar histología' });
+    expect(registerButton).toHaveClass('MuiButton-contained');
+    expect(registerButton).toBeDisabled();
+
+    fireEvent.click(screen.getByText('HURYC-C000034'));
+    expect(registerButton).not.toBeDisabled();
+    fireEvent.click(registerButton);
+
+    expect(await screen.findByLabelText('Estado histopatología')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Guardar'));
+
+    await waitFor(() => {
+      expect(ApiService).toHaveBeenCalledWith('token', 'POST', '/app/cases/34/histology', expect.any(Object));
+    });
   });
 
   it('shows permissions message on 403 instead of a silent empty table', async () => {

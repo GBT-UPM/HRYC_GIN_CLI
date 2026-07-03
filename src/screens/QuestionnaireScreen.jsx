@@ -143,7 +143,6 @@ export default function QuestionnaireScreen() {
   const [responses, setResponses] = useState([]);
   const [questionnaireResponses, setQuestionnaireResponses] = useState([]);
   const [transientNhc, setTransientNhc] = useState("");
-  const [studyPatientCode, setStudyPatientCode] = useState("");
   const [careSetting, setCareSetting] = useState(DEFAULT_CARE_SETTING);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -327,7 +326,6 @@ export default function QuestionnaireScreen() {
     setQuestionnaireResponses([]);
     setResponses([]);
     setTransientNhc("");
-    setStudyPatientCode("");
     setCareSetting(DEFAULT_CARE_SETTING);
     setHasUnsavedChanges(false);
     resetStudyUsageSession();
@@ -355,7 +353,6 @@ export default function QuestionnaireScreen() {
     setQuestionnaireResponses([]);
     setResponses([]);
     setTransientNhc("");
-    setStudyPatientCode("");
     setCareSetting(DEFAULT_CARE_SETTING);
     setHasUnsavedChanges(false);
     resetStudyUsageSession();
@@ -516,7 +513,7 @@ export default function QuestionnaireScreen() {
             )}
             <Chip label="Datos pseudonimizados" size="small" variant="outlined" sx={{ fontSize: "0.75rem" }} />
             {isSiteCoordinator(keycloak) && (
-              <Chip label="Código pendiente permitido" size="small" variant="outlined" sx={{ fontSize: "0.75rem" }} />
+              <Chip label="Código automático" size="small" variant="outlined" sx={{ fontSize: "0.75rem" }} />
             )}
           </Stack>
         </Stack>
@@ -570,9 +567,6 @@ export default function QuestionnaireScreen() {
               questionnaire={questionnaire.resourceData}
               transientNhc={transientNhc}
               onTransientNhcChange={setTransientNhc}
-              studyPatientCode={studyPatientCode}
-              onStudyPatientCodeChange={setStudyPatientCode}
-              canEnterStudyPatientCode={isSiteCoordinator(keycloak)}
               careSettingCode={careSetting.code}
               onCareSettingChange={(nextCareSetting) =>
                 setCareSetting(normalizeCareSetting(nextCareSetting?.code || nextCareSetting))
@@ -587,15 +581,12 @@ export default function QuestionnaireScreen() {
               event={QBack}
               transientNhc={transientNhc}
               onClearTransientNhc={() => setTransientNhc("")}
-              studyPatientCode={studyPatientCode}
-              canUseStudyPatientCode={isSiteCoordinator(keycloak)}
               careSetting={careSetting}
               studyUsageFlowId={studyUsageFlowId}
               studyConsentConfirmed={studyConsent?.studyConsentConfirmed === true}
               consentVersion={studyConsent?.consentVersion || ""}
               consentConfirmedAt={studyConsent?.consentConfirmedAt || ""}
               onCaseSaved={() => {
-                setStudyPatientCode("");
                 setHasUnsavedChanges(false);
                 resetStudyUsageSession();
               }}

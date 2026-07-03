@@ -2,11 +2,6 @@ import React, { useState } from "react";
 import '../assets/css/QuestionnaireForm.css';
 
 import Modal from "./Modal";
-import { mapCenterToCode } from "../utils/caseMetadata";
-import {
-  validateStudyPatientCode,
-  STUDY_PARTICIPANT_ERROR_MESSAGES,
-} from "../services/studyParticipantService";
 import { CARE_SETTING_OPTIONS, normalizeCareSetting } from "../utils/careSetting";
 
 export const HIDDEN_LINK_IDS = new Set(["PAT_CODIGO", "PAT_NHC", "PAT_NOMBRE"]);
@@ -47,12 +42,8 @@ const QuestionnaireForm = ({
   questionnaire,
   event,
   eventContinue,
-  token = "",
   transientNhc,
   onTransientNhcChange,
-  studyPatientCode = "",
-  onStudyPatientCodeChange = () => {},
-  canEnterStudyPatientCode = false,
   careSettingCode = "UNKNOWN",
   onCareSettingChange = () => {},
   onDirtyChange = () => {},
@@ -61,9 +52,7 @@ const QuestionnaireForm = ({
   const [answers, setAnswers] = useState([]);
   const [error, setError] = useState("");
   const [nhcError, setNhcError] = useState("");
-  const [studyCodeError, setStudyCodeError] = useState("");
   const [requiredFieldsError, setRequiredFieldsError] = useState("");
-  const [validatingStudyCode, setValidatingStudyCode] = useState(false);
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const pendingFieldLabels = getPendingFieldLabels(requiredFieldsError);
@@ -585,60 +574,12 @@ const renderInput = (item) => {
     }
   };
 
-  const validateStudyCodeIfNeeded = async () => {
-    const trimmedStudyCode = String(studyPatientCode || "").trim();
-
-    if (!canEnterStudyPatientCode || !trimmedStudyCode) {
-      setStudyCodeError("");
-      return true;
-    }
-
-    const centerId = mapCenterToCode(getAnswerDisplayValue("HOSPITAL_REF"));
-    if (!centerId) {
-      const message = "No se pudo identificar el centro participante.";
-      setStudyCodeError(message);
-      setError(message);
-      return false;
-    }
-
-    try {
-      setValidatingStudyCode(true);
-      setStudyCodeError("");
-      const result = await validateStudyPatientCode(token, {
-        centerId,
-        nhc: String(transientNhc || "").trim(),
-        studyPatientCode: trimmedStudyCode,
-      });
-
-      if (result.valid === false && result.reason === "CODE_ASSIGNED_TO_ANOTHER_PARTICIPANT") {
-        setStudyCodeError(STUDY_PARTICIPANT_ERROR_MESSAGES.conflict);
-        setError(STUDY_PARTICIPANT_ERROR_MESSAGES.conflict);
-        return false;
-      }
-
-      if (result.valid === false) {
-        setStudyCodeError(STUDY_PARTICIPANT_ERROR_MESSAGES.validateGeneric);
-        setError(STUDY_PARTICIPANT_ERROR_MESSAGES.validateGeneric);
-        return false;
-      }
-
-      return true;
-    } catch (validationError) {
-      const message = validationError.message || STUDY_PARTICIPANT_ERROR_MESSAGES.validateGeneric;
-      setStudyCodeError(message);
-      setError(message);
-      return false;
-    } finally {
-      setValidatingStudyCode(false);
-    }
-  };
-
   const validate = async () => {
     if (!validateRequiredFields()) {
       return false;
     }
 
-    return validateStudyCodeIfNeeded();
+    return true;
   };
 
   const handleNextClick = async () => {
@@ -809,47 +750,16 @@ const renderInput = (item) => {
 	            ))}
 	          </select>
 	        </div>
-	        {canEnterStudyPatientCode && (
-          <div className={getItemClassName({ type: "string" }, "questionnaire-item--context")}>
-            {renderFieldLabel({
-              htmlFor: "study-patient-code",
-              text: "Código de estudio",
-            })}
-            <input
-              id="study-patient-code"
-              type="text"
-              value={studyPatientCode}
-              onChange={(event) => {
-                onStudyPatientCodeChange(event.target.value);
-                onDirtyChange(true);
-                onQuestionnaireInteraction(answers, {
-                  linkId: "study-patient-code",
-                  type: "string",
-                });
-                setStudyCodeError("");
-                if (error === STUDY_PARTICIPANT_ERROR_MESSAGES.conflict) {
-                  setError("");
-                }
-              }}
-              autoComplete="off"
-              aria-invalid={Boolean(studyCodeError)}
-              aria-describedby={studyCodeError ? "study-patient-code-error" : undefined}
-            />
-            {studyCodeError && (
-              <p id="study-patient-code-error" className="error-message">
-                {studyCodeError}
-              </p>
-            )}
+        <div className={getItemClassName({ type: "display" }, "questionnaire-item--context")}>
+          {renderFieldLabel({
+            text: "Código de estudio",
+          })}
+          <div className="questionnaire-help-box">
             <small>
-              Si dispone del código de estudio, puede introducirlo ahora. Si se deja vacío, el caso quedará pendiente de asignación de código.
+              El código de estudio se asignará automáticamente al guardar el primer registro de la paciente.
             </small>
-            {studyCodeError && (
-              <small>
-                Puede dejar el código vacío y el caso quedará pendiente de asignación.
-              </small>
-            )}
           </div>
-        )}
+        </div>
 	        {questionnaire.item.map((item) => {
           // Si no está habilitado, no lo mostramos
           if (!isItemEnabled(item) || HIDDEN_LINK_IDS.has(item.linkId)) return null;
@@ -904,8 +814,8 @@ const renderInput = (item) => {
           </div>
         </section>
       )}
-      <button className="save-btn" onClick={handleNextClick} disabled={validatingStudyCode}>
-        {validatingStudyCode ? "Validando..." : "Siguiente"}
+      <button className="save-btn" onClick={handleNextClick}>
+        Siguiente
       </button>
       {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>

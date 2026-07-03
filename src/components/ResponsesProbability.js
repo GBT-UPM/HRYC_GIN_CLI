@@ -87,8 +87,6 @@ const ResponsesProbability = ({
   event,
   transientNhc,
   onClearTransientNhc,
-  studyPatientCode = "",
-  canUseStudyPatientCode = false,
   careSetting = DEFAULT_CARE_SETTING,
   studyUsageFlowId = "",
   onCaseSaved = () => {},
@@ -116,11 +114,9 @@ const ResponsesProbability = ({
   const [saveInProgress, setSaveInProgress] = useState(false);
   const [isSaveConfirmationOpen, setIsSaveConfirmationOpen] = useState(false);
   const [pendingSaveRequest, setPendingSaveRequest] = useState(null);
-  const [isStudyCodeConflictOpen, setIsStudyCodeConflictOpen] = useState(false);
-  const [studyCodeConflictRequest, setStudyCodeConflictRequest] = useState(null);
-  const [correctedStudyPatientCode, setCorrectedStudyPatientCode] = useState("");
-  const [studyCodeConflictError, setStudyCodeConflictError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const [saveResult, setSaveResult] = useState(null);
+  const [copyFeedback, setCopyFeedback] = useState("");
 
   const { keycloak } = useKeycloak();
   // eslint-disable-next-line no-unused-vars
@@ -132,9 +128,6 @@ const ResponsesProbability = ({
   const { generateRiskAssessment } = useRiskAssessmentTemplate();
   const { generatePatient } = usePatientTemplate();
 
-  const effectiveStudyPatientCode = canUseStudyPatientCode
-    ? String(studyPatientCode || "").trim()
-    : "";
   const reportMetadata = (() => {
     try {
       return validateCaseMetadata(sanitizeQuestionnaireResponse(responses?.[0] || {}));
@@ -149,7 +142,7 @@ const ResponsesProbability = ({
   })();
   const reportCenterId = reportMetadata.centerId || "";
   const reportMassCount = reports.length || responses?.length || 0;
-  const reportStudyCodeLabel = effectiveStudyPatientCode || "Pendiente";
+  const reportStudyCodeLabel = "Se asignará al guardar";
 
   const selectedDuplicateMatch = duplicateMatches.find(
     (match) => String(match?.caseId || match?.id || "") === String(selectedDuplicateCaseId || "")
@@ -166,12 +159,8 @@ const ResponsesProbability = ({
         : "El caso seleccionado ya tiene código de estudio asignado.";
     }
 
-    if (selectedDuplicateMatch.codeStatus === "PENDING_CODE" && effectiveStudyPatientCode) {
-      return "Se añadirá una evaluación secundaria al caso existente y se asignará el código de estudio indicado.";
-    }
-
     if (selectedDuplicateMatch.codeStatus === "PENDING_CODE") {
-      return "Se añadirá una evaluación secundaria al caso existente y el caso seguirá pendiente de código de estudio.";
+      return "Se añadirá una evaluación secundaria al caso existente y el backend asignará el código de estudio automáticamente si procede.";
     }
 
     return "";
@@ -432,10 +421,30 @@ const ResponsesProbability = ({
     setDuplicateMatches([]);
     setSelectedDuplicateCaseId("");
     setIsDuplicateModalOpen(false);
-    setStudyCodeConflictRequest(null);
-    setCorrectedStudyPatientCode("");
-    setStudyCodeConflictError("");
-    setIsStudyCodeConflictOpen(false);
+  };
+
+  const continueAfterSuccessfulSave = () => {
+    setSaveResult(null);
+    setCopyFeedback("");
+    clearTransientCaseState();
+    onCaseSaved();
+    event();
+  };
+
+  const copyAssignedStudyCode = async () => {
+    const code = saveResult?.studyPatientCode;
+    if (!code) return;
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+        setCopyFeedback("Código copiado");
+        return;
+      }
+    } catch (copyError) {
+      console.error("No se pudo copiar el código de estudio:", copyError);
+    }
+    setCopyFeedback("Copie el código manualmente");
   };
 
   const clearDuplicateModalState = () => {
@@ -532,13 +541,6 @@ const ResponsesProbability = ({
       encId,
       imgStuId,
     };
-  };
-
-  const openStudyCodeConflictModal = (request, failedCode = "") => {
-    setStudyCodeConflictRequest(request);
-    setCorrectedStudyPatientCode(failedCode);
-    setStudyCodeConflictError("");
-    setIsStudyCodeConflictOpen(true);
   };
 
   const runDuplicateChecks = async ({ nhc, options, preparedResponses, decisions = {}, startIndex = 0 }) => {
@@ -655,48 +657,6 @@ const ResponsesProbability = ({
     }
   };
 
-  const cancelStudyCodeConflictModal = () => {
-    setIsStudyCodeConflictOpen(false);
-    setStudyCodeConflictError("");
-  };
-
-  const retrySaveWithCorrectedStudyCode = async () => {
-    if (!studyCodeConflictRequest) return;
-
-    try {
-      setSaveInProgress(true);
-      setError(null);
-      setStudyCodeConflictError("");
-      await persistCaseFlow({
-        ...studyCodeConflictRequest,
-        studyPatientCodeOverride: correctedStudyPatientCode,
-      });
-    } catch (error) {
-      setStudyCodeConflictError(getSafeSaveErrorMessage(error));
-    } finally {
-      setSaveInProgress(false);
-    }
-  };
-
-  const saveWithoutStudyCode = async () => {
-    if (!studyCodeConflictRequest) return;
-
-    try {
-      setSaveInProgress(true);
-      setError(null);
-      setStudyCodeConflictError("");
-      await persistCaseFlow({
-        ...studyCodeConflictRequest,
-        studyPatientCodeOverride: null,
-        successMessage: "El caso se ha guardado como pendiente de código de estudio.",
-      });
-    } catch (error) {
-      setStudyCodeConflictError(getSafeSaveErrorMessage(error));
-    } finally {
-      setSaveInProgress(false);
-    }
-  };
-
   const persistCaseFlow = async ({
     nhc,
     options,
@@ -704,7 +664,6 @@ const ResponsesProbability = ({
     decisions,
     startIndex = 0,
     persistenceContext = null,
-    studyPatientCodeOverride,
     successMessage = "",
   }) => {
     try {
@@ -714,10 +673,8 @@ const ResponsesProbability = ({
       const context = persistenceContext || await createPersistenceContext(contextCenterId, normalizedCareSetting.code);
       const { patientId, encId, imgStuId } = context;
       const savedUsageContext = [];
-      const requestStudyPatientCode =
-        canUseStudyPatientCode && studyPatientCodeOverride !== null
-          ? String((studyPatientCodeOverride ?? studyPatientCode) || "").trim()
-          : "";
+      const assignedStudyPatientCodes = [];
+      const studyCodeAssignments = [];
 
       for (let index = startIndex; index < preparedResponses.length; index++) {
         const preparedResponse = preparedResponses[index];
@@ -745,7 +702,6 @@ const ResponsesProbability = ({
                 observerInitials: preparedResponse.metadata.observerInitials,
                 careSettingCode: normalizedCareSetting.code,
                 careSettingDisplay: normalizedCareSetting.display,
-                studyPatientCode: requestStudyPatientCode || undefined,
                 studyConsentConfirmed: true,
                 consentVersion,
               })
@@ -760,7 +716,6 @@ const ResponsesProbability = ({
                 questionnaireResponse: sanitizedQuestionnaireResponse,
                 encounterId: encId,
                 observerInitials: preparedResponse.metadata.observerInitials,
-                studyPatientCode: requestStudyPatientCode || undefined,
                 careSettingCode: normalizedCareSetting.code,
                 careSettingDisplay: normalizedCareSetting.display,
                 studyConsentConfirmed: true,
@@ -769,6 +724,13 @@ const ResponsesProbability = ({
 
           const questionnaireResponseId = caseResponse.questionnaireResponseFhirId;
           const evaluationId = caseResponse.evaluationId;
+          if (caseResponse.studyPatientCode) {
+            assignedStudyPatientCodes.push(caseResponse.studyPatientCode);
+            studyCodeAssignments.push({
+              studyPatientCode: caseResponse.studyPatientCode,
+              studyCodeAssignmentMode: caseResponse.studyCodeAssignmentMode || "GENERATED",
+            });
+          }
           if (!questionnaireResponseId) {
             throw new Error("El backend no devolvió questionnaireResponseFhirId.");
           }
@@ -830,21 +792,6 @@ const ResponsesProbability = ({
           savedUsageContext.push(usagePayload);
           await safelyRecordStudyUsageEvent(usagePayload);
         } catch (error) {
-          if (error.message === CASE_ERROR_MESSAGES.studyCodeConflict) {
-            openStudyCodeConflictModal(
-              {
-                nhc,
-                options,
-                preparedResponses,
-                decisions,
-                startIndex: index,
-                persistenceContext: context,
-              },
-              requestStudyPatientCode
-            );
-            return;
-          }
-
           console.error("Error al guardar la respuesta:", error);
           setError(getSafeSaveErrorMessage(error));
           throw error;
@@ -856,21 +803,36 @@ const ResponsesProbability = ({
           encounterId: context.encId,
           savedUsageContext,
           preparedResponses,
+          studyPatientCode: assignedStudyPatientCodes[0] || "",
         });
       }
-      if (successMessage) {
-        setSaveMessage(successMessage);
-      }
-      clearTransientCaseState();
-      onCaseSaved();
-      event();
+      const uniqueAssignedCodes = [...new Set(assignedStudyPatientCodes.filter(Boolean))];
+      const firstAssignment = studyCodeAssignments[0] || null;
+      const assignmentMode = studyCodeAssignments.some((item) => item.studyCodeAssignmentMode === "GENERATED")
+        ? "GENERATED"
+        : firstAssignment?.studyCodeAssignmentMode || "";
+      setSaveMessage(
+        successMessage ||
+        (uniqueAssignedCodes.length > 0
+          ? `Código de estudio asignado: ${uniqueAssignedCodes.join(", ")}.`
+          : "El caso se ha guardado correctamente.")
+      );
+      setSaveResult(uniqueAssignedCodes.length > 0
+        ? {
+            studyPatientCode: uniqueAssignedCodes[0],
+            studyCodeAssignmentMode: assignmentMode,
+            multipleStudyPatientCodes: uniqueAssignedCodes,
+          }
+        : {
+            studyPatientCode: "",
+            studyCodeAssignmentMode: "",
+            multipleStudyPatientCodes: [],
+          });
+      setCopyFeedback("");
     } catch (error) {
       console.error("Error al guardar el encounter:", error);
       const safeMessage = getSafeSaveErrorMessage(error);
       setError(safeMessage);
-      if (studyCodeConflictRequest) {
-        setStudyCodeConflictError(safeMessage);
-      }
     }
   };
 
@@ -884,7 +846,7 @@ const ResponsesProbability = ({
         centerIdHint: reportCenterId,
         practitionerName: sessionStorage.getItem('practitionerName') || '',
         careSettingDisplay: normalizedCareSetting.display || '',
-        studyPatientCode: effectiveStudyPatientCode || '',
+        studyPatientCode: usageContext.studyPatientCode || '',
       });
 
       const singleSavedContext = usageContext.savedUsageContext?.length === 1
@@ -1052,6 +1014,65 @@ const ResponsesProbability = ({
       </div>
       </section>
 
+      <Modal isOpen={Boolean(saveResult)} onClose={continueAfterSuccessfulSave}>
+        {saveResult && (
+          <div className="save-confirmation-modal">
+            <header className="save-confirmation-modal__header">
+              <h2>Caso guardado correctamente</h2>
+              <p className="save-confirmation-modal__subtitle">
+                {saveResult.studyCodeAssignmentMode === "REUSED"
+                  ? "Código de estudio reutilizado"
+                  : "Código de estudio asignado"}
+              </p>
+              {saveResult.studyPatientCode && (
+                <div className="save-confirmation-modal__chips">
+                  <span className="responses-review-chip responses-review-chip--neutral">
+                    {saveResult.studyPatientCode}
+                  </span>
+                  <span className="responses-review-chip responses-review-chip--soft">
+                    {saveResult.studyCodeAssignmentMode === "REUSED" ? "Reutilizado" : "Nuevo"}
+                  </span>
+                </div>
+              )}
+            </header>
+
+            <section className="save-confirmation-callout" aria-label="Información de custodia local del código">
+              <p>
+                Este código identifica a la paciente en el estudio. Si el centro mantiene una lista local de correspondencia NHC-código,
+                registre esta información en el circuito definido por el centro.
+              </p>
+            </section>
+
+            {saveResult.multipleStudyPatientCodes?.length > 1 && (
+              <section className="save-confirmation-summary">
+                <h3>Códigos guardados</h3>
+                <div className="save-confirmation-summary__grid">
+                  {saveResult.multipleStudyPatientCodes.map((code) => (
+                    <div className="save-confirmation-field" key={code}>
+                      <span className="save-confirmation-field__label">Código de estudio</span>
+                      <span className="save-confirmation-field__value">{code}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {copyFeedback && <p className="success-message">{copyFeedback}</p>}
+
+            <footer className="save-confirmation-modal__actions">
+              {saveResult.studyPatientCode && (
+                <button className="continue" onClick={copyAssignedStudyCode} type="button">
+                  Copiar código
+                </button>
+              )}
+              <button className="save" onClick={continueAfterSuccessfulSave} type="button">
+                Continuar
+              </button>
+            </footer>
+          </div>
+        )}
+      </Modal>
+
       {/* Modal para dar opción de incluir la probabilidad en el informe */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h2>Incluir probabilidad en el informe</h2>
@@ -1073,14 +1094,10 @@ const ResponsesProbability = ({
       <Modal isOpen={isSaveConfirmationOpen} onClose={() => setIsSaveConfirmationOpen(false)}>
         {(() => {
           const metadata = pendingSaveRequest?.preparedResponses?.[0]?.metadata || {};
-          const codeLabel =
-            canUseStudyPatientCode && String(studyPatientCode || "").trim()
-              ? String(studyPatientCode).trim()
-              : "Pendiente";
+          const codeLabel = "Se asignará automáticamente";
           const massCount = pendingSaveRequest?.preparedResponses?.length || 0;
           const nhcStatus = pendingSaveRequest?.nhc ? "NHC informado" : "NHC no informado";
           const massLabel = `${massCount} ${massCount === 1 ? "masa" : "masas"}`;
-          const hasStudyCode = codeLabel !== "Pendiente";
 
           return (
             <div className="save-confirmation-modal">
@@ -1091,7 +1108,7 @@ const ResponsesProbability = ({
                 </p>
                 <div className="save-confirmation-modal__chips">
                   <span className="responses-review-chip responses-review-chip--info">{maskNhc(pendingSaveRequest?.nhc)}</span>
-                  <span className={`responses-review-chip ${hasStudyCode ? "responses-review-chip--neutral" : "responses-review-chip--pending"}`}>
+                  <span className="responses-review-chip responses-review-chip--pending">
                     {codeLabel}
                   </span>
                   <span className="responses-review-chip responses-review-chip--soft">{massLabel}</span>
@@ -1138,8 +1155,8 @@ const ResponsesProbability = ({
                     </div>
                     <div className="save-confirmation-field">
                       <span className="save-confirmation-field__label">Código de estudio</span>
-                      <span className={`responses-review-chip ${hasStudyCode ? "responses-review-chip--neutral" : "responses-review-chip--pending"}`}>
-                        {codeLabel}
+                      <span className="responses-review-chip responses-review-chip--pending">
+                        se asignará automáticamente
                       </span>
                     </div>
                   </section>
@@ -1297,41 +1314,6 @@ const ResponsesProbability = ({
           </footer>
         </div>
       </Modal>
-      <Modal isOpen={isStudyCodeConflictOpen} onClose={cancelStudyCodeConflictModal}>
-        <h2>Conflicto de código de estudio</h2>
-        <p>{CASE_ERROR_MESSAGES.studyCodeConflict}</p>
-        <p>
-          El código de estudio es un dato administrativo. Puede corregirlo sin volver al cuestionario o guardar el caso como pendiente de código.
-        </p>
-        {studyCodeConflictError && <p className="error-message">{studyCodeConflictError}</p>}
-        <button
-          className="save"
-          onClick={() => setStudyCodeConflictError("")}
-          disabled={saveInProgress}
-        >
-          Corregir código de estudio
-        </button>
-        <div className="parts">
-          <div className="tlabel">Nuevo código de estudio:</div>
-          <div className="text">
-            <input
-              aria-label="Nuevo código de estudio"
-              value={correctedStudyPatientCode}
-              onChange={(event) => setCorrectedStudyPatientCode(event.target.value)}
-              autoComplete="off"
-            />
-          </div>
-        </div>
-        <button className="save" onClick={retrySaveWithCorrectedStudyCode} disabled={saveInProgress}>
-          Reintentar guardado
-        </button>
-        <button className="continue" onClick={saveWithoutStudyCode} disabled={saveInProgress}>
-          Guardar sin código y dejar pendiente
-        </button>
-        <button className="cancel" onClick={cancelStudyCodeConflictModal} disabled={saveInProgress}>
-          Cancelar
-        </button>
-      </Modal>
 	  </div>
   );
 }
@@ -1346,8 +1328,6 @@ ResponsesProbability.propTypes = {
   event: PropTypes.func.isRequired,
   transientNhc: PropTypes.string.isRequired,
   onClearTransientNhc: PropTypes.func.isRequired,
-  studyPatientCode: PropTypes.string,
-  canUseStudyPatientCode: PropTypes.bool,
   careSetting: PropTypes.oneOfType([
     PropTypes.string,
     PropTypes.shape({

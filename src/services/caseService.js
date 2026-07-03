@@ -73,7 +73,6 @@ export const createCase = async (
     questionnaireResponse,
     encounterId,
     observerInitials,
-    studyPatientCode,
     careSettingCode,
     careSettingDisplay,
     studyConsentConfirmed,
@@ -99,11 +98,20 @@ export const createCase = async (
     consentVersion,
   };
 
-  if (studyPatientCode) {
-    body.studyPatientCode = studyPatientCode;
-  }
-
   const response = await ApiService(token, "POST", "/app/cases", body);
+
+  return parseJsonResponse(response);
+};
+
+export const searchCasesByNhc = async (token, { centerId, nhc }) => {
+  const response = await ApiService(token, "POST", "/app/cases/search-by-nhc", {
+    centerId,
+    nhc,
+  });
+
+  if (!response.ok && response.status === 404) {
+    throw new Error("No se encontró participante/caso pendiente para el NHC introducido en este centro.");
+  }
 
   return parseJsonResponse(response);
 };
@@ -117,7 +125,6 @@ export const addSecondaryEvaluation = async (
     observerInitials,
     careSettingCode,
     careSettingDisplay,
-    studyPatientCode,
     studyConsentConfirmed,
     consentVersion,
   }
@@ -131,10 +138,6 @@ export const addSecondaryEvaluation = async (
     studyConsentConfirmed,
     consentVersion,
   };
-
-  if (studyPatientCode) {
-    body.studyPatientCode = studyPatientCode;
-  }
 
   const response = await ApiService(token, "POST", `/app/cases/${caseId}/evaluations`, body);
 
