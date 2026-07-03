@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import Header from "../components/Header";
 import TopNavigation from "../components/TopNavigation";
+import Footer from "../components/Footer";
 
 
 const Layout = ({ closeSession, preferred_username, keycloak }) => {
@@ -11,6 +12,7 @@ const Layout = ({ closeSession, preferred_username, keycloak }) => {
       <main className="main-content">
         <Outlet />
       </main>
+      <Footer />
     </div>
   );
 };

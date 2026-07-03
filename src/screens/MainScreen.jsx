@@ -178,7 +178,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
   const visibleScopeLabel = isGlobalView
     ? "Vista global"
     : selectedCenter
-      ? `Centro ${selectedCenter}`
+      ? `Centro activo: ${selectedCenter}`
       : "Centro pendiente";
 
   const metricCards = [
@@ -267,7 +267,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
     <Box sx={{ px: 0, py: 0 }}>
       {/* Bloque superior compacto */}
       <Paper
-        className="study-page-header"
+        className="study-page-header home-study-context"
         elevation={0}
         sx={{
           p: { xs: 2, md: 2.5 },
@@ -305,7 +305,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
                 variant="body2"
                 sx={{ color: "#52616B", fontSize: "0.875rem", lineHeight: 1.4 }}
               >
-                Validación externa multicéntrica del ECO-SCORE en masas anexiales
+                Validación externa multicéntrica del ECO-SCORE en masas anexiales. Registro estructurado de evaluaciones ecográficas y resultados ECO-SCORE.
               </Typography>
             </Box>
             <Button
@@ -411,11 +411,11 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
       )}
 
       {/* Tarjetas de métricas */}
-      <Grid2 container spacing={2} alignItems="stretch" sx={{ mb: 2.5 }}>
+      <Grid2 className="home-kpi-grid" container spacing={2} alignItems="stretch" sx={{ mb: 2.5 }}>
         {metricCards.map(({ label, icon, count, subtext }, index) => (
           <Grid2 size={{ xs: 12, sm: 6, lg: 3 }} key={index} sx={{ display: "flex" }}>
             <Paper
-              className="clinical-card"
+              className="clinical-card home-kpi-card"
               elevation={0}
               sx={{
                 flex: 1,
@@ -464,7 +464,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
       </Grid2>
 
       {/* Acciones principales */}
-      <Stack spacing={1.5}>
+      <Stack className="home-actions" spacing={1.5}>
         <Typography variant="h6" sx={{ color: "#1F2933", fontWeight: 800, fontSize: "0.95rem", letterSpacing: "0.01em" }}>
           Acciones principales
         </Typography>
@@ -472,7 +472,7 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
           {actionCards.map((action) => (
             <Grid2 key={action.title} size={{ xs: 12, sm: 6, md: 4 }} sx={{ display: "flex" }}>
               <Paper
-                className="clinical-card"
+                className="clinical-card home-action-card"
                 elevation={0}
                 sx={{
                   p: 2,

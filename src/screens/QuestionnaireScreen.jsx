@@ -460,7 +460,7 @@ export default function QuestionnaireScreen() {
         </DialogActions>
       </Dialog>
 
-      <Paper elevation={0} sx={HEADER_PAPER_SX}>
+      <Paper className="study-page-header" elevation={0} sx={HEADER_PAPER_SX}>
         <Stack spacing={1.5}>
           <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
             <Box>

@@ -56,6 +56,8 @@ select {
 .App {
   min-height: 100vh;
   background: var(--mia-background);
+  display: flex;
+  flex-direction: column;
 }
 
 .header {
@@ -71,11 +73,24 @@ select {
 .header-inner {
   min-height: 68px;
   display: grid;
-  grid-template-columns: minmax(260px, 1.2fr) minmax(240px, 0.8fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(250px, 0.8fr) minmax(220px, 0.7fr) minmax(420px, 1.15fr);
   align-items: center;
   gap: 24px;
   width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
   padding: 10px 32px;
+}
+
+.header-study-context {
+  justify-self: center;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.015em;
+  line-height: 1.3;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .brand-section {
@@ -137,11 +152,37 @@ select {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   line-height: 1.2;
+}
+
+.session-institution {
+  max-width: 460px;
+  overflow: hidden;
+  color: var(--color-on-primary);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-summary {
+  max-width: 460px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-info--warning .session-institution {
+  color: #FBBF24;
 }
 
 .session-info-row {
@@ -212,20 +253,29 @@ select {
   gap: 4px;
   overflow-x: auto;
   padding: 0 32px;
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  justify-content: flex-start;
 }
 
 .top-navigation-link {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 48px;
-  padding: 0 14px;
+  gap: 6px;
+  min-height: 46px;
+  padding: 0 13px;
   color: var(--mia-text-secondary);
   text-decoration: none;
   border-bottom: 3px solid transparent;
-  font-size: 0.92rem;
-  font-weight: 700;
+  font-size: 0.9rem;
+  font-weight: 600;
   white-space: nowrap;
+}
+
+.top-navigation-link svg {
+  font-size: 1.08rem;
+  opacity: 0.82;
 }
 
 .top-navigation-link:hover {
@@ -237,7 +287,11 @@ select {
 .top-navigation-link.active {
   color: var(--mia-primary);
   border-bottom-color: var(--color-primary);
-  font-weight: 700;
+  font-weight: 600;
+}
+
+.top-navigation-link.active svg {
+  opacity: 1;
 }
 
 .main-content {
@@ -245,6 +299,7 @@ select {
   max-width: 1480px;
   margin: 0 auto;
   padding: 24px 32px 36px;
+  flex: 1 0 auto;
 }
 
 .report div {
@@ -272,8 +327,48 @@ select {
   font-weight: 700 !important;
 }
 
+.study-page-header {
+  position: relative;
+  overflow: hidden;
+  padding-left: 24px !important;
+}
+
+.study-page-header::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--color-primary);
+}
+
 .study-page-header .MuiTypography-body2 {
   color: var(--color-on-surface-variant) !important;
+}
+
+.study-page-header .MuiChip-root {
+  height: 25px;
+  background: var(--color-surface-container-low);
+  border-color: var(--color-outline-variant) !important;
+  color: var(--color-on-surface-variant) !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.study-page-header .MuiChip-root:first-child {
+  background: var(--color-primary-container);
+  border-color: #aebde2 !important;
+  color: var(--color-on-primary-container) !important;
+}
+
+.study-page-header .MuiButton-outlined {
+  color: var(--color-primary) !important;
+  border-color: var(--color-outline-variant) !important;
+  background: var(--color-surface-container-lowest);
+}
+
+.study-page-header .MuiButton-outlined:hover {
+  border-color: var(--color-primary) !important;
+  background: var(--color-surface-container-low) !important;
 }
 
 .clinical-card {
@@ -287,6 +382,22 @@ select {
 
 .clinical-search {
   background: var(--color-surface-container-low) !important;
+}
+
+.clinical-filter-panel,
+.clinical-filter-group {
+  background: var(--color-surface-container-lowest) !important;
+  border: 1px solid var(--color-outline-variant) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
+}
+
+.clinical-filter-panel {
+  padding: 20px !important;
+}
+
+.clinical-filter-group {
+  background: #fbfcff !important;
 }
 
 /* Form controls */
@@ -307,6 +418,14 @@ select {
 .MuiButton-root {
   border-radius: var(--radius-sm) !important;
   font-family: var(--font-main) !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+}
+
+.MuiButton-root:focus-visible {
+  outline: 3px solid rgba(27, 54, 93, 0.22);
+  outline-offset: 2px;
 }
 
 .MuiButton-containedPrimary {
@@ -323,9 +442,19 @@ select {
   color: var(--color-primary) !important;
 }
 
+.MuiButton-outlinedPrimary:hover {
+  border-color: var(--color-primary) !important;
+  background: var(--color-surface-container-low) !important;
+}
+
 .MuiChip-root {
   border-radius: var(--radius-sm) !important;
   font-family: var(--font-main) !important;
+}
+
+.MuiChip-outlined {
+  border-color: var(--color-outline-variant);
+  color: var(--color-on-surface-variant);
 }
 
 /* Clinical registry table */
@@ -342,6 +471,7 @@ select {
 
 .clinical-table .MuiTableCell-root {
   border-bottom-color: var(--color-surface-variant);
+  color: var(--color-on-surface);
 }
 
 .clinical-table .MuiTableBody-root .MuiTableRow-root:nth-of-type(even) {
@@ -352,6 +482,38 @@ select {
   background: var(--color-surface-container-low) !important;
 }
 
+.clinical-table .MuiTablePagination-root {
+  color: var(--color-on-surface-variant);
+  background: var(--color-surface-container-lowest);
+  font-size: 0.8rem;
+}
+
+.clinical-table .MuiButton-root {
+  min-height: 26px;
+  font-size: 0.72rem;
+}
+
+.clinical-table .MuiChip-root {
+  min-height: 20px;
+  font-size: 0.7rem;
+}
+
+.clinical-empty-state {
+  padding: 32px 20px !important;
+  color: var(--color-on-surface-variant) !important;
+  background: var(--color-surface-container-lowest);
+  font-size: 0.86rem !important;
+  text-align: center !important;
+}
+
+.clinical-empty-state::before {
+  content: "—";
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-outline);
+  font-size: 1.1rem;
+}
+
 .clinical-identifier {
   color: var(--color-on-primary-container) !important;
   font-family: 'SFMono-Regular', Consolas, monospace !important;
@@ -359,21 +521,141 @@ select {
 }
 
 /* Structured clinical dialogs */
+.MuiBackdrop-root {
+  background-color: rgba(12, 28, 48, 0.5) !important;
+}
+
+.MuiDialog-paper,
 .clinical-dialog .MuiDialog-paper {
   border: 1px solid var(--color-outline-variant);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-md) !important;
+  background: var(--color-surface-container-lowest);
+  box-shadow: 0 12px 32px rgba(0, 25, 69, 0.16) !important;
 }
 
+.MuiDialogTitle-root,
 .clinical-dialog .MuiDialogTitle-root {
   color: var(--color-primary) !important;
-  background: var(--color-surface-container-low);
+  background: var(--color-surface-container-low) !important;
   border-bottom-color: var(--color-outline-variant) !important;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  line-height: 1.35;
 }
 
+.MuiDialogContent-root {
+  color: var(--color-on-surface);
+  border-color: var(--color-outline-variant) !important;
+}
+
+.MuiDialogActions-root,
 .clinical-dialog .MuiDialogActions-root {
   background: var(--color-surface-container-lowest);
   border-top-color: var(--color-outline-variant) !important;
+  gap: 8px;
+  padding: 12px 20px !important;
+}
+
+.MuiDialogTitle-root .MuiIconButton-root {
+  color: var(--color-on-surface-variant) !important;
+  border-radius: var(--radius-sm);
+}
+
+.MuiDialogTitle-root .MuiIconButton-root:hover {
+  color: var(--color-primary) !important;
+  background: var(--color-primary-container) !important;
+}
+
+/* Home: MIA Clinical Study Workspace */
+.home-study-context {
+  position: relative;
+  overflow: hidden;
+  padding-left: 24px !important;
+}
+
+.home-study-context::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--color-primary);
+}
+
+.home-study-context .MuiChip-root {
+  height: 25px;
+  background: var(--color-surface-container-low);
+  border-color: var(--color-outline-variant);
+  color: var(--color-on-surface-variant);
+}
+
+.home-study-context .MuiChip-root:first-child {
+  background: var(--color-primary-container);
+  border-color: #aebde2;
+  color: var(--color-on-primary-container);
+}
+
+.home-kpi-card {
+  min-height: 96px !important;
+  border-top: 3px solid var(--color-primary) !important;
+}
+
+.home-kpi-card > .MuiBox-root:first-child {
+  width: 38px;
+  height: 38px;
+  color: var(--color-primary);
+  background: var(--color-surface-container);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-sm);
+}
+
+.home-kpi-card .MuiTypography-root:nth-of-type(2) {
+  color: var(--color-on-primary-container);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-actions > .MuiTypography-root {
+  color: var(--color-primary) !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
+
+.home-action-card {
+  min-height: 144px !important;
+  border-left: 3px solid var(--color-surface-dim) !important;
+}
+
+.home-action-card .MuiTypography-body1 {
+  font-size: 0.96rem !important;
+  font-weight: 700 !important;
+}
+
+.home-action-card .MuiTypography-body2 {
+  font-size: 0.86rem !important;
+}
+
+.home-action-card:hover {
+  border-color: var(--color-outline-variant) !important;
+  border-left-color: var(--color-primary) !important;
+  box-shadow: 0 1px 3px rgba(0, 25, 69, 0.1) !important;
+}
+
+.home-action-card .MuiButton-contained {
+  min-width: 92px;
+  box-shadow: none;
+}
+
+.home-action-card .MuiButton-contained:hover {
+  box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .home-study-context {
+    padding-left: 20px !important;
+  }
+
+  .study-page-header {
+    padding-left: 20px !important;
+  }
 }
 
 @media (max-width: 1100px) {
@@ -385,6 +667,10 @@ select {
 
   .brand-section {
     justify-content: space-between;
+  }
+
+  .header-study-context {
+    display: none;
   }
 
   .institution-section {
@@ -432,6 +718,7 @@ select {
 
   .top-navigation-inner {
     padding: 0 16px;
+    justify-content: flex-start;
   }
 
   .main-content {

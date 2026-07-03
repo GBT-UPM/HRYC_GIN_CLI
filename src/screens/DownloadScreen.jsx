@@ -80,7 +80,7 @@ const SectionTitle = ({ title, subtitle }) => (
 );
 
 const FilterGroup = ({ title, children }) => (
-    <Paper elevation={0} sx={{ p: 2, border: '1px solid #E4EBF1', borderRadius: 2, backgroundColor: '#FBFCFE', height: '100%' }}>
+    <Paper className="clinical-filter-group" elevation={0} sx={{ p: 2, border: '1px solid #E4EBF1', borderRadius: 2, backgroundColor: '#FBFCFE', height: '100%' }}>
         <Typography variant="subtitle2" sx={{ color: '#1E3A5F', fontWeight: 800, mb: 1.5 }}>
             {title}
         </Typography>
@@ -91,7 +91,7 @@ const FilterGroup = ({ title, children }) => (
 );
 
 const AdvancedSection = ({ id, title, subtitle, open, onToggle, children }) => (
-    <Paper elevation={0} sx={SECTION_SX}>
+    <Paper className="clinical-filter-panel" elevation={0} sx={SECTION_SX}>
         <Button
             type="button"
             fullWidth
@@ -392,7 +392,7 @@ const DownloadScreen = () => {
             : "Centro pendiente";
 
     return (
-        <Box sx={{ px: { xs: 2, md: 4 }, py: 3, backgroundColor: '#F5F7FA', minHeight: '100%' }}>
+        <Box sx={{ px: 0, py: 0, minHeight: '100%' }}>
             {showScientificExports ? (
                 <Stack spacing={2}>
                     <StudyPageHeader
@@ -429,7 +429,7 @@ const DownloadScreen = () => {
                         </DialogActions>
                     </Dialog>
 
-                    <Paper elevation={0} sx={SECTION_SX}>
+                    <Paper className="clinical-filter-panel" elevation={0} sx={SECTION_SX}>
                         <SectionTitle
                             title="Configuración básica de la exportación"
                             subtitle="Defina el alcance temporal, centro y preset de columnas antes de descargar."

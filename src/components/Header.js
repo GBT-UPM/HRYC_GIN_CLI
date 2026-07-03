@@ -1,11 +1,27 @@
 import React from 'react';
-import { getCentersDisplayLabel, getPreferredUsername, getPrimaryRoleLabel } from "../utils/auth";
+import { getAllowedCenters, getCentersDisplayLabel, getPreferredUsername, getPrimaryRoleLabel } from "../utils/auth";
+
+const CENTER_INSTITUTION_NAMES = {
+  HURYC: "Hospital Universitario Ramón y Cajal",
+  H12O: "Hospital Universitario 12 de Octubre",
+  "GBT/UPM": "Universidad Politécnica de Madrid",
+  IRYCIS: "Instituto Ramón y Cajal de Investigación Sanitaria",
+};
 
 const Header = (props) => {
   const username = getPreferredUsername(props.keycloak) || props.name || "Usuario";
   const roleLabel = getPrimaryRoleLabel(props.keycloak);
   const centersLabel = getCentersDisplayLabel(props.keycloak);
+  const allowedCenters = getAllowedCenters(props.keycloak);
+  const activeCenterCode = allowedCenters.length === 1 ? allowedCenters[0] : "";
+  const institutionName = CENTER_INSTITUTION_NAMES[activeCenterCode];
   const hasMissingCenter = centersLabel === "Sin centro asignado";
+  const institutionHeading = hasMissingCenter
+    ? centersLabel
+    : institutionName || `Centro ${activeCenterCode || centersLabel}`;
+  const sessionSummary = institutionName
+    ? `${activeCenterCode} · ${roleLabel} · ${username}`
+    : `${roleLabel} · ${username}`;
 
   return (
 <header className="header">
@@ -15,29 +31,25 @@ const Header = (props) => {
         <div className="brand-title">MIA</div>
         <div className="brand-subtitle">Masses Identification Assistant</div>
       </div>
-      <div className="study-subtitle">Validación externa multicéntrica del ECO-SCORE</div>
     </div>
 
-    <div className="institution-section" aria-label="Instituciones">
-      <span>HURYC</span>
-      <span>H12O</span>
-      <span>GBT/UPM</span>
-      <span>IRYCIS</span>
-    </div>
+    <div className="header-study-context">Estudio multicéntrico ECO-SCORE</div>
 
     <div className="user-section">
-      <div className="session-info" aria-label="Información de sesión">
-        <div className="session-info-row">
-          <span className="session-label">Usuario</span>
-          <span className="session-info-main">{username}</span>
+      <div className={`session-info${hasMissingCenter ? " session-info--warning" : ""}`} aria-label="Información de sesión">
+        <div className="session-institution" title={institutionHeading}>
+          {institutionHeading}
         </div>
-        <div className="session-info-row">
-          <span className="session-label">Rol</span>
+        <div className="session-summary" title={sessionSummary}>
+          {institutionName && (
+            <>
+              <span>{activeCenterCode}</span>
+              <span aria-hidden="true"> · </span>
+            </>
+          )}
           <span>{roleLabel}</span>
-        </div>
-        <div className={hasMissingCenter ? "session-info-warning" : "session-info-centers"}>
-          <span className="session-label">Centros</span>
-          <span>{centersLabel}</span>
+          <span aria-hidden="true"> · </span>
+          <span>{username}</span>
         </div>
       </div>
       <button onClick={props.closeSession} className="logout-btn">

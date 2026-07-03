@@ -6,10 +6,10 @@
 }
 
 .questionnaire-card {
-  background: #ffffff;
-  border: 1px solid #d9e2ec;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  background: var(--color-surface-container-lowest, #ffffff);
+  border: 1px solid var(--color-outline-variant, #c4c6d0);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 1px 2px rgba(0, 25, 69, 0.05);
 }
 
 .questionnaire-intro-card {
@@ -21,7 +21,7 @@
 
 .questionnaire-eyebrow {
   margin: 0 0 8px;
-  color: #2f5d7c;
+  color: var(--color-primary, #1b365d);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -30,7 +30,7 @@
 
 .questionnaire-title {
   margin: 0;
-  color: #1f2933;
+  color: var(--color-primary, #1b365d);
   font-size: 1.35rem;
   font-weight: 800;
   line-height: 1.2;
@@ -38,7 +38,7 @@
 
 .questionnaire-subtitle {
   margin: 8px 0 0;
-  color: #52616b;
+  color: var(--color-on-surface-variant, #44474e);
   font-size: 0.94rem;
   line-height: 1.5;
 }
@@ -55,10 +55,10 @@
   justify-content: center;
   min-height: 30px;
   padding: 0 12px;
-  border: 1px solid #d9e2ec;
-  border-radius: 999px;
-  background: #f5f7fa;
-  color: #52616b;
+  border: 1px solid var(--color-outline-variant, #c4c6d0);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface-container-low, #eff4ff);
+  color: var(--color-on-surface-variant, #44474e);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -68,7 +68,7 @@
   flex-wrap: wrap;
   gap: 16px;
   padding: 20px;
-  color: #52616b;
+  color: var(--color-on-surface-variant, #44474e);
 }
 
 .questionnaire-container-group {
@@ -80,18 +80,18 @@
 .questionnaire-group {
   width: 100%;
   padding: 18px;
-  background: linear-gradient(180deg, #fbfdff 0%, #f8fbfd 100%);
+  background: #fbfcff;
 }
 
 .questionnaire-section-heading {
   margin-bottom: 14px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #e5edf5;
+  border-bottom: 1px solid var(--color-outline-variant, #c4c6d0);
 }
 
 .questionnaire-group-title {
   margin: 0;
-  color: #1e3a5f;
+  color: var(--color-primary, #1b365d);
   font-size: 1rem;
   font-weight: 800;
   line-height: 1.3;
@@ -121,7 +121,7 @@
   gap: 8px;
   min-height: 52px;
   margin-bottom: 8px;
-  color: #1f2933;
+  color: var(--color-on-surface, #191c20);
   font-size: 0.92rem;
   font-weight: 700;
 }
@@ -146,10 +146,10 @@
   flex: 0 0 auto;
   min-height: 22px;
   padding: 0 8px;
-  border: 1px solid #d6e0ea;
-  border-radius: 999px;
-  background: #f5f7fa;
-  color: #52616b;
+  border: 1px solid var(--color-outline-variant, #c4c6d0);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface-container-low, #eff4ff);
+  color: var(--color-on-surface-variant, #44474e);
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -159,12 +159,12 @@
 .questionnaire-item select {
   width: 100%;
   padding: 11px 12px;
-  border: 1px solid #d9e2ec;
-  border-radius: 10px;
+  border: 1px solid var(--color-outline-variant, #c4c6d0);
+  border-radius: var(--radius-sm, 4px);
   box-sizing: border-box;
   font-size: 0.96rem;
-  color: #1f2933;
-  background: #ffffff;
+  color: var(--color-on-surface, #191c20);
+  background: var(--color-surface-container-lowest, #ffffff);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
@@ -177,8 +177,8 @@
 .questionnaire-item textarea:focus,
 .questionnaire-item select:focus {
   outline: none;
-  border-color: #2f5d7c;
-  box-shadow: 0 0 0 3px rgba(47, 93, 124, 0.14);
+  border-color: var(--color-primary, #1b365d);
+  box-shadow: 0 0 0 3px rgba(27, 54, 93, 0.16);
 }
 
 .questionnaire-item input:disabled,
@@ -192,20 +192,20 @@
 .questionnaire-help-box {
   margin-top: 8px;
   padding: 10px 12px;
-  border: 1px solid #d6e0ea;
-  border-radius: 10px;
-  background: #f8fbfd;
+  border: 1px solid var(--color-outline-variant, #c4c6d0);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface-container-low, #eff4ff);
 }
 
 .questionnaire-help-box small,
 .questionnaire-item small {
-  color: #52616b;
+  color: var(--color-on-surface-variant, #44474e);
   font-size: 0.8rem;
   line-height: 1.45;
 }
 
 .required-asterisk {
-  color: #c53030;
+  color: var(--color-error, #ba1a1a);
   display: inline-block;
   flex: 0 0 auto;
   line-height: 1.1;
@@ -214,7 +214,7 @@
 
 .questionnaire-inline-error,
 .error-message {
-  color: #c53030;
+  color: var(--color-error, #ba1a1a);
   font-weight: 700;
   margin-top: 10px;
 }
@@ -236,7 +236,7 @@
   margin-bottom: 4px;
   padding: 14px 16px;
   border: 1px solid #fecaca;
-  border-radius: 14px;
+  border-radius: var(--radius-md, 8px);
   background: #fef2f2;
 }
 
@@ -305,9 +305,9 @@
   flex-wrap: wrap;
   gap: 10px 14px;
   padding: 12px;
-  border: 1px solid #d9e2ec;
-  border-radius: 10px;
-  background: #ffffff;
+  border: 1px solid var(--color-outline-variant, #c4c6d0);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface-container-lowest, #ffffff);
 }
 
 .radio-container {
@@ -316,9 +316,9 @@
   gap: 8px;
   min-height: 36px;
   padding: 6px 10px;
-  border: 1px solid #d9e2ec;
-  border-radius: 999px;
-  background: #f8fbfd;
+  border: 1px solid var(--color-outline-variant, #c4c6d0);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface-container-low, #eff4ff);
 }
 
 .radio-container input[type="radio"] {
@@ -328,18 +328,18 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid #1e3a5f;
+  border: 2px solid var(--color-primary, #1b365d);
   background: #ffffff;
   cursor: pointer;
 }
 
 .radio-container input[type="radio"]:checked {
-  background: radial-gradient(circle, #1e3a5f 0 45%, #ffffff 46% 100%);
+  background: radial-gradient(circle, var(--color-primary, #1b365d) 0 45%, #ffffff 46% 100%);
 }
 
 .radio-container label {
   margin: 0;
-  color: #1f2933;
+  color: var(--color-on-surface, #191c20);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -349,8 +349,8 @@
   margin-top: 4px;
   padding: 12px 18px;
   border: none;
-  border-radius: 10px;
-  background: #1e3a5f;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-primary, #1b365d);
   color: #ffffff;
   font-size: 0.95rem;
   font-weight: 700;
@@ -359,7 +359,7 @@
 }
 
 .save-btn:hover:not(:disabled) {
-  background: #173050;
+  background: var(--color-on-primary-container, #001945);
 }
 
 .save-btn:disabled {

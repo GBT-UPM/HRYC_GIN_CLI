@@ -3,12 +3,15 @@ import {
     Alert,
     Box,
     Button,
+    Checkbox,
     Chip,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
     FormControl,
+    FormControlLabel,
+    FormGroup,
     IconButton,
     InputLabel,
     MenuItem,
@@ -59,6 +62,14 @@ import { upsertHistopathology } from '../services/histopathologyService';
 import StudyPageHeader from '../components/StudyPageHeader';
 import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS } from '../utils/ecoScore';
 import { formatRiskDisplay } from '../utils/riskDisplay';
+import {
+    NO_SURGERY_REASONS,
+    PATHOLOGY_RESULTS,
+    SURGERY_OPTIONS,
+    SURGICAL_PROCEDURES,
+    TUMOR_TYPES,
+    isOtherTumorType,
+} from '../constants/histopathology';
 
 const tipoMap = {
     'sólida': 'sólido',
@@ -269,8 +280,14 @@ const ResponsesScreen = () => {
     const [histologyForm, setHistologyForm] = useState({
         status: 'PENDING',
         diagnosis: '',
-        benignMalignant: '',
+        surgeryPerformed: 'UNKNOWN',
+        noSurgeryReason: '',
+        noSurgeryReasonOther: '',
+        surgicalProcedures: [],
+        otherSurgicalProcedure: '',
+        finalPathologyResult: 'PENDING',
         tumorType: '',
+        tumorTypeOther: '',
         surgeryDate: '',
         pathologyDate: '',
         source: '',
@@ -427,12 +444,18 @@ const ResponsesScreen = () => {
         setHistologyForm({
             status: item.histologyStatus || 'PENDING',
             diagnosis: item.histologyDiagnosis || '',
-            benignMalignant: item.benignMalignant || '',
+            surgeryPerformed: item.surgeryPerformed || 'UNKNOWN',
+            noSurgeryReason: item.noSurgeryReason || '',
+            noSurgeryReasonOther: item.noSurgeryReasonOther || '',
+            surgicalProcedures: Array.isArray(item.surgicalProcedures) ? item.surgicalProcedures : [],
+            otherSurgicalProcedure: item.otherSurgicalProcedure || '',
+            finalPathologyResult: item.finalPathologyResult || item.benignMalignant || 'PENDING',
             tumorType: item.tumorType || '',
+            tumorTypeOther: item.tumorTypeOther || '',
             surgeryDate: item.surgeryDate || '',
             pathologyDate: item.pathologyDate || '',
             source: item.histologySource || '',
-            notes: '',
+            notes: item.pathologyNotes || '',
         });
         setHistologyError('');
         setHistologyModalOpen(true);
@@ -542,14 +565,46 @@ const ResponsesScreen = () => {
     };
 
     const handleHistologyFieldChange = (field) => (event) => {
+        const value = event.target.value;
         setHistologyForm((current) => ({
             ...current,
-            [field]: event.target.value,
+            [field]: value,
+            ...(field === 'status' && value !== 'AVAILABLE' ? {
+                finalPathologyResult: 'PENDING', tumorType: '', tumorTypeOther: '', diagnosis: '', pathologyDate: '',
+            } : {}),
+            ...(field === 'surgeryPerformed' && value !== 'NO' ? { noSurgeryReason: '', noSurgeryReasonOther: '' } : {}),
+            ...(field === 'surgeryPerformed' && value !== 'YES' ? { surgicalProcedures: [], otherSurgicalProcedure: '' } : {}),
+            ...(field === 'finalPathologyResult' ? { tumorType: '', tumorTypeOther: '' } : {}),
         }));
+    };
+
+    const handleSurgicalProcedureChange = (procedure) => (event) => {
+        setHistologyForm((current) => ({
+            ...current,
+            surgicalProcedures: event.target.checked
+                ? [...current.surgicalProcedures, procedure]
+                : current.surgicalProcedures.filter((value) => value !== procedure),
+            ...(!event.target.checked && procedure === 'OTHER' ? { otherSurgicalProcedure: '' } : {}),
+        }));
+    };
+
+    const validateHistologyForm = () => {
+        if (histologyForm.surgeryPerformed === 'NO' && !histologyForm.noSurgeryReason) return 'Seleccione la situación sin cirugía.';
+        if (histologyForm.noSurgeryReason === 'OTHER' && !histologyForm.noSurgeryReasonOther.trim()) return 'Especifique el otro motivo sin cirugía.';
+        if (histologyForm.surgicalProcedures.includes('OTHER') && !histologyForm.otherSurgicalProcedure.trim()) return 'Especifique el otro procedimiento.';
+        if (histologyForm.status === 'AVAILABLE' && histologyForm.finalPathologyResult === 'PENDING') return 'Seleccione el resultado anatomopatológico final.';
+        if (histologyForm.status === 'AVAILABLE' && !histologyForm.tumorType) return 'Seleccione el tipo tumoral.';
+        if (isOtherTumorType(histologyForm.tumorType) && !histologyForm.tumorTypeOther.trim()) return 'Especifique el tipo tumoral.';
+        return '';
     };
 
     const handleSaveHistology = async () => {
         if (!selectedHistologyCase?.caseId) {
+            return;
+        }
+        const validationError = validateHistologyForm();
+        if (validationError) {
+            setHistologyError(validationError);
             return;
         }
         try {
@@ -557,12 +612,18 @@ const ResponsesScreen = () => {
             setHistologyError('');
             await upsertHistopathology(keycloak.token, selectedHistologyCase.caseId, {
                 status: histologyForm.status,
-                diagnosis: histologyForm.diagnosis,
-                benignMalignant: histologyForm.benignMalignant || undefined,
-                tumorType: histologyForm.tumorType,
+                diagnosis: histologyForm.status === 'AVAILABLE' ? histologyForm.diagnosis : '',
+                surgeryPerformed: histologyForm.surgeryPerformed,
+                noSurgeryReason: histologyForm.noSurgeryReason || null,
+                noSurgeryReasonOther: histologyForm.noSurgeryReasonOther || null,
+                surgicalProcedures: histologyForm.surgicalProcedures,
+                otherSurgicalProcedure: histologyForm.otherSurgicalProcedure || null,
+                finalPathologyResult: histologyForm.status === 'AVAILABLE' ? histologyForm.finalPathologyResult : 'PENDING',
+                tumorType: histologyForm.status === 'AVAILABLE' ? histologyForm.tumorType : '',
+                tumorTypeOther: histologyForm.status === 'AVAILABLE' ? histologyForm.tumorTypeOther || null : null,
                 surgeryDate: histologyForm.surgeryDate || null,
-                pathologyDate: histologyForm.pathologyDate || null,
-                source: histologyForm.source,
+                pathologyDate: histologyForm.status === 'AVAILABLE' ? histologyForm.pathologyDate || null : null,
+                source: histologyForm.status === 'UNKNOWN' ? '' : histologyForm.source,
                 notes: histologyForm.notes,
             });
             closeHistologyModal();
@@ -1087,6 +1148,13 @@ const ResponsesScreen = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
+                            {paginatedData.length === 0 && (
+                                <TableRow>
+                                    <TableCell className="clinical-empty-state" colSpan={9}>
+                                        No hay casos o evaluaciones para los criterios seleccionados.
+                                    </TableCell>
+                                </TableRow>
+                            )}
                             {paginatedData.map((item, index) => {
                                 const codeLabel = getCodeStatus(item);
                                 const caseLabel = getCaseStatus(item);
@@ -1284,6 +1352,12 @@ const ResponsesScreen = () => {
                             Localice los casos asociados a una paciente para completar o revisar la información histopatológica.
                         </Typography>
                     </Box>
+
+                    {histologyForm.status === 'NOT_APPLICABLE' && histologyForm.surgeryPerformed === 'YES' && (
+                        <Alert severity="warning" sx={{ mb: 3 }}>
+                            Se ha indicado cirugía con histopatología no aplicable. Revise el estado antes de guardar.
+                        </Alert>
+                    )}
                     <IconButton
                         onClick={closeCaseSearchModal}
                         size="small"
@@ -1739,8 +1813,7 @@ const ResponsesScreen = () => {
                         </Alert>
                     )}
 
-                    {/* Sección 1: Estado del resultado */}
-                    <Typography variant="caption" sx={SECTION_LABEL_SX}>Estado del resultado</Typography>
+                    <Typography variant="caption" sx={SECTION_LABEL_SX}>Cirugía</Typography>
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 3 }}>
                         <FormControl fullWidth>
                             <InputLabel id="histology-status-label">Estado histopatología</InputLabel>
@@ -1757,70 +1830,85 @@ const ResponsesScreen = () => {
                             </Select>
                         </FormControl>
                         <FormControl fullWidth>
-                            <InputLabel id="benign-malignant-label">Benigno / borderline / maligno</InputLabel>
+                            <InputLabel id="surgery-performed-label">¿Se ha realizado cirugía?</InputLabel>
                             <Select
-                                labelId="benign-malignant-label"
-                                label="Benigno / borderline / maligno"
-                                value={histologyForm.benignMalignant}
-                                onChange={handleHistologyFieldChange('benignMalignant')}
+                                labelId="surgery-performed-label"
+                                label="¿Se ha realizado cirugía?"
+                                value={histologyForm.surgeryPerformed}
+                                onChange={handleHistologyFieldChange('surgeryPerformed')}
                             >
-                                <MenuItem value="">No especificado</MenuItem>
-                                <MenuItem value="BENIGN">Benigno</MenuItem>
-                                <MenuItem value="BORDERLINE">Borderline</MenuItem>
-                                <MenuItem value="MALIGNANT">Maligno</MenuItem>
-                                <MenuItem value="UNKNOWN">Desconocido</MenuItem>
-                                <MenuItem value="NOT_APPLICABLE">No aplicable</MenuItem>
+                                {SURGERY_OPTIONS.map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
                             </Select>
                         </FormControl>
                     </Box>
 
-                    {/* Sección 2: Diagnóstico anatomopatológico */}
-                    <Typography variant="caption" sx={SECTION_LABEL_SX}>Diagnóstico anatomopatológico</Typography>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 3 }}>
-                        <TextField
-                            label="Diagnóstico"
-                            fullWidth
-                            value={histologyForm.diagnosis}
-                            onChange={handleHistologyFieldChange('diagnosis')}
-                        />
-                        <TextField
-                            label="Tipo tumoral"
-                            fullWidth
-                            value={histologyForm.tumorType}
-                            onChange={handleHistologyFieldChange('tumorType')}
-                        />
-                    </Box>
+                    {histologyForm.surgeryPerformed === 'NO' && (
+                        <Box sx={{ mb: 3 }}>
+                            <FormControl fullWidth>
+                                <InputLabel id="no-surgery-reason-label">Situación sin cirugía</InputLabel>
+                                <Select labelId="no-surgery-reason-label" label="Situación sin cirugía" value={histologyForm.noSurgeryReason} onChange={handleHistologyFieldChange('noSurgeryReason')}>
+                                    {NO_SURGERY_REASONS.map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
+                                </Select>
+                            </FormControl>
+                            {histologyForm.noSurgeryReason === 'OTHER' && (
+                                <TextField label="Especificar otro motivo" fullWidth sx={{ mt: 2 }} value={histologyForm.noSurgeryReasonOther} onChange={handleHistologyFieldChange('noSurgeryReasonOther')} />
+                            )}
+                        </Box>
+                    )}
 
-                    {/* Sección 3: Fechas */}
-                    <Typography variant="caption" sx={SECTION_LABEL_SX}>Fechas</Typography>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 3 }}>
-                        <TextField
-                            label="Fecha cirugía"
-                            type="date"
-                            fullWidth
-                            InputLabelProps={{ shrink: true }}
-                            value={histologyForm.surgeryDate}
-                            onChange={handleHistologyFieldChange('surgeryDate')}
-                        />
-                        <TextField
-                            label="Fecha anatomía patológica"
-                            type="date"
-                            fullWidth
-                            InputLabelProps={{ shrink: true }}
-                            value={histologyForm.pathologyDate}
-                            onChange={handleHistologyFieldChange('pathologyDate')}
-                        />
-                    </Box>
+                    {histologyForm.surgeryPerformed === 'YES' && (
+                        <Box sx={{ mb: 3 }}>
+                            <TextField
+                                label="Fecha cirugía"
+                                type="date"
+                                fullWidth
+                                InputLabelProps={{ shrink: true }}
+                                value={histologyForm.surgeryDate}
+                                onChange={handleHistologyFieldChange('surgeryDate')}
+                                sx={{ mb: 2 }}
+                            />
+                            <Typography variant="caption" sx={SECTION_LABEL_SX}>Procedimientos realizados</Typography>
+                            <FormGroup sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 0.5 }}>
+                                {SURGICAL_PROCEDURES.map(([value, label]) => (
+                                    <FormControlLabel key={value} control={<Checkbox checked={histologyForm.surgicalProcedures.includes(value)} onChange={handleSurgicalProcedureChange(value)} />} label={label} />
+                                ))}
+                            </FormGroup>
+                            {histologyForm.surgicalProcedures.includes('OTHER') && (
+                                <TextField label="Especificar otro procedimiento" fullWidth sx={{ mt: 2 }} value={histologyForm.otherSurgicalProcedure} onChange={handleHistologyFieldChange('otherSurgicalProcedure')} />
+                            )}
+                        </Box>
+                    )}
+
+                    {histologyForm.status === 'AVAILABLE' && (
+                        <>
+                            <Typography variant="caption" sx={SECTION_LABEL_SX}>Resultado anatomopatológico final</Typography>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 3 }}>
+                                <FormControl fullWidth>
+                                    <InputLabel id="final-pathology-result-label">Resultado anatomopatológico final</InputLabel>
+                                    <Select labelId="final-pathology-result-label" label="Resultado anatomopatológico final" value={histologyForm.finalPathologyResult} onChange={handleHistologyFieldChange('finalPathologyResult')}>
+                                        {PATHOLOGY_RESULTS.filter(([value]) => value !== 'PENDING').map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                                <FormControl fullWidth disabled={histologyForm.finalPathologyResult === 'PENDING'}>
+                                    <InputLabel id="tumor-type-label">Tipo tumoral</InputLabel>
+                                    <Select labelId="tumor-type-label" label="Tipo tumoral" value={histologyForm.tumorType} onChange={handleHistologyFieldChange('tumorType')}>
+                                        {(TUMOR_TYPES[histologyForm.finalPathologyResult] || []).map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                                <TextField label="Diagnóstico definitivo" fullWidth value={histologyForm.diagnosis} onChange={handleHistologyFieldChange('diagnosis')} />
+                                <TextField label="Fecha anatomía patológica" type="date" fullWidth InputLabelProps={{ shrink: true }} value={histologyForm.pathologyDate} onChange={handleHistologyFieldChange('pathologyDate')} />
+                                {isOtherTumorType(histologyForm.tumorType) && (
+                                    <TextField label="Especificar tipo tumoral" fullWidth value={histologyForm.tumorTypeOther} onChange={handleHistologyFieldChange('tumorTypeOther')} />
+                                )}
+                            </Box>
+                        </>
+                    )}
 
                     {/* Sección 4: Información adicional */}
                     <Typography variant="caption" sx={SECTION_LABEL_SX}>Información adicional</Typography>
-                    <TextField
-                        label="Fuente"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        value={histologyForm.source}
-                        onChange={handleHistologyFieldChange('source')}
-                    />
+                    {histologyForm.status !== 'UNKNOWN' && (
+                        <TextField label="Fuente" fullWidth sx={{ mb: 2 }} value={histologyForm.source} onChange={handleHistologyFieldChange('source')} />
+                    )}
                     <TextField
                         label="Notas"
                         multiline

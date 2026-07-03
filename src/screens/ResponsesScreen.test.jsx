@@ -544,12 +544,20 @@ describe('ResponsesScreen', () => {
     render(<ResponsesScreen />);
 
     fireEvent.click(await screen.findByText('Histología'));
+    expect(screen.queryByLabelText('Resultado anatomopatológico final')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Diagnóstico definitivo')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Fecha anatomía patológica')).not.toBeInTheDocument();
     fireEvent.mouseDown(screen.getByLabelText('Estado histopatología'));
     fireEvent.click(screen.getByText('Disponible'));
-    fireEvent.change(screen.getByLabelText('Diagnóstico'), { target: { value: 'Cistoadenoma seroso' } });
-    fireEvent.mouseDown(screen.getByLabelText('Benigno / borderline / maligno'));
+    expect(screen.getByLabelText('Resultado anatomopatológico final')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText('¿Se ha realizado cirugía?'));
+    fireEvent.click(screen.getByText('Sí'));
+    fireEvent.click(screen.getByLabelText('Quistectomía unilateral'));
+    fireEvent.change(screen.getByLabelText('Diagnóstico definitivo'), { target: { value: 'Cistoadenoma seroso' } });
+    fireEvent.mouseDown(screen.getByLabelText('Resultado anatomopatológico final'));
     fireEvent.click(screen.getByText('Benigno'));
-    fireEvent.change(screen.getByLabelText('Tipo tumoral'), { target: { value: 'Serous cystadenoma' } });
+    fireEvent.mouseDown(screen.getByLabelText('Tipo tumoral'));
+    fireEvent.click(screen.getByText('Cistadenoma seroso'));
     fireEvent.change(screen.getByLabelText('Fecha cirugía'), { target: { value: '2026-06-01' } });
     fireEvent.change(screen.getByLabelText('Fecha anatomía patológica'), { target: { value: '2026-06-10' } });
     fireEvent.change(screen.getByLabelText('Fuente'), { target: { value: 'Pathology report' } });
@@ -560,8 +568,10 @@ describe('ResponsesScreen', () => {
       expect(ApiService).toHaveBeenCalledWith('token', 'POST', '/app/cases/1/histology', expect.objectContaining({
         status: 'AVAILABLE',
         diagnosis: 'Cistoadenoma seroso',
-        benignMalignant: 'BENIGN',
-        tumorType: 'Serous cystadenoma',
+        surgeryPerformed: 'YES',
+        surgicalProcedures: ['UNILATERAL_CYSTECTOMY'],
+        finalPathologyResult: 'BENIGN',
+        tumorType: 'SEROUS_CYSTADENOMA',
         surgeryDate: '2026-06-01',
         pathologyDate: '2026-06-10',
         source: 'Pathology report',

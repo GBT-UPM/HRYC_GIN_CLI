@@ -384,7 +384,7 @@ const PendingParticipantsScreen = () => {
       </Stack>
 
       {/* Card de tabla */}
-      <Paper elevation={0} sx={{ border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF", overflow: "hidden" }}>
+      <Paper className="clinical-table" elevation={0} sx={{ border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF", overflow: "hidden" }}>
         <TableContainer sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
@@ -408,7 +408,7 @@ const PendingParticipantsScreen = () => {
               )}
               {!loading && participants.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} sx={{ py: 3, px: 2, color: "#52616B", fontSize: "0.85rem", textAlign: "center" }}>
+                  <TableCell className="clinical-empty-state" colSpan={7}>
                     No hay participantes pendientes.
                   </TableCell>
                 </TableRow>
@@ -470,7 +470,7 @@ const PendingParticipantsScreen = () => {
                           label={statusLabel}
                           size="small"
                           variant="outlined"
-                          sx={{ height: 20, fontSize: "0.7rem", fontWeight: 600, backgroundColor: "#fff8e1", color: "#7a4800", borderColor: "#fce48a" }}
+                          sx={{ height: 20, fontSize: "0.7rem", fontWeight: 600, backgroundColor: "#fff5dc", color: "#765600", borderColor: "#e8cf8e" }}
                         />
                       </TableCell>
 

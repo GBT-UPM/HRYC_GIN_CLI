@@ -207,7 +207,7 @@ const StudyAuditScreen = () => {
         Se muestran los eventos relevantes del estudio asociados explícitamente a los centros permitidos.
       </Alert>
 
-      <Paper elevation={0} sx={{ p: { xs: 2, md: 2.5 }, border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF", mb: 2 }}>
+      <Paper className="clinical-filter-panel" elevation={0} sx={{ p: { xs: 2, md: 2.5 }, border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF", mb: 2 }}>
         <Grid2 container spacing={2}>
           {studyCoordinator ? (
             <Grid2 size={{ xs: 12, md: 3 }}>
@@ -303,7 +303,7 @@ const StudyAuditScreen = () => {
         </Alert>
       ) : null}
 
-      <Paper elevation={0} sx={{ border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF", overflow: "hidden" }}>
+      <Paper className="clinical-table" elevation={0} sx={{ border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF", overflow: "hidden" }}>
         <TableContainer>
           <Table>
             <TableHead>
@@ -329,7 +329,7 @@ const StudyAuditScreen = () => {
               ))}
               {!loading && events.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} sx={{ py: 4 }}>
+                  <TableCell className="clinical-empty-state" colSpan={6}>
                     <Typography variant="body2" sx={{ color: "#52616B", textAlign: "center" }}>
                       No hay eventos relevantes para los filtros seleccionados.
                     </Typography>
