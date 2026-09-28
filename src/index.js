@@ -14,7 +14,7 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <ReactKeycloakProvider
   authClient={keycloak}
-  initOptions={{ onLoad: 'login-required' }} // 'login-required' redirige automáticamente para autenticación
+  initOptions={{ onLoad: 'login-required', pkceMethod: 'S256' }}
 >
     <BrowserRouter>
       <App />

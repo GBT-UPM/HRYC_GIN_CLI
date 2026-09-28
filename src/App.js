@@ -95,7 +95,8 @@ function App() {
     console.log(keycloak)
     if (initialized && keycloak.authenticated) {
       const realmRoles = keycloak.tokenParsed?.realm_access?.roles || [];
-      const clientRoles = keycloak.tokenParsed?.resource_access?.['my-api-client']?.roles || [];
+      const clientId = window.__APP_CONFIG__?.OIDC_CLIENT_ID || 'my-api-client';
+      const clientRoles = keycloak.tokenParsed?.resource_access?.[clientId]?.roles || [];
   
       if (realmRoles.includes('practitioner') || clientRoles.includes('practitioner')) {
         setIsAdmin(true);

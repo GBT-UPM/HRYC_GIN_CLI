@@ -1,22 +1,20 @@
-# Usar una imagen base de Node.js
-FROM node:20-alpine
+FROM node:20-alpine AS build
 
-# Establecer el directorio de trabajo dentro del contenedor
 WORKDIR /app
-
-# Copiar package.json y package-lock.json
 COPY package*.json ./
-
-# Instalar dependencias
-RUN npm install
-
-# Copiar el resto del código de la aplicación
+RUN npm ci
 COPY . .
-#RUN chown -R node:node /app/node_modules
-# Cambiar a un usuario no root
-#USER node
-# Exponer el puerto por defecto de React
-EXPOSE 3000
+RUN npm run build
 
-# Comando para iniciar la aplicación
-CMD ["npm", "start"]
+FROM nginx:1.27-alpine
+
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/40-runtime-config.sh /docker-entrypoint.d/40-runtime-config.sh
+COPY --from=build /app/build /usr/share/nginx/html
+
+RUN chmod +x /docker-entrypoint.d/40-runtime-config.sh
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1

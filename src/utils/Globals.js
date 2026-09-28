@@ -1,6 +1,5 @@
+const runtimeConfig = window.__APP_CONFIG__ || {};
+
 module.exports = {
-  STORE_KEY: 'a56z0fzrNpl^2',
-  BASE_URL: 'https://emma.gbt.tfo.upm.es',
- // BASE_URL: 'http://localhost:8081',
-  //  BASE_URL: 'https://emma.gbt.tfo.upm.es',
+  BASE_URL: runtimeConfig.API_BASE_URL || '/api',
 };

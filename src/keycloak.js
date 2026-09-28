@@ -1,10 +1,11 @@
 import Keycloak from 'keycloak-js';
 
-// Configura el Keycloak con las credenciales del realm y el cliente
+const runtimeConfig = window.__APP_CONFIG__ || {};
+
 const keycloak = new Keycloak({
-  url: 'https://emma.gbt.tfo.upm.es/auth', // URL del servidor Keycloak
-  realm: 'TFT',                  // Nombre del realm en Keycloak
-  clientId: 'my-api-client',           // ID del cliente configurado en Keycloak
+  url: runtimeConfig.OIDC_URL || `${window.location.origin}/auth`,
+  realm: runtimeConfig.OIDC_REALM || 'TFT',
+  clientId: runtimeConfig.OIDC_CLIENT_ID || 'my-api-client',
 });
 
 export default keycloak;
