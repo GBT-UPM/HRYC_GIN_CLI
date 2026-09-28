@@ -2,17 +2,63 @@ import React, { useState } from "react";
 import '../assets/css/QuestionnaireForm.css';
 
 import Modal from "./Modal";
+import { CARE_SETTING_OPTIONS, normalizeCareSetting } from "../utils/careSetting";
 
-const QuestionnaireForm = ({ questionnaire,event,eventContinue }) => {
+export const HIDDEN_LINK_IDS = new Set(["PAT_CODIGO", "PAT_NHC", "PAT_NOMBRE"]);
+export const isHiddenQuestionnaireItem = (linkId) => HIDDEN_LINK_IDS.has(linkId);
+export const NHC_REQUIRED_MESSAGE = "Debe introducir el NHC para continuar.";
+const SECTION_INDEX_LABELS = [
+  "Contexto",
+  "Datos clínicos",
+  "Ecografista",
+  "Masa anexial",
+  "Hallazgos",
+  "ECO-SCORE",
+];
+
+const renderFieldLabel = ({ htmlFor, text, required = false, chipText = "" }) => (
+  <label htmlFor={htmlFor} className="questionnaire-field-label">
+    <span className="questionnaire-label-main">
+      <span className="questionnaire-label-text">{text}</span>
+      {required ? (
+        <span className="required-asterisk" aria-hidden="true">
+          *
+        </span>
+      ) : null}
+    </span>
+    {chipText ? <span className="questionnaire-inline-chip">{chipText}</span> : null}
+  </label>
+);
+
+const getPendingFieldLabels = (requiredFieldsError = "") =>
+  String(requiredFieldsError || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("- "))
+    .map((line) => line.replace(/^- /, "").trim())
+    .filter(Boolean);
+
+const QuestionnaireForm = ({
+  questionnaire,
+  event,
+  eventContinue,
+  transientNhc,
+  onTransientNhcChange,
+  careSettingCode = "UNKNOWN",
+  onCareSettingChange = () => {},
+  onDirtyChange = () => {},
+  onQuestionnaireInteraction = () => {},
+}) => {
   const [answers, setAnswers] = useState([]);
   const [error, setError] = useState("");
+  const [nhcError, setNhcError] = useState("");
+  const [requiredFieldsError, setRequiredFieldsError] = useState("");
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const pendingFieldLabels = getPendingFieldLabels(requiredFieldsError);
 
   // Verifica si hay masa anexial
   const hasMass = answers.find(a => a.linkId === "PAT_MA")?.answer?.[0]?.valueCoding.display === "Sí" || false;
-  /**console.log("La variable hasMass:")
-  console.log(hasMass)*/
 
   /**
  * Recorre recursivamente el cuestionario (items e hijos) para
@@ -24,7 +70,11 @@ function getEnabledLinkIds(items, currentAnswers) {
 
   for (const item of items) {
     // Verificamos si este ítem está habilitado con sus condiciones
-    const thisItemEnabled = checkEnableWhen(item.enableWhen, currentAnswers);
+    const thisItemEnabled = checkEnableWhen(
+      item.enableWhen,
+      currentAnswers,
+      item.enableBehavior
+    );
 
     if (thisItemEnabled) {
       // Agregamos este linkId
@@ -43,6 +93,8 @@ function getEnabledLinkIds(items, currentAnswers) {
 }
 
   const handleInputChange = (questionText,linkId, type, value,display) => {
+    onDirtyChange(true);
+    let nextAnswersSnapshot = answers;
     setAnswers((prevAnswers) => {
       const existingAnswerIndex = prevAnswers.findIndex(
         (answer) => answer.linkId === linkId
@@ -60,8 +112,6 @@ function getEnabledLinkIds(items, currentAnswers) {
 
       switch (type) {
         case "choice":
-          //console.log(value)
-          //console.log(display)
         //newAnswer.answer = [{ valueCoding: { code: value, display: display } }];
          newAnswer.answer = value;
           break;
@@ -93,22 +143,32 @@ function getEnabledLinkIds(items, currentAnswers) {
       // --- Nuevo paso para limpiar respuestas de ítems no habilitados ---
       const enabledLinkIds = getEnabledLinkIds(questionnaire.item, updatedAnswers);
       const cleanedAnswers = updatedAnswers.filter((ans) =>
-        enabledLinkIds.includes(ans.linkId)
+        enabledLinkIds.includes(ans.linkId) && !HIDDEN_LINK_IDS.has(ans.linkId)
       );
+
+      nextAnswersSnapshot = cleanedAnswers;
 
       return cleanedAnswers;
    
     });
+
+    onQuestionnaireInteraction(nextAnswersSnapshot, {
+      linkId,
+      questionText,
+      type,
+      display,
+    });
+    setRequiredFieldsError("");
    
   };
 /**
  * Determina si un ítem (y su descendencia) está habilitado,
  * evaluando sus condiciones enableWhen y la habilitación del padre.
  */
-function checkEnableWhen(enableWhen, currentAnswers) {
+function checkEnableWhen(enableWhen, currentAnswers, enableBehavior) {
   if (!enableWhen) return true;
 
-  return enableWhen.every((condition) => {
+  const matchesCondition = (condition) => {
     const answer = currentAnswers.find((a) => a.linkId === condition.question);
     // Si no hay respuesta para la pregunta que condiciona, no se cumple
     if (!answer) return false;
@@ -144,15 +204,52 @@ function checkEnableWhen(enableWhen, currentAnswers) {
       default:
         return false;
     }
-  });
+  };
+
+  if (enableBehavior === "any") {
+    return enableWhen.some(matchesCondition);
+  }
+
+  return enableWhen.every(matchesCondition);
 }
+
+const getAnswerDisplayValue = (linkId) => {
+  const answer = answers.find((a) => a.linkId === linkId)?.answer?.[0];
+  return (
+    answer?.valueCoding?.display ||
+    answer?.valueCoding?.code ||
+    answer?.valueString ||
+    answer?.valueInteger?.toString() ||
+    answer?.valueDecimal?.toString() ||
+    answer?.valueDate ||
+    ""
+  );
+};
   
 /**
    * Ajustado para que reciba también 'answers'.
    * Se llama en tiempo de render para saber si mostrar o no el ítem.
    */
 const isItemEnabled = (item) => {
-  return checkEnableWhen(item.enableWhen, answers);
+  return checkEnableWhen(item.enableWhen, answers, item.enableBehavior);
+};
+
+const getItemClassName = (item, extraClassName = "") => {
+  const itemClasses = ["questionnaire-item"];
+
+  if (item.type === "text") {
+    itemClasses.push("questionnaire-item--full");
+  } else if (item.type === "choice" && item.repeats) {
+    itemClasses.push("questionnaire-item--full");
+  } else {
+    itemClasses.push("questionnaire-item--compact");
+  }
+
+  if (extraClassName) {
+    itemClasses.push(extraClassName);
+  }
+
+  return itemClasses.join(" ");
 };
 
 /**
@@ -434,7 +531,7 @@ const renderInput = (item) => {
   const getRequiredItems = (items) => {
     let requiredItems = [];
     items.forEach((item) => {
-      if (item.required) {
+      if (item.required && !HIDDEN_LINK_IDS.has(item.linkId)) {
         requiredItems.push(item);
       }
       if (item.item && item.item.length > 0) {
@@ -447,10 +544,17 @@ const renderInput = (item) => {
    /**
    * Valida los campos requeridos que estén habilitados.
    */
-   const validate = () => {
-    const requiredItems = getRequiredItems(questionnaire.item);
+	   const validateRequiredFields = () => {
+	    const requiredItems = getRequiredItems(questionnaire.item);
+      if (!String(transientNhc || "").trim()) {
+        setNhcError(NHC_REQUIRED_MESSAGE);
+        setError(NHC_REQUIRED_MESSAGE);
+        setRequiredFieldsError("");
+        return false;
+      }
+      setNhcError("");
 
-    // Solo se requieren los ítems que verdaderamente estén habilitados
+	    // Solo se requieren los ítems que verdaderamente estén habilitados
     const missingAnswers = requiredItems.filter((item) => {
       if (!isItemEnabled(item)) return false; // si no está habilitado, no se valida
       const answer = answers.find((a) => a.linkId === item.linkId);
@@ -460,18 +564,32 @@ const renderInput = (item) => {
     if (missingAnswers.length > 0) {
       const missingLabels = missingAnswers.map((item) => `- ${item.text || item.linkId}`);
       const message = `Los siguientes campos están sin rellenar:\n\n${missingLabels.join('\n')}`;
-      console.log(message);    
       setError(message);
+      setRequiredFieldsError(message);
       return false;
     } else {
       setError(null);
+      setRequiredFieldsError("");
       return true;
     }
   };
+
+  const validate = async () => {
+    if (!validateRequiredFields()) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleNextClick = async () => {
+    if (await validate()) {
+      setIsModalOpen(true);
+    }
+  };
+
    const handleReset = () => {
     const preservedLinkIds = [
-      "PAT_NOMBRE", // Nombre
-      "PAT_NHC",  // NHC
       "PAT_EDAD", // Edad
       "PAT_FUR", // FUR
       "PAT_IND", // Indicación ecografía
@@ -505,8 +623,10 @@ const renderInput = (item) => {
    */
     const renderGroup = (itemGroup) => {
       return (
-        <div key={itemGroup.linkId} className="questionnaire-group">
-          <h3 className="questionnaire-group-title">{itemGroup.text}</h3>
+        <section key={itemGroup.linkId} className="questionnaire-group questionnaire-card">
+          <div className="questionnaire-section-heading">
+            <h3 className="questionnaire-group-title">{itemGroup.text}</h3>
+          </div>
           <div className="questionnaire-container-group">
             {itemGroup.item.map((child) => {
               const styleString =
@@ -517,7 +637,7 @@ const renderInput = (item) => {
               const style = parseStyleString(styleString);
   
               // Solo renderizamos si el ítem está habilitado
-              if (!isItemEnabled(child)) return null;
+              if (!isItemEnabled(child) || HIDDEN_LINK_IDS.has(child.linkId)) return null;
   
               return child.type === "group" ? (
                 renderGroup(child)
@@ -525,28 +645,124 @@ const renderInput = (item) => {
                 <div
                   id={child.linkId}
                   key={child.linkId}
-                  className="questionnaire-item"
+                  className={getItemClassName(child)}
                   style={style}
                 >
-                  <label>
-                    {child.text}
-                    {child.required && <span className="required-asterisk">*</span>}
-                  </label>
+                  {renderFieldLabel({
+                    text: child.text,
+                    required: child.required,
+                  })}
                   {renderInput(child)}
                 </div>
               );
             })}
           </div>
-        </div>
+        </section>
       );
     };
 
-  return (
-    <><h2 className="questionnaire-title">{questionnaire.title}</h2>
-    <div className="questionnaire-container">
-        {questionnaire.item.map((item) => {
+	  return (
+	    <>
+      <div className="questionnaire-shell">
+        <div className="questionnaire-intro-card questionnaire-card">
+          <div className="questionnaire-intro-copy">
+            <p className="questionnaire-eyebrow">Registro clínico guiado</p>
+            <h2 className="questionnaire-title">Formulario clínico estructurado</h2>
+            <p className="questionnaire-subtitle">
+              Complete el cuestionario manteniendo el flujo actual de registro, validación y cálculo clínico.
+            </p>
+          </div>
+          <div className="questionnaire-section-index" aria-label="Índice visual de secciones">
+            {SECTION_INDEX_LABELS.map((label) => (
+              <span key={label} className="questionnaire-section-pill">
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+	    <div className="questionnaire-container questionnaire-card">
+        <div className={getItemClassName({ type: "string" }, "questionnaire-item--context")}>
+          {renderFieldLabel({
+            htmlFor: "transient-nhc",
+            text: "NHC",
+            required: true,
+            chipText: "Dato transitorio",
+          })}
+          <input
+            id="transient-nhc"
+            type="text"
+            value={transientNhc}
+            onChange={(event) => {
+              onTransientNhcChange(event.target.value);
+              onDirtyChange(true);
+              onQuestionnaireInteraction(answers, {
+                linkId: "transient-nhc",
+                type: "string",
+              });
+              if (event.target.value.trim()) {
+                setNhcError("");
+                if (error === NHC_REQUIRED_MESSAGE) {
+                  setError("");
+                }
+              }
+            }}
+            autoComplete="off"
+            aria-invalid={Boolean(nhcError)}
+            aria-describedby={nhcError ? "transient-nhc-error" : undefined}
+          />
+          {nhcError && (
+            <p id="transient-nhc-error" className="questionnaire-inline-error" role="alert">
+              {nhcError}
+            </p>
+          )}
+          <div className="questionnaire-help-box">
+            <small>
+              El NHC se utiliza únicamente para comprobaciones internas de pseudonimización y control de duplicados.
+              No debe mostrarse ni incluirse en exportaciones.
+            </small>
+          </div>
+	        </div>
+	        <div className={getItemClassName({ type: "choice" }, "questionnaire-item--context")}>
+	          {renderFieldLabel({
+	            htmlFor: "care-setting",
+	            text: "Ámbito asistencial",
+	            required: true,
+	          })}
+	          <select
+	            id="care-setting"
+	            value={normalizeCareSetting(careSettingCode).code}
+	            onChange={(event) => {
+	              const selected = normalizeCareSetting(event.target.value);
+	              onCareSettingChange(selected);
+	              onDirtyChange(true);
+                onQuestionnaireInteraction(answers, {
+                  linkId: "care-setting",
+                  type: "choice",
+                });
+	            }}
+	            required
+	          >
+	            {CARE_SETTING_OPTIONS.map((option) => (
+	              <option key={option.code} value={option.code}>
+	                {option.display}
+	              </option>
+	            ))}
+	          </select>
+	        </div>
+        <div className={getItemClassName({ type: "display" }, "questionnaire-item--context")}>
+          {renderFieldLabel({
+            text: "Código de estudio",
+          })}
+          <div className="questionnaire-help-box">
+            <small>
+              El código de estudio se asignará automáticamente al guardar el primer registro de la paciente.
+            </small>
+          </div>
+        </div>
+	        {questionnaire.item.map((item) => {
           // Si no está habilitado, no lo mostramos
-          if (!isItemEnabled(item)) return null;
+          if (!isItemEnabled(item) || HIDDEN_LINK_IDS.has(item.linkId)) return null;
 
           if (item.type === "group") {
             return renderGroup(item);
@@ -562,24 +778,45 @@ const renderInput = (item) => {
               <div
                 id={item.linkId}
                 key={item.linkId}
-                className="questionnaire-item"
+                className={getItemClassName(item)}
                 style={style}
               >
-                <label>
-                  {item.text}
-                  {item.required && <span className="required-asterisk">*</span>}
-                </label>
-                {renderInput(item)}
+                {renderFieldLabel({
+                  text: item.text,
+                  required: item.required,
+                })}
+              {renderInput(item)}
               </div>
             );
           }
         })}
       </div>
-      <div style={{display:"none"}} className="questionnaire-responses">
-        <h3>Respuestas:</h3>
-        <pre>{JSON.stringify({ resourceType: "QuestionnaireResponse", status: "completed", item: answers }, null, 2)}</pre>
-      </div>
-      <button className="save-btn" onClick={() => { validate(); setIsModalOpen(true) } }>Siguiente</button>
+      {requiredFieldsError && pendingFieldLabels.length > 0 && (
+        <section className="questionnaire-validation-alert" role="alert" aria-live="polite">
+          <div className="questionnaire-validation-alert__header">
+            <span className="questionnaire-validation-alert__icon" aria-hidden="true">
+              !
+            </span>
+            <div>
+              <h3 className="questionnaire-validation-alert__title">No se puede continuar todavia</h3>
+              <p className="questionnaire-validation-alert__subtitle">
+                Revisa los campos obligatorios pendientes antes de avanzar.
+              </p>
+            </div>
+          </div>
+          <p className="questionnaire-validation-alert__label">Campos pendientes:</p>
+          <div className="questionnaire-validation-alert__chips">
+            {pendingFieldLabels.map((label) => (
+              <span key={label} className="questionnaire-validation-chip">
+                {label}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+      <button className="save-btn" onClick={handleNextClick}>
+        Siguiente
+      </button>
       {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h2>Confirmación</h2>
@@ -597,14 +834,17 @@ const renderInput = (item) => {
           <>
             <p>Pulse <b>continuar</b> para elaborar el informe.</p>
             <p><b>Si continúa no podrá volver a este cuestionario.</b></p>
-            <button className="save" onClick={() => { if (validate()) { event(answers); setIsModalOpen(false); } }}>Continuar</button>
-            {/* Mostrar solo si hay masa anexial */}
-            {hasMass && (
-              <button className="continue" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); setIsModalOpen(false)} } }>Añadir masa anexial</button>)}
+            <div className="custom-modal-actions">
+              <button className="save" onClick={() => { event(answers); setIsModalOpen(false); }}>Continuar</button>
+              {/* Mostrar solo si hay masa anexial */}
+              {hasMass && (
+                <button className="continue" onClick={() => { eventContinue(answers); handleReset(); setIsModalOpen(false)} }>Añadir masa anexial</button>)}
               <button className="cancel" onClick={() => setIsModalOpen(false)}>Cancelar</button>
+            </div>
           </>
         )}
       </Modal>
+      </div>
     </>
   );
 };

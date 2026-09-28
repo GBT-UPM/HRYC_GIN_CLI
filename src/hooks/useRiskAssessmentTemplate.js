@@ -1,8 +1,13 @@
 import { RiskAssessmentTemplate } from "../templetes/riskAssessmentTemplate";
 
+const hasUsablePractitionerId = (practitionerId) => {
+  const value = String(practitionerId || "").trim();
+  return value !== "" && value !== "null" && value !== "undefined";
+};
+
 export const useRiskAssessmentTemplate = () => {
   const generateRiskAssessment = (riskId, encId, patientId, practitioner, prob, mitigation,quesRId) => {
-    return {
+    const riskAssessment = {
       ...RiskAssessmentTemplate,
       id: riskId,
       subject: {
@@ -17,9 +22,6 @@ export const useRiskAssessmentTemplate = () => {
         }
       ],
       date: new Date().toISOString(),
-      performer: {
-        reference: `Practitioner/${practitioner}`,
-      },
       prediction: [
         {
           outcome: {
@@ -38,6 +40,14 @@ export const useRiskAssessmentTemplate = () => {
       ],
       mitigation: mitigation
     };
+
+    if (hasUsablePractitionerId(practitioner)) {
+      riskAssessment.performer = {
+        reference: `Practitioner/${String(practitioner).trim()}`,
+      };
+    }
+
+    return riskAssessment;
   };
 
   return { generateRiskAssessment };

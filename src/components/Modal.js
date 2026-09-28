@@ -8,7 +8,7 @@ const Modal = ({ isOpen, onClose, children }) => {
   return (
     <div className="custom-modal-overlay">
       <div className="custom-modal-content">
-        <button className="custom-modal-close" onClick={onClose}>X</button>
+        <button className="custom-modal-close" onClick={onClose} aria-label="Cerrar">X</button>
         {children}
       </div>
     </div>

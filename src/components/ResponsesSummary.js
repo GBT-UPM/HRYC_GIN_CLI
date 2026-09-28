@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import '../assets/css/ResponsesSummary.css';
+import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS } from '../utils/ecoScore';
 
 
   const tipoMap = {
@@ -26,30 +27,6 @@ const ResponsesSummary = ({ responses, event }) => {
       // Añadir más tipos de respuesta según sea necesario
       return JSON.stringify(answer);
     }; */
-
-    // Función para calcular logit(p)
- 
-    const calcularLogit = (contorno, sombra, vascAreaSolida, vascPapila) =>{
-      let logit = -3.625;
-
-      //Cálculo coeficientes
-      if (contorno === 'irregular') logit += 1.299;
-
-      if (sombra === 'no') logit += 1.847;
-
-      if (vascAreaSolida === 'nula (score color 1)' || vascAreaSolida === 'leve (score color 2)') logit += 2.209;
-      else if (vascAreaSolida === 'moderada (score color 3)' || vascAreaSolida === 'abundante (score color 4)') logit += 2.967
-
-      if (vascPapila === 'nula (score color 1)' || vascPapila === 'leve (score color 2)') logit += 1.253;
-      else if (vascPapila === 'moderada (score color 3)' || vascPapila === 'abundante (score color 4)') logit +=1.988;
-
-      return logit;
-    }
-
-    // Función para calcular la probabilidad.
-    const calcularProbabilidad = (logit) => {
-      return 1 / (1 + Math.exp(-logit));
-    };
 
     // Función para generar el informe médico
     const generateReport = () => {
@@ -118,11 +95,7 @@ const ResponsesSummary = ({ responses, event }) => {
       const MA_CARC = getValue('MA_CARC');
       //const RES_CONCL = getValue('RES_CONCL');
 
-      //Calcular logit y probabilidad      
-      const logit = calcularLogit(MA_Q_CONTORNO, MA_SA, MA_Q_AS_VASC, MA_Q_P_VASC);
-      const probabilidad = calcularProbabilidad(logit);
-      
-      const RES_SCORE = probabilidad.toFixed(4);    //no sé si esto se mostraría en el informe o solo para información del médico.
+      const ecoScore = calculateEcoScoreFromQuestionnaireResponse({ item: responses });
     
       //Construcción del informe
       let report = '';
@@ -139,7 +112,9 @@ const ResponsesSummary = ({ responses, event }) => {
         report += `Anejo izquierdo de ${OI_M1} x ${OI_M2} mm con ${OI_FOL} folículo/s.\n`;
         
         return {
-          text: report
+          text: report,
+          ecoScoreStatus: ecoScore.status,
+          missingEcoScoreVariables: ecoScore.missingVariables,
         };
       } else {  //Si SÍ hay masa anexial
           const estructurasFemeninas = ['trompa'];
@@ -211,13 +186,14 @@ const ResponsesSummary = ({ responses, event }) => {
             if (MA_CARC === 'sí') {   //Carcinomatosis.
               report += 'Hay carcinomatosis.<br/>';
             }
-            //report += `La probabilidad de que la masa anexial sea maligna es de ${(RES_SCORE ?? 0)* 100}%. \n`;
         }
       }
         return {
           text: report,
-          score: RES_SCORE,
-          text_score: `La probabilidad de que la masa anexial sea maligna es de ${(RES_SCORE ?? 0)* 100}%.`,
+          score: ecoScore.status === ECO_SCORE_STATUS.CALCULATED ? ecoScore.score : null,
+          text_score: ecoScore.status === ECO_SCORE_STATUS.CALCULATED ? ecoScore.text_score : '',
+          ecoScoreStatus: ecoScore.status,
+          missingEcoScoreVariables: ecoScore.missingVariables,
         };
     };
 

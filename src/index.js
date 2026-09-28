@@ -11,10 +11,11 @@ import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
 import keycloak from './keycloak';
 import { ReactKeycloakProvider } from '@react-keycloak/web';
 const root = ReactDOM.createRoot(document.getElementById('root'));
+
 root.render(
   <ReactKeycloakProvider
   authClient={keycloak}
-  initOptions={{ onLoad: 'login-required', pkceMethod: 'S256' }}
+  initOptions={{ onLoad: 'login-required', checkLoginIframe: false, pkceMethod: 'S256' }}
 >
     <BrowserRouter>
       <App />

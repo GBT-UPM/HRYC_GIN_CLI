@@ -1,88 +1,117 @@
-/* Modal overlay */
 .custom-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7); /* Más oscuro para mayor contraste */
+  inset: 0;
   display: flex;
-  justify-content: center;
   align-items: center;
-  z-index: 1000;
-  transition: opacity 0.3s ease; /* Transición suave */
+  justify-content: center;
+  padding: 56px 20px 20px;
+  background-color: rgba(12, 28, 48, 0.5);
+  z-index: 1200;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-/* Modal content */
 .custom-modal-content {
-  background-color: #fff;
-  padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); /* Sombra más pronunciada */
   position: relative;
-  width: 90%;
-  max-width: 600px; /* Más ancho para mayor visibilidad */
-  animation: slide-down 0.3s ease; /* Animación de deslizamiento */
+  width: min(720px, 100%);
+  max-height: calc(100vh - 76px);
+  overflow-y: auto;
+  background-color: var(--color-surface-container-lowest, #ffffff);
+  border: 1px solid var(--color-outline-variant, #c4c6d0);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 12px 32px rgba(0, 25, 69, 0.16);
+  padding: 28px 24px 22px;
+  margin: auto 0;
 }
 
-/* Close button */
 .custom-modal-close {
   position: absolute;
-  top: 15px;
-  right: 15px;
-  background: none;
-  border: none;
-  font-size: 24px; /* Tamaño de fuente más grande */
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-outline-variant, #c4c6d0);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface-container-lowest, #ffffff);
+  color: var(--color-on-surface-variant, #44474e);
+  font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
-  color: #333; /* Color más oscuro */
-  transition: color 0.2s ease; /* Transición suave */
+  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
 }
 
 .custom-modal-close:hover {
-  color: #ff5a5f; /* Color de hover */
+  border-color: var(--color-primary, #1b365d);
+  color: var(--color-primary, #1b365d);
+  background-color: var(--color-surface-container-low, #eff4ff);
 }
 
-/* Animación de deslizamiento */
-@keyframes slide-down {
-  from {
-    transform: translateY(-20%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-/* Botones dentro del modal */
 .custom-modal-content button {
-  background-color: #007bff;
-  color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm, 4px);
+  padding: 10px 16px;
+  font-size: 0.94rem;
+  font-weight: 700;
   cursor: pointer;
-  font-size: 16px;
-  margin: 10px 5px;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
 }
-.save {
-  background-color: #4CAF50 !important;
+
+.custom-modal-content button.save {
+  background-color: var(--color-primary, #1b365d);
+  color: #ffffff;
 }
-.continue {
-  background-color: #2196F3 !important;
-}
-.cancel {
-  background-color: #9E9E9E !important;
-}
-.custom-modal-content button:hover {
-  background-color: #0056b3;
+
+.custom-modal-content button.continue {
+  background-color: var(--color-primary, #1b365d);
+  color: #ffffff;
 }
 
 .custom-modal-content button.cancel {
-  background-color: #6c757d;
+  background-color: var(--color-surface-container, #eff4ff);
+  color: var(--color-primary, #1b365d);
+}
+
+.custom-modal-content button.save:hover,
+.custom-modal-content button.continue:hover {
+  background-color: var(--color-on-primary-container, #001945);
 }
 
 .custom-modal-content button.cancel:hover {
-  background-color: #5a6268;
+  background-color: var(--color-surface-variant, #e0e2ec);
+}
+
+.custom-modal-info {
+  background-color: var(--color-surface-container-low, #eff4ff);
+  border: 1px solid var(--color-outline-variant, #c4c6d0);
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 14px;
+  margin-top: 12px;
+  font-size: 0.875rem;
+  color: var(--color-on-surface-variant, #44474e);
+  line-height: 1.5;
+}
+
+.custom-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+@media (max-width: 640px) {
+  .custom-modal-overlay {
+    align-items: flex-start;
+    padding: 64px 12px 12px;
+  }
+
+  .custom-modal-content {
+    width: 100%;
+    max-height: calc(100vh - 76px);
+    padding: 24px 18px 18px;
+  }
+
+  .custom-modal-actions {
+    gap: 10px;
+  }
 }
