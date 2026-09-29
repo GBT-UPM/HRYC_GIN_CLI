@@ -568,6 +568,7 @@ export default function QuestionnaireScreen() {
               transientNhc={transientNhc}
               onTransientNhcChange={setTransientNhc}
               careSettingCode={careSetting.code}
+              authorizedCenters={allowedCenters}
               onCareSettingChange={(nextCareSetting) =>
                 setCareSetting(normalizeCareSetting(nextCareSetting?.code || nextCareSetting))
               }

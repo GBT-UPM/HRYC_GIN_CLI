@@ -25,6 +25,7 @@ import { DEFAULT_CARE_SETTING, getCareSettingDisplay, normalizeCareSetting } fro
 import { generateClinicalReportPdf } from '../utils/pdfReport';
 import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS, extractEcoScoreInputs } from '../utils/ecoScore';
 import { formatProbabilityFromDecimal } from '../utils/riskDisplay';
+import { getAllowedCenters } from '../utils/auth';
 import {
   addSecondaryEvaluation,
   checkDuplicateCase,
@@ -119,6 +120,7 @@ const ResponsesProbability = ({
   const [copyFeedback, setCopyFeedback] = useState("");
 
   const { keycloak } = useKeycloak();
+  const allowedCenters = getAllowedCenters(keycloak);
   // eslint-disable-next-line no-unused-vars
   const [error, setError] = useState(null);
 
@@ -479,6 +481,12 @@ const ResponsesProbability = ({
 
       if (!metadata.isValid) {
         throw new Error(metadata.errors.join(" "));
+      }
+
+      if (allowedCenters.length > 0 && !allowedCenters.includes(metadata.centerId)) {
+        throw new Error(
+          `El cuestionario corresponde al centro ${metadata.centerId}, pero su usuario solo puede registrar en ${allowedCenters.join(", ")}.`
+        );
       }
 
       return {

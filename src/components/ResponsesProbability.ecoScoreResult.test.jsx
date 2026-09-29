@@ -138,6 +138,8 @@ const renderComponent = (responses) =>
       studyPatientCode=""
       canUseStudyPatientCode={false}
       careSetting={{ code: "EMERGENCY", display: "Urgencias" }}
+      studyConsentConfirmed
+      consentVersion="MIA-1.0"
       onCaseSaved={jest.fn()}
     />
   );

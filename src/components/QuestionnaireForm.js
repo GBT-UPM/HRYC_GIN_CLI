@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import '../assets/css/QuestionnaireForm.css';
 
 import Modal from "./Modal";
 import { CARE_SETTING_OPTIONS, normalizeCareSetting } from "../utils/careSetting";
+import { mapCenterToCode } from "../utils/caseMetadata";
 
 export const HIDDEN_LINK_IDS = new Set(["PAT_CODIGO", "PAT_NHC", "PAT_NOMBRE"]);
 export const isHiddenQuestionnaireItem = (linkId) => HIDDEN_LINK_IDS.has(linkId);
@@ -15,6 +16,32 @@ const SECTION_INDEX_LABELS = [
   "Hallazgos",
   "ECO-SCORE",
 ];
+
+const findQuestionnaireItem = (items = [], linkId) => {
+  for (const item of items) {
+    if (item.linkId === linkId) return item;
+
+    const nestedItem = findQuestionnaireItem(item.item, linkId);
+    if (nestedItem) return nestedItem;
+  }
+
+  return null;
+};
+
+const buildCenterAnswer = (item, centerCode) => {
+  const matchingOption = (item?.answerOption || []).find((option) => {
+    const value = option?.valueCoding?.code || option?.valueCoding?.display || option?.valueString || "";
+    return mapCenterToCode(value) === centerCode;
+  });
+
+  if (item?.type === "choice") {
+    const code = matchingOption?.valueCoding?.code || centerCode;
+    const display = matchingOption?.valueCoding?.display || centerCode;
+    return [{ valueString: code, valueCoding: { code, display } }];
+  }
+
+  return [{ valueString: centerCode }];
+};
 
 const renderFieldLabel = ({ htmlFor, text, required = false, chipText = "" }) => (
   <label htmlFor={htmlFor} className="questionnaire-field-label">
@@ -37,6 +64,7 @@ const QuestionnaireForm = ({
   transientNhc,
   onTransientNhcChange,
   careSettingCode = "UNKNOWN",
+  authorizedCenters = [],
   onCareSettingChange = () => {},
   onDirtyChange = () => {},
   onQuestionnaireInteraction = () => {},
@@ -47,6 +75,38 @@ const QuestionnaireForm = ({
   const [requiredFieldsError, setRequiredFieldsError] = useState("");
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const sessionCenter = authorizedCenters.length === 1 ? String(authorizedCenters[0]).trim().toUpperCase() : "";
+
+  // A single-centre account cannot accidentally register a case under another
+  // hospital. The server remains the authority, but the form reflects the same
+  // scope before the user invests time completing the questionnaire.
+  useEffect(() => {
+    if (!sessionCenter) return;
+
+    const centerItem = findQuestionnaireItem(questionnaire?.item, "HOSPITAL_REF");
+    if (!centerItem) return;
+
+    setAnswers((currentAnswers) => {
+      const existingAnswerIndex = currentAnswers.findIndex((answer) => answer.linkId === "HOSPITAL_REF");
+      const currentAnswer = currentAnswers[existingAnswerIndex]?.answer?.[0];
+      const currentCenter = mapCenterToCode(
+        currentAnswer?.valueCoding?.code || currentAnswer?.valueCoding?.display || currentAnswer?.valueString || ""
+      );
+
+      if (currentCenter === sessionCenter) return currentAnswers;
+
+      const nextCenterAnswer = {
+        questionText: centerItem.text,
+        linkId: "HOSPITAL_REF",
+        answer: buildCenterAnswer(centerItem, sessionCenter),
+      };
+      if (existingAnswerIndex < 0) return [...currentAnswers, nextCenterAnswer];
+
+      const nextAnswers = [...currentAnswers];
+      nextAnswers[existingAnswerIndex] = nextCenterAnswer;
+      return nextAnswers;
+    });
+  }, [questionnaire, sessionCenter]);
 
   // Verifica si hay masa anexial
   const hasMass = answers.find(a => a.linkId === "PAT_MA")?.answer?.[0]?.valueCoding.display === "Sí" || false;
@@ -248,7 +308,7 @@ const getItemClassName = (item, extraClassName = "") => {
  */
 const renderInput = (item) => {
   const initialValue = item.initial?.[0] || {};
-  const isDisabled = disabledFields.includes(item.linkId);
+  const isDisabled = disabledFields.includes(item.linkId) || (item.linkId === "HOSPITAL_REF" && Boolean(sessionCenter));
   const currentAnswer = answers.find((a) => a.linkId === item.linkId);
 
   switch (item.type) {
@@ -671,6 +731,7 @@ const renderInput = (item) => {
                   {renderFieldLabel({
                     text: child.text,
                     required: child.required,
+                    chipText: child.linkId === "HOSPITAL_REF" && sessionCenter ? `Centro asignado: ${sessionCenter}` : "",
                   })}
                   {renderInput(child)}
                 </div>
@@ -825,6 +886,7 @@ const renderInput = (item) => {
                 {renderFieldLabel({
                   text: item.text,
                   required: item.required,
+                  chipText: item.linkId === "HOSPITAL_REF" && sessionCenter ? `Centro asignado: ${sessionCenter}` : "",
                 })}
               {renderInput(item)}
               </div>

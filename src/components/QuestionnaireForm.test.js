@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import QuestionnaireForm, { isHiddenQuestionnaireItem } from "./QuestionnaireForm";
 import { maskNhc } from "../utils/privacy";
@@ -342,6 +342,23 @@ describe("QuestionnaireForm visibility rules", () => {
     await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
 
     expect(await screen.findByText(/Pulse/)).toBeInTheDocument();
+  });
+
+  it("fixes the hospital to the session centre for single-centre users", async () => {
+    render(
+      <QuestionnaireForm
+        questionnaire={questionnaire}
+        event={jest.fn()}
+        eventContinue={jest.fn()}
+        transientNhc="123456"
+        onTransientNhcChange={jest.fn()}
+        authorizedCenters={["HURYC"]}
+      />
+    );
+
+    await waitFor(() => expect(getHospitalInput()).toHaveValue("HURYC"));
+    expect(getHospitalInput()).toBeDisabled();
+    expect(screen.getByText("Centro asignado: HURYC")).toBeInTheDocument();
   });
 
   it("keeps all-of semantics when enableBehavior is omitted", async () => {
