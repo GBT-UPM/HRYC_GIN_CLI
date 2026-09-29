@@ -30,14 +30,6 @@ const renderFieldLabel = ({ htmlFor, text, required = false, chipText = "" }) =>
   </label>
 );
 
-const getPendingFieldLabels = (requiredFieldsError = "") =>
-  String(requiredFieldsError || "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith("- "))
-    .map((line) => line.replace(/^- /, "").trim())
-    .filter(Boolean);
-
 const QuestionnaireForm = ({
   questionnaire,
   event,
@@ -55,7 +47,6 @@ const QuestionnaireForm = ({
   const [requiredFieldsError, setRequiredFieldsError] = useState("");
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const pendingFieldLabels = getPendingFieldLabels(requiredFieldsError);
 
   // Verifica si hay masa anexial
   const hasMass = answers.find(a => a.linkId === "PAT_MA")?.answer?.[0]?.valueCoding.display === "Sí" || false;
@@ -541,6 +532,35 @@ const renderInput = (item) => {
     return requiredItems;
   };
 
+  // The same conditions used for validation also drive the progress display.
+  // A field which is not enabled must never make the questionnaire look incomplete.
+  const requiredItems = getRequiredItems(questionnaire.item).filter((item) => isItemEnabled(item));
+  const pendingRequiredItems = requiredItems.filter((item) => {
+    const answer = answers.find((currentAnswer) => currentAnswer.linkId === item.linkId);
+    return !answer || !answer.answer || answer.answer.length === 0;
+  });
+  const hasTransientNhc = Boolean(String(transientNhc || "").trim());
+  const requiredFieldTotal = requiredItems.length + 1;
+  const completedRequiredFields = requiredFieldTotal - pendingRequiredItems.length - (hasTransientNhc ? 0 : 1);
+  const progressPercent = requiredFieldTotal > 0
+    ? Math.round((completedRequiredFields / requiredFieldTotal) * 100)
+    : 100;
+  const pendingFieldCount = pendingRequiredItems.length + (hasTransientNhc ? 0 : 1);
+
+  const focusQuestionnaireField = (fieldId) => {
+    if (typeof document === "undefined") return;
+
+    const fieldContainer = document.getElementById(fieldId);
+    if (!fieldContainer) return;
+
+    fieldContainer.scrollIntoView({ behavior: "smooth", block: "center" });
+    const control = fieldContainer.matches("input, select, textarea")
+      ? fieldContainer
+      : fieldContainer.querySelector("input, select, textarea");
+
+    window.setTimeout(() => control?.focus(), 250);
+  };
+
    /**
    * Valida los campos requeridos que estén habilitados.
    */
@@ -665,16 +685,37 @@ const renderInput = (item) => {
 	    <>
       <div className="questionnaire-shell">
         <div className="questionnaire-intro-card questionnaire-card">
-          <div className="questionnaire-intro-copy">
-            <p className="questionnaire-eyebrow">Registro clínico guiado</p>
-            <h2 className="questionnaire-title">Formulario clínico estructurado</h2>
-            <p className="questionnaire-subtitle">
-              Complete el cuestionario manteniendo el flujo actual de registro, validación y cálculo clínico.
-            </p>
+          <div className="questionnaire-intro-header">
+            <div className="questionnaire-intro-copy">
+              <p className="questionnaire-eyebrow">Registro clínico guiado</p>
+              <h2 className="questionnaire-title">Formulario clínico estructurado</h2>
+              <p className="questionnaire-subtitle">
+                Complete los datos necesarios para registrar la evaluación ecográfica.
+              </p>
+            </div>
+            <div className="questionnaire-progress-summary" aria-live="polite">
+              <span className="questionnaire-progress-count">
+                {completedRequiredFields} de {requiredFieldTotal} obligatorios
+              </span>
+              <span className="questionnaire-progress-status">
+                {pendingFieldCount === 0 ? "Listo para revisar" : `${pendingFieldCount} pendientes`}
+              </span>
+            </div>
+          </div>
+          <div
+            className="questionnaire-progress-track"
+            role="progressbar"
+            aria-label="Progreso de los campos obligatorios"
+            aria-valuemin={0}
+            aria-valuemax={requiredFieldTotal}
+            aria-valuenow={completedRequiredFields}
+          >
+            <span className="questionnaire-progress-value" style={{ width: `${progressPercent}%` }} />
           </div>
           <div className="questionnaire-section-index" aria-label="Índice visual de secciones">
-            {SECTION_INDEX_LABELS.map((label) => (
+            {SECTION_INDEX_LABELS.map((label, index) => (
               <span key={label} className="questionnaire-section-pill">
+                <span className="questionnaire-section-number" aria-hidden="true">{index + 1}</span>
                 {label}
               </span>
             ))}
@@ -791,7 +832,7 @@ const renderInput = (item) => {
           }
         })}
       </div>
-      {requiredFieldsError && pendingFieldLabels.length > 0 && (
+      {requiredFieldsError && pendingRequiredItems.length > 0 && (
         <section className="questionnaire-validation-alert" role="alert" aria-live="polite">
           <div className="questionnaire-validation-alert__header">
             <span className="questionnaire-validation-alert__icon" aria-hidden="true">
@@ -806,17 +847,32 @@ const renderInput = (item) => {
           </div>
           <p className="questionnaire-validation-alert__label">Campos pendientes:</p>
           <div className="questionnaire-validation-alert__chips">
-            {pendingFieldLabels.map((label) => (
-              <span key={label} className="questionnaire-validation-chip">
-                {label}
-              </span>
+            {pendingRequiredItems.map((item) => (
+              <button
+                type="button"
+                key={item.linkId}
+                className="questionnaire-validation-chip"
+                onClick={() => focusQuestionnaireField(item.linkId)}
+              >
+                {item.text || item.linkId}
+              </button>
             ))}
           </div>
         </section>
       )}
-      <button className="save-btn" onClick={handleNextClick}>
-        Siguiente
-      </button>
+      <div className="questionnaire-action-bar">
+        <div className="questionnaire-action-bar__status" aria-live="polite">
+          <span className="questionnaire-action-bar__label">Estado del formulario</span>
+          <span>
+            {pendingFieldCount === 0
+              ? "Todos los campos obligatorios están completos."
+              : `Quedan ${pendingFieldCount} campos obligatorios por completar.`}
+          </span>
+        </div>
+        <button className="save-btn" onClick={handleNextClick}>
+          Siguiente
+        </button>
+      </div>
       {/* <button className="save-btn" onClick={() => { if (validate()) { eventContinue(answers); handleReset(); } } }>Añadir masa anexial</button> */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <h2>Confirmación</h2>
