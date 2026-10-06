@@ -1,19 +1,15 @@
 import {
-  Assignment,
   CalendarMonth,
   Close,
-  Download,
-  InfoOutlined,
   LocalHospital,
   MedicalInformation,
   People,
-  PostAdd,
+  Add,
 } from "@mui/icons-material";
 import {
   Alert,
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -26,11 +22,18 @@ import {
   Paper,
   Select,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Typography,
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ApiService from "../services/ApiService";
+import StudyPageHeader from "../components/StudyPageHeader";
 import {
   canRegisterQuestionnaire,
   canUseGlobalView,
@@ -41,8 +44,10 @@ import {
   isSiteCoordinator,
   isStudyCoordinator,
 } from "../utils/auth";
-import { CASE_EVALUATION_ERROR_MESSAGES } from "../services/caseEvaluationService";
+import { CASE_EVALUATION_ERROR_MESSAGES, getCaseEvaluations } from "../services/caseEvaluationService";
 import { DASHBOARD_ERROR_MESSAGES, getStudyDashboardStats } from "../services/studyDashboardService";
+import { formatEvaluationStatusLabel } from "../utils/caseStatus";
+import { formatEvaluationTypeLabel } from "../utils/evaluationType";
 
 const getUniqueCount = (items, selector) => {
   const values = new Set();
@@ -55,6 +60,16 @@ const getUniqueCount = (items, selector) => {
   });
 
   return values.size;
+};
+
+export const getRecentEvaluations = (evaluations = []) =>
+  [...(Array.isArray(evaluations) ? evaluations : [])]
+    .sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0))
+    .slice(0, 5);
+
+const formatEvaluationDate = (value) => {
+  const date = new Date(value);
+  return value && !Number.isNaN(date.getTime()) ? date.toLocaleDateString("es-ES") : "—";
 };
 
 export const buildDashboardCounts = (evaluations = []) => {
@@ -102,6 +117,8 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
   });
   const [selectedCenter, setSelectedCenter] = useState(getDefaultCenter(keycloak));
   const [error, setError] = useState("");
+  const [recentEvaluations, setRecentEvaluations] = useState([]);
+  const [recentError, setRecentError] = useState("");
   const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
@@ -110,33 +127,54 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
       return;
     }
 
+    let cancelled = false;
+    setRecentEvaluations([]);
+    setRecentError("");
+
     const fetchCounts = async () => {
       if (!isGlobalView && allowedCenters.length === 0) {
         setError(CASE_EVALUATION_ERROR_MESSAGES.missingCenter);
+        setRecentEvaluations([]);
         return;
       }
 
       if (shouldSelectCenter && !selectedCenter) {
         setError("");
+        setRecentEvaluations([]);
         return;
       }
 
       try {
         setError("");
         const stats = await getStudyDashboardStats(token, keycloak, selectedCenter);
-        setCounts({
-          participants:      stats.participantsCount      ?? 0,
-          encounters:        stats.encountersCount        ?? 0,
-          ultrasoundRecords: stats.ultrasoundRecordsCount ?? 0,
-          adnexalMasses:     stats.adnexalMassesCount     ?? 0,
-        });
+        if (!cancelled) {
+          setCounts({
+            participants:      stats.participantsCount      ?? 0,
+            encounters:        stats.encountersCount        ?? 0,
+            ultrasoundRecords: stats.ultrasoundRecordsCount ?? 0,
+            adnexalMasses:     stats.adnexalMassesCount     ?? 0,
+          });
+        }
       } catch (error) {
         console.error("Error al llamar al backend:", error);
-        setError(error.message || DASHBOARD_ERROR_MESSAGES.generic);
+        if (!cancelled) setError(error.message || DASHBOARD_ERROR_MESSAGES.generic);
+        return;
+      }
+      if (cancelled) return;
+      try {
+        setRecentError("");
+        const evaluations = await getCaseEvaluations(token, keycloak, selectedCenter);
+        if (!cancelled) setRecentEvaluations(getRecentEvaluations(evaluations));
+      } catch (error) {
+        if (!cancelled) {
+          setRecentEvaluations([]);
+          setRecentError(error.message || CASE_EVALUATION_ERROR_MESSAGES.generic);
+        }
       }
     };
 
     fetchCounts();
+    return () => { cancelled = true; };
   }, [token, keycloak, selectedCenter, isGlobalView, allowedCenters.length, shouldSelectCenter]);
 
 
@@ -168,9 +206,9 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
     }
     navigate('/questionnaire');
   };
-  const handleResponsesClick = () => { navigate('/responses'); };
-  const handleEncountersClick = () => { navigate('/encounters'); };
-  const handleExportsClick = () => { navigate('/download'); };
+  const handleEvaluationClick = (item) => {
+    navigate('/responses', { state: { caseSearch: item.evaluationDisplayId || item.caseDisplayId || item.studyPatientCode || "" } });
+  };
 
   const visibleScopeLabel = isGlobalView
     ? "Vista global"
@@ -205,42 +243,6 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
     },
   ];
 
-  const actionCards = [
-    ...(canUseQuestionnaireRegistration
-      ? [{
-        title: "Nuevo cuestionario",
-        text: "Registrar un nuevo caso ecográfico estructurado.",
-        button: "Iniciar",
-        icon: <PostAdd fontSize="small" />,
-        onClick: handleNewPatientClick,
-        disabled: !token,
-      }]
-      : []),
-    {
-      title: "Casos y evaluaciones",
-      text: "Consultar ECO-SCORE, evaluaciones e histopatología.",
-      button: "Revisar",
-      icon: <Assignment fontSize="small" />,
-      onClick: handleResponsesClick,
-    },
-    {
-      title: "Citas / encuentros",
-      text: "Consultar encuentros clínicos asociados al estudio.",
-      button: "Ver citas",
-      icon: <CalendarMonth fontSize="small" />,
-      onClick: handleEncountersClick,
-    },
-    ...(canExportScientificData
-      ? [{
-        title: "Exportaciones científicas",
-        text: "Descargar datasets CSV/XLSX para análisis.",
-        button: "Exportar",
-        icon: <Download fontSize="small" />,
-        onClick: handleExportsClick,
-      }]
-      : []),
-  ];
-
   const studyInfoRows = [
     ["Vista actual", visibleScopeLabel],
     ["Centros incluidos", centersLabel],
@@ -253,83 +255,22 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
 
   return (
     <Box sx={{ px: 0, py: 0 }}>
-      {/* Bloque superior compacto */}
-      <Paper
-        className="study-page-header home-study-context"
-        elevation={0}
-        sx={{
-          p: { xs: 2, md: 2.5 },
-          mb: 2,
-          border: "1px solid #D9E2EC",
-          borderRadius: 2,
-          backgroundColor: "#FFFFFF",
-        }}
-      >
-        <Stack spacing={1.5}>
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              gap: 2,
-              flexWrap: "wrap",
-            }}
-          >
-            <Box>
-              <Typography
-                variant="h5"
-                sx={{
-                  color: "#1F2933",
-                  fontSize: { xs: "1.25rem", sm: "1.45rem", md: "1.6rem" },
-                  fontWeight: 800,
-                  letterSpacing: 0,
-                  lineHeight: 1.2,
-                  mb: 0.5,
-                }}
-              >
-                Panel principal del estudio MIA
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ color: "#52616B", fontSize: "0.875rem", lineHeight: 1.4 }}
-              >
-                Validación externa multicéntrica del ECO-SCORE en masas anexiales. Registro estructurado de evaluaciones ecográficas y resultados ECO-SCORE.
-              </Typography>
-            </Box>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<InfoOutlined sx={{ fontSize: "1rem !important" }} />}
-              onClick={() => setInfoOpen(true)}
-              aria-label="Información del estudio"
-              sx={{
-                borderColor: "#D9E2EC",
-                color: "#52616B",
-                textTransform: "none",
-                fontWeight: 600,
-                fontSize: "0.8rem",
-                flexShrink: 0,
-                whiteSpace: "nowrap",
-                py: 0.5,
-                "&:hover": { borderColor: "#2F5D7C", color: "#1E3A5F", backgroundColor: "#F5F7FA" },
-              }}
-            >
-              Información del estudio
-            </Button>
-          </Box>
-
-          <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
-            <Chip
-              label={visibleScopeLabel}
-              size="small"
-              variant="outlined"
-              sx={{ borderColor: "#2F5D7C", color: "#1E3A5F", fontWeight: 700, fontSize: "0.75rem" }}
-            />
-            <Chip label={roleLabel} size="small" variant="outlined" sx={{ fontSize: "0.75rem" }} />
-            <Chip label={`Centros: ${centersLabel}`} size="small" variant="outlined" sx={{ fontSize: "0.75rem" }} />
-          </Stack>
-        </Stack>
-      </Paper>
+      <StudyPageHeader
+        title="Panel principal del estudio MIA"
+        subtitle="Validación externa multicéntrica del ECO-SCORE en masas anexiales. Registro estructurado de evaluaciones ecográficas y resultados ECO-SCORE."
+        visibleScopeLabel={visibleScopeLabel}
+        roleLabel={roleLabel}
+        centersLabel={centersLabel}
+        onInfoClick={() => setInfoOpen(true)}
+        infoButtonLabel="Información del estudio"
+      />
+      {canUseQuestionnaireRegistration && (
+        <Box className="home-primary-action">
+          <Button variant="contained" startIcon={<Add />} onClick={handleNewPatientClick} disabled={!token}>
+            Nuevo cuestionario
+          </Button>
+        </Box>
+      )}
 
       {/* Dialog Información del estudio */}
       <Dialog open={infoOpen} onClose={() => setInfoOpen(false)} maxWidth="xs" fullWidth>
@@ -451,65 +392,44 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
         ))}
       </Grid2>
 
-      {/* Acciones principales */}
-      <Stack className="home-actions" spacing={1.5}>
-        <Typography variant="h6" sx={{ color: "#1F2933", fontWeight: 800, fontSize: "0.95rem", letterSpacing: "0.01em" }}>
-          Acciones principales
-        </Typography>
-        <Grid2 container spacing={2}>
-          {actionCards.map((action) => (
-            <Grid2 key={action.title} size={{ xs: 12, sm: 6, md: 4 }} sx={{ display: "flex" }}>
-              <Paper
-                className="clinical-card home-action-card"
-                elevation={0}
-                sx={{
-                  p: 2,
-                  border: "1px solid #D9E2EC",
-                  borderRadius: 2,
-                  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 1,
-                  minHeight: 148,
-                  width: "100%",
-                  transition: "border-color 0.15s, box-shadow 0.15s",
-                  "&:hover": {
-                    borderColor: "#2F5D7C",
-                    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.08)",
-                  },
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#1E3A5F" }}>
-                  {action.icon}
-                  <Typography variant="body1" sx={{ fontWeight: 800, fontSize: "0.9rem", color: "#1F2933" }}>
-                    {action.title}
-                  </Typography>
-                </Box>
-                <Typography variant="body2" sx={{ color: "#52616B", flex: 1, fontSize: "0.82rem", lineHeight: 1.45 }}>
-                  {action.text}
-                </Typography>
-                <Button
-                  onClick={action.onClick}
-                  variant="contained"
-                  disabled={action.disabled}
-                  size="small"
-                  sx={{
-                    alignSelf: "flex-start",
-                    backgroundColor: "#1E3A5F",
-                    borderRadius: 1,
-                    textTransform: "none",
-                    fontWeight: 700,
-                    fontSize: "0.8rem",
-                    "&:hover": { backgroundColor: "#2F5D7C" },
-                  }}
-                >
-                  {action.button}
-                </Button>
-              </Paper>
-            </Grid2>
-          ))}
-        </Grid2>
-      </Stack>
+      <Paper className="clinical-table home-recent" elevation={0}>
+        <Box className="home-recent-heading">
+          <Typography component="h2" variant="h6">Últimos casos y evaluaciones</Typography>
+        </Box>
+        {recentError && <Alert severity="warning" sx={{ m: 2 }}>{recentError}</Alert>}
+        {!recentError && recentEvaluations.length === 0 ? (
+          <Typography className="home-recent-empty">Aún no hay evaluaciones registradas en esta vista.</Typography>
+        ) : !recentError && (
+          <TableContainer>
+            <Table size="small" aria-label="Últimos casos y evaluaciones">
+              <TableHead><TableRow>
+                <TableCell>Código de estudio</TableCell>
+                <TableCell>Caso / evaluación</TableCell>
+                <TableCell>Fecha</TableCell>
+                <TableCell>Tipo</TableCell>
+                <TableCell>Estado</TableCell>
+                <TableCell align="right">Acción</TableCell>
+              </TableRow></TableHead>
+              <TableBody>
+                {recentEvaluations.map((item, index) => (
+                  <TableRow key={item.evaluationId || item.evaluationDisplayId || index}>
+                    <TableCell>{item.studyPatientCode || "Pendiente"}</TableCell>
+                    <TableCell>{item.evaluationDisplayId || item.caseDisplayId || "—"}</TableCell>
+                    <TableCell>{formatEvaluationDate(item.createdAt)}</TableCell>
+                    <TableCell>{formatEvaluationTypeLabel(item.evaluationType, item.primaryEvaluation, item.evaluationId)}</TableCell>
+                    <TableCell>{formatEvaluationStatusLabel(item.evaluationStatus)}</TableCell>
+                    <TableCell align="right">
+                      <Button size="small" onClick={() => handleEvaluationClick(item)} aria-label={`Ver evaluación ${item.evaluationDisplayId || item.caseDisplayId || index + 1}`}>
+                        Ver
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
     </Box>
   );
 };

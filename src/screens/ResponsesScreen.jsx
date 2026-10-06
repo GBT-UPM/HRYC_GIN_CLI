@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
     Alert,
     Box,
@@ -257,6 +258,7 @@ const CASE_SEARCH_NEUTRAL_BTN_SX = {
 
 const ResponsesScreen = () => {
     const { keycloak, initialized } = useKeycloak();
+    const location = useLocation();
     const allowedCenters = getAllowedCenters(keycloak);
     const isGlobalView = canUseGlobalView(keycloak);
     const shouldSelectCenter = !isGlobalView && allowedCenters.length > 1;
@@ -267,7 +269,7 @@ const ResponsesScreen = () => {
     const [data, setData] = useState([]);
     // eslint-disable-next-line no-unused-vars
     const [error, setError] = useState(null);
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState(location.state?.caseSearch || '');
     const [orderBy, setOrderBy] = useState('createdAt');
     const [orderDirection, setOrderDirection] = useState('desc');
     const [page, setPage] = useState(0);
@@ -1091,6 +1093,7 @@ const ResponsesScreen = () => {
                 </Box>
                 <TextField
                     label="Búsqueda"
+                    value={search}
                     variant="outlined"
                     fullWidth
                     size="small"

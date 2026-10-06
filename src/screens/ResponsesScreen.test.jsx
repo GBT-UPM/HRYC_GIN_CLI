@@ -1,10 +1,12 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
+import { fireEvent, render as renderWithTestingLibrary, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import ResponsesScreen from './ResponsesScreen';
 import ApiService from '../services/ApiService';
 
 let mockKeycloak;
 const searchLabel = 'Búsqueda';
+const render = (ui) => renderWithTestingLibrary(<MemoryRouter>{ui}</MemoryRouter>);
 
 jest.mock('@react-keycloak/web', () => ({
   useKeycloak: () => ({

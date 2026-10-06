@@ -26,14 +26,6 @@ import {
 import { STUDY_CONSENT_VERSION } from "../constants/studyConsent";
 Chart.register(CategoryScale);
 
-const HEADER_PAPER_SX = {
-  p: { xs: 2, md: 2.5 },
-  mb: 2,
-  border: "1px solid #D9E2EC",
-  borderRadius: 2,
-  backgroundColor: "#FFFFFF",
-};
-
 const DIALOG_PAPER_SX = {
   borderRadius: "12px",
   border: "1px solid #D6E0EA",
@@ -460,7 +452,7 @@ export default function QuestionnaireScreen() {
         </DialogActions>
       </Dialog>
 
-      <Paper className="study-page-header" elevation={0} sx={HEADER_PAPER_SX}>
+      <Paper className="study-page-header" elevation={0}>
         <Stack spacing={1.5}>
           <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
             <Box>

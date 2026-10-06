@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import TopNavigation from "./TopNavigation";
 
@@ -20,7 +20,7 @@ describe("TopNavigation", () => {
     renderNavigation(["ROLE_CLINICIAN"]);
 
     expect(screen.getByText("Inicio")).toBeInTheDocument();
-    expect(screen.getByText("Nuevo cuestionario")).toBeInTheDocument();
+    expect(screen.queryByText("Nuevo cuestionario")).not.toBeInTheDocument();
     expect(screen.getByText("Casos y evaluaciones")).toBeInTheDocument();
     expect(screen.getByText("Citas / encuentros")).toBeInTheDocument();
   });
@@ -29,6 +29,7 @@ describe("TopNavigation", () => {
     renderNavigation(["ROLE_SITE_COORDINATOR"]);
 
     expect(screen.queryByText("Pendientes")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Gestión" }));
     expect(screen.getByText("Exportaciones")).toBeInTheDocument();
     expect(screen.getByText("Trazabilidad")).toBeInTheDocument();
   });
@@ -36,6 +37,7 @@ describe("TopNavigation", () => {
   it("shows exports but not pending participants for study coordinators", () => {
     renderNavigation(["ROLE_STUDY_COORDINATOR"]);
 
+    fireEvent.click(screen.getByRole("button", { name: "Gestión" }));
     expect(screen.getByText("Exportaciones")).toBeInTheDocument();
     expect(screen.getByText("Trazabilidad")).toBeInTheDocument();
     expect(screen.queryByText("Nuevo cuestionario")).not.toBeInTheDocument();
@@ -49,9 +51,9 @@ describe("TopNavigation", () => {
     expect(screen.getByText("Casos y evaluaciones")).toBeInTheDocument();
   });
 
-  it("shows questionnaire registration for mixed study coordinator and clinician users", () => {
+  it("does not duplicate questionnaire registration in the navigation", () => {
     renderNavigation(["ROLE_STUDY_COORDINATOR", "ROLE_CLINICIAN"]);
 
-    expect(screen.getByText("Nuevo cuestionario")).toBeInTheDocument();
+    expect(screen.queryByText("Nuevo cuestionario")).not.toBeInTheDocument();
   });
 });

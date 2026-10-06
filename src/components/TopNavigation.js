@@ -1,5 +1,6 @@
-import React from "react";
-import { NavLink } from "react-router-dom";
+import React, { useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import { Button, Menu, MenuItem } from "@mui/material";
 import {
   Assignment,
   CalendarMonth,
@@ -7,21 +8,21 @@ import {
   FactCheck,
   Home,
   ManageAccounts,
-  PostAdd,
+  Settings,
 } from "@mui/icons-material";
-import { canRegisterQuestionnaire, isSiteCoordinator, isStudyCoordinator } from "../utils/auth";
+import { isSiteCoordinator, isStudyCoordinator } from "../utils/auth";
 
 const TopNavigation = ({ keycloak }) => {
-  const canUseQuestionnaireRegistration = canRegisterQuestionnaire(keycloak);
+  const [settingsAnchor, setSettingsAnchor] = useState(null);
+  const location = useLocation();
   const canUseScientificExports = isSiteCoordinator(keycloak) || isStudyCoordinator(keycloak);
   const canUseStudyAudit = isSiteCoordinator(keycloak) || isStudyCoordinator(keycloak);
   const items = [
     { to: "/", label: "Inicio", icon: <Home fontSize="small" />, end: true },
-    ...(canUseQuestionnaireRegistration
-      ? [{ to: "/questionnaire", label: "Nuevo cuestionario", icon: <PostAdd fontSize="small" /> }]
-      : []),
     { to: "/responses", label: "Casos y evaluaciones", icon: <Assignment fontSize="small" /> },
     { to: "/encounters", label: "Citas / encuentros", icon: <CalendarMonth fontSize="small" /> },
+  ];
+  const managementItems = [
     ...(canUseScientificExports
       ? [{ to: "/download", label: "Exportaciones", icon: <Download fontSize="small" /> }]
       : []),
@@ -32,6 +33,7 @@ const TopNavigation = ({ keycloak }) => {
       ? [{ to: "/users", label: "Usuarios del centro", icon: <ManageAccounts fontSize="small" /> }]
       : []),
   ];
+  const managementActive = managementItems.some((item) => location.pathname.startsWith(item.to));
 
   return (
     <nav className="top-navigation" aria-label="Navegación principal">
@@ -47,6 +49,39 @@ const TopNavigation = ({ keycloak }) => {
             <span>{item.label}</span>
           </NavLink>
         ))}
+        {managementItems.length > 0 && (
+          <>
+            <Button
+              className={`top-navigation-link top-navigation-menu-trigger${managementActive ? " active" : ""}`}
+              startIcon={<Settings fontSize="small" />}
+              onClick={(event) => setSettingsAnchor(event.currentTarget)}
+              aria-controls={settingsAnchor ? "management-menu" : undefined}
+              aria-haspopup="menu"
+              aria-expanded={Boolean(settingsAnchor)}
+            >
+              Gestión
+            </Button>
+            <Menu
+              id="management-menu"
+              anchorEl={settingsAnchor}
+              open={Boolean(settingsAnchor)}
+              onClose={() => setSettingsAnchor(null)}
+            >
+              {managementItems.map((item) => (
+                <MenuItem
+                  key={item.to}
+                  component={NavLink}
+                  to={item.to}
+                  selected={location.pathname.startsWith(item.to)}
+                  onClick={() => setSettingsAnchor(null)}
+                  sx={{ gap: 1 }}
+                >
+                  {item.icon}{item.label}
+                </MenuItem>
+              ))}
+            </Menu>
+          </>
+        )}
       </div>
     </nav>
   );

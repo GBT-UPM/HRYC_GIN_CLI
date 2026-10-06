@@ -1,17 +1,33 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import MainScreen, { buildDashboardCounts } from './MainScreen';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import MainScreen, { buildDashboardCounts, getRecentEvaluations } from './MainScreen';
 import ApiService from '../services/ApiService';
 
+const mockNavigate = jest.fn();
 jest.mock('../services/ApiService', () => jest.fn());
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
-  useNavigate: () => jest.fn(),
+  useNavigate: () => mockNavigate,
 }));
 
 describe('MainScreen', () => {
   beforeEach(() => {
     ApiService.mockReset();
+    mockNavigate.mockClear();
+    ApiService.mockImplementation(async (_token, _method, endpoint) => {
+      if (endpoint.startsWith('/app/cases/evaluations')) {
+        return { status: 200, json: async () => [] };
+      }
+      throw new Error(`Unexpected endpoint: ${endpoint}`);
+    });
+  });
+
+  it('keeps only the five newest evaluations', () => {
+    const evaluations = Array.from({ length: 6 }, (_, index) => ({
+      evaluationId: index,
+      createdAt: `2026-09-${String(index + 1).padStart(2, '0')}`,
+    }));
+    expect(getRecentEvaluations(evaluations).map((item) => item.evaluationId)).toEqual([5, 4, 3, 2, 1]);
   });
 
   const expectCardCount = (label, expectedCount) => {
@@ -94,6 +110,18 @@ describe('MainScreen', () => {
         adnexalMassesCount:     2,
       }),
     });
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => [{
+        evaluationId: 1,
+        studyPatientCode: 'HURYC-000001',
+        caseDisplayId: 'HURYC-C000001',
+        evaluationDisplayId: 'HURYC-C000001-E000001',
+        createdAt: '2026-09-29T12:00:00Z',
+        evaluationType: 'PRIMARY',
+        evaluationStatus: 'COMPLETED',
+      }],
+    });
 
     render(
       <MainScreen
@@ -115,8 +143,15 @@ describe('MainScreen', () => {
 
     expectCardCount('Encuentros registrados', 2);
     expectCardCount('Registros ecográficos', 2);
-    expect(screen.getByText('Acciones principales')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Revisar' })).toBeInTheDocument();
+    expect(screen.getByText('Panel principal del estudio MIA')).toBeInTheDocument();
+    expect(screen.getByText(/Validación externa multicéntrica del ECO-SCORE/)).toBeInTheDocument();
+    expect(screen.getByText('Últimos casos y evaluaciones')).toBeInTheDocument();
+    expect(await screen.findByText('HURYC-000001')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver evaluación HURYC-C000001-E000001' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/responses', {
+      state: { caseSearch: 'HURYC-C000001-E000001' },
+    });
+    expect(screen.queryByText('Acciones principales')).not.toBeInTheDocument();
     expectCardCount('Masas anexiales detectadas', 2);
     expect(screen.getByRole('button', { name: /información del estudio/i })).toBeInTheDocument();
     expect(ApiService).toHaveBeenCalledWith('token', 'GET', '/app/study-dashboard/stats?centerId=HURYC', {});
@@ -146,9 +181,7 @@ describe('MainScreen', () => {
     });
 
     expect(screen.queryByText('Nuevo cuestionario')).not.toBeInTheDocument();
-    expect(screen.getByText('Casos y evaluaciones')).toBeInTheDocument();
-    expect(screen.getByText('Citas / encuentros')).toBeInTheDocument();
-    expect(screen.getByText('Exportaciones científicas')).toBeInTheDocument();
+    expect(screen.getByText('Últimos casos y evaluaciones')).toBeInTheDocument();
   });
 
   it('shows questionnaire registration card for clinicians', async () => {
@@ -238,7 +271,7 @@ describe('MainScreen', () => {
     expect(await screen.findByText('Usuario sin centro asignado.')).toBeInTheDocument();
     expect(ApiService).not.toHaveBeenCalled();
     expect(screen.queryByText('Nuevo cuestionario')).not.toBeInTheDocument();
-    expect(screen.getByText('Casos y evaluaciones')).toBeInTheDocument();
+    expect(screen.getByText('Últimos casos y evaluaciones')).toBeInTheDocument();
   });
 
   it('shows missing center message and does not query global endpoint', async () => {

@@ -33,7 +33,7 @@ const Header = (props) => {
       </div>
     </div>
 
-    <div className="header-study-context">Estudio multicéntrico ECO-SCORE</div>
+    {props.children}
 
     <div className="user-section">
       <div className={`session-info${hasMissingCenter ? " session-info--warning" : ""}`} aria-label="Información de sesión">

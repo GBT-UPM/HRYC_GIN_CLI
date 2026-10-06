@@ -7,8 +7,9 @@ import Footer from "../components/Footer";
 const Layout = ({ closeSession, preferred_username, keycloak }) => {
   return (
     <div className="App">
-      <Header name={preferred_username} closeSession={closeSession} keycloak={keycloak} />
-      <TopNavigation keycloak={keycloak} />
+      <Header name={preferred_username} closeSession={closeSession} keycloak={keycloak}>
+        <TopNavigation keycloak={keycloak} />
+      </Header>
       <main className="main-content">
         <Outlet />
       </main>

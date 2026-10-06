@@ -14,17 +14,7 @@ const StudyPageHeader = ({
     onInfoClick,
     infoButtonLabel = 'Información de la vista',
 }) => (
-    <Paper
-        className="study-page-header"
-        elevation={0}
-        sx={{
-            p: { xs: 2, md: 2.5 },
-            mb: 2,
-            border: '1px solid #D9E2EC',
-            borderRadius: 2,
-            backgroundColor: '#FFFFFF',
-        }}
-    >
+    <Paper className="study-page-header" elevation={0}>
         <Stack spacing={1.5}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
                 <Box>
