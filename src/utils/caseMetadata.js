@@ -107,6 +107,11 @@ export const mapCenterToCode = (center) => {
     return "H12O";
   }
 
+  const centerCode = String(center || "").trim().toUpperCase();
+  if (/^[A-Z0-9][A-Z0-9_-]{1,31}$/.test(centerCode)) {
+    return centerCode;
+  }
+
   return "";
 };
 

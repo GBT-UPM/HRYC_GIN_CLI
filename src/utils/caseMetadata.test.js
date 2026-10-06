@@ -68,6 +68,11 @@ describe("case metadata", () => {
     expect(mapCenterToCode("H12O")).toBe("H12O");
   });
 
+  it("accepts configured center codes without treating arbitrary names as codes", () => {
+    expect(mapCenterToCode("centro_03")).toBe("CENTRO_03");
+    expect(mapCenterToCode("Centro no mapeado")).toBe("");
+  });
+
   it("validates required case metadata", () => {
     expect(validateCaseMetadata(questionnaireResponse)).toMatchObject({
       centerId: "HURYC",

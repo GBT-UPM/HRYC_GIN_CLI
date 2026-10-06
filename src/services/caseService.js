@@ -110,7 +110,7 @@ export const searchCasesByNhc = async (token, { centerId, nhc }) => {
   });
 
   if (!response.ok && response.status === 404) {
-    throw new Error("No se encontró participante/caso pendiente para el NHC introducido en este centro.");
+    throw new Error("No hay casos para ese NHC en el centro seleccionado. Introduzca el NHC original usado en el cuestionario, no el código de estudio.");
   }
 
   return parseJsonResponse(response);

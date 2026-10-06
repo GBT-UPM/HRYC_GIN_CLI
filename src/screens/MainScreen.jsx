@@ -7,7 +7,6 @@ import {
   LocalHospital,
   MedicalInformation,
   People,
-  PlaylistAddCheck,
   PostAdd,
 } from "@mui/icons-material";
 import {
@@ -92,7 +91,6 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
   const roleLabel = getPrimaryRoleLabel(keycloak);
   const centersLabel = getCentersDisplayLabel(keycloak);
   const canUseQuestionnaireRegistration = canRegisterQuestionnaire(keycloak);
-  const canManagePendingParticipants = isSiteCoordinator(keycloak);
   const canExportScientificData = isSiteCoordinator(keycloak) || isStudyCoordinator(keycloak);
   const shouldSelectCenter = !isGlobalView && allowedCenters.length > 1;
 
@@ -172,7 +170,6 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
   };
   const handleResponsesClick = () => { navigate('/responses'); };
   const handleEncountersClick = () => { navigate('/encounters'); };
-  const handlePendingParticipantsClick = () => { navigate('/study-participants/pending'); };
   const handleExportsClick = () => { navigate('/download'); };
 
   const visibleScopeLabel = isGlobalView
@@ -233,15 +230,6 @@ const WelcomeScreen = ({ keycloak, practitionerName, isAdmin }) => {
       icon: <CalendarMonth fontSize="small" />,
       onClick: handleEncountersClick,
     },
-    ...(canManagePendingParticipants
-      ? [{
-        title: "Participantes pendientes",
-        text: "Asignar códigos de estudio y revisar pendientes.",
-        button: "Gestionar",
-        icon: <PlaylistAddCheck fontSize="small" />,
-        onClick: handlePendingParticipantsClick,
-      }]
-      : []),
     ...(canExportScientificData
       ? [{
         title: "Exportaciones científicas",

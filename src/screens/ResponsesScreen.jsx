@@ -991,13 +991,22 @@ const ResponsesScreen = () => {
             {/* Encabezado institucional */}
             <StudyPageHeader
                 title="Casos y evaluaciones"
-                subtitle="Consulta de casos registrados, evaluaciones primarias/secundarias, ECO-SCORE e histopatología asociada al estudio."
+                subtitle="Registro y seguimiento de casos, evaluaciones y resultados anatomopatológicos."
                 visibleScopeLabel={visibleScopeLabel}
                 roleLabel={roleLabel}
                 centersLabel={centersLabel}
                 recordCount={filteredData.length}
                 onInfoClick={() => setInfoOpen(true)}
             />
+
+            <Box className="cases-workflow-note" role="note">
+                <Typography component="span" className="cases-workflow-label">Histopatología</Typography>
+                <Typography component="span" variant="body2">
+                    {isSiteCoordinator(keycloak)
+                        ? 'Cuando llegue el resultado, localice el caso y seleccione «Histología» para registrarlo o actualizarlo.'
+                        : 'El resultado se incorpora después al caso; su registro corresponde al coordinador del centro.'}
+                </Typography>
+            </Box>
 
             {/* Dialog Información de la vista */}
             <Dialog open={infoOpen} onClose={() => setInfoOpen(false)} maxWidth="sm" fullWidth>
@@ -1075,7 +1084,11 @@ const ResponsesScreen = () => {
             )}
 
             {/* Card de búsqueda */}
-            <Paper className="clinical-search" elevation={0} sx={{ p: 2, mb: 2, border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF" }}>
+            <Paper className="clinical-search cases-search" elevation={0} sx={{ p: 2, mb: 2, border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF" }}>
+                <Box className="cases-search-heading">
+                    <Typography component="h2" variant="subtitle2">Filtrar registros</Typography>
+                    <Typography variant="body2">{filteredData.length} resultados</Typography>
+                </Box>
                 <TextField
                     label="Búsqueda"
                     variant="outlined"
@@ -1092,7 +1105,7 @@ const ResponsesScreen = () => {
             {/* Card de tabla */}
             <Paper className="clinical-table" elevation={0} sx={{ border: "1px solid #D9E2EC", borderRadius: 2, backgroundColor: "#FFFFFF", overflow: "hidden" }}>
                 <TableContainer sx={{ overflowX: "auto" }}>
-                    <Table size="small">
+                    <Table size="small" aria-label="Casos y evaluaciones registrados">
                         <TableHead>
                             <TableRow>
                                 {/* 1. Código de estudio */}
@@ -1234,21 +1247,13 @@ const ResponsesScreen = () => {
 
                                         {/* Estado (agrupado) */}
                                         <TableCell sx={{ py: 1, px: 1.5, verticalAlign: 'top' }}>
-                                            <Stack spacing={0.5} alignItems="flex-start">
-                                                {[codeLabel, caseLabel, evalLabel].map((label, i) =>
+                                            <Stack spacing={0.25} alignItems="flex-start" className="cases-status-list">
+                                                {[["Código", codeLabel], ["Caso", caseLabel], ["Evaluación", evalLabel]].map(([name, label]) =>
                                                     label && label !== '—' ? (
-                                                        <Chip
-                                                            key={i}
-                                                            label={label}
-                                                            size="small"
-                                                            variant="outlined"
-                                                            sx={{
-                                                                height: 20,
-                                                                fontSize: '0.7rem',
-                                                                fontWeight: 600,
-                                                                ...getStatusChipSx(label),
-                                                            }}
-                                                        />
+                                                        <Box key={name} className="cases-status-line">
+                                                            <Typography component="span" className="cases-status-name">{name}</Typography>
+                                                            <Typography component="span" className="cases-status-value" sx={{ color: getStatusChipSx(label).color }}>{label}</Typography>
+                                                        </Box>
                                                     ) : null
                                                 )}
                                             </Stack>
@@ -1422,7 +1427,7 @@ const ResponsesScreen = () => {
                         </Box>
                         {caseSearchError && (
                             <Alert severity="warning">
-                                No se pudo completar la búsqueda. Revise los datos introducidos o inténtelo de nuevo.
+                                {caseSearchError}
                             </Alert>
                         )}
                         {caseSearchResult && (

@@ -80,7 +80,7 @@ describe("caseService", () => {
         centerId: "HURYC",
         nhc: "123456",
       })
-    ).rejects.toThrow("No se encontró participante/caso pendiente para el NHC introducido en este centro.");
+    ).rejects.toThrow("No hay casos para ese NHC en el centro seleccionado. Introduzca el NHC original usado en el cuestionario, no el código de estudio.");
   });
 
   it("calls create case endpoint without sensitive questionnaire items", async () => {

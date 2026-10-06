@@ -1,4 +1,5 @@
 import { getCareSettingLocationSuffix } from "./careSetting";
+import { mapCenterToCode } from "./caseMetadata";
 
 const normalizeCenter = (centerId = "") =>
   String(centerId)
@@ -22,7 +23,7 @@ export const resolveCenterCode = (centerId = "") => {
     return "H12O";
   }
 
-  return "";
+  return normalized === "unknown" ? "" : mapCenterToCode(centerId);
 };
 
 export const getOrganizationForCenter = (centerId = "") => {
@@ -39,8 +40,8 @@ export const getOrganizationForCenter = (centerId = "") => {
       };
     default:
       return {
-        reference: "Organization/unknown",
-        display: "Centro no especificado",
+        reference: resolveCenterCode(centerId) ? `Organization/${resolveCenterCode(centerId).toLowerCase()}` : "Organization/unknown",
+        display: resolveCenterCode(centerId) ? `Centro ${resolveCenterCode(centerId)}` : "Centro no especificado",
       };
   }
 };
@@ -62,7 +63,7 @@ export const getLocationForCenter = (centerId = "", careSettingCode = "UNKNOWN")
       };
     default:
       return {
-        reference: `Location/${suffix}`,
+        reference: centerCode ? `Location/${centerCode.toLowerCase()}-${suffix}` : `Location/${suffix}`,
         display,
       };
   }

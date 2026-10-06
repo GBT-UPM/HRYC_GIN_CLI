@@ -6,14 +6,13 @@ import {
   Download,
   FactCheck,
   Home,
-  PeopleAlt,
+  ManageAccounts,
   PostAdd,
 } from "@mui/icons-material";
 import { canRegisterQuestionnaire, isSiteCoordinator, isStudyCoordinator } from "../utils/auth";
 
 const TopNavigation = ({ keycloak }) => {
   const canUseQuestionnaireRegistration = canRegisterQuestionnaire(keycloak);
-  const canManageStudyParticipants = isSiteCoordinator(keycloak);
   const canUseScientificExports = isSiteCoordinator(keycloak) || isStudyCoordinator(keycloak);
   const canUseStudyAudit = isSiteCoordinator(keycloak) || isStudyCoordinator(keycloak);
   const items = [
@@ -23,14 +22,14 @@ const TopNavigation = ({ keycloak }) => {
       : []),
     { to: "/responses", label: "Casos y evaluaciones", icon: <Assignment fontSize="small" /> },
     { to: "/encounters", label: "Citas / encuentros", icon: <CalendarMonth fontSize="small" /> },
-    ...(canManageStudyParticipants
-      ? [{ to: "/study-participants/pending", label: "Pendientes", icon: <PeopleAlt fontSize="small" /> }]
-      : []),
     ...(canUseScientificExports
       ? [{ to: "/download", label: "Exportaciones", icon: <Download fontSize="small" /> }]
       : []),
     ...(canUseStudyAudit
       ? [{ to: "/study-audit", label: "Trazabilidad", icon: <FactCheck fontSize="small" /> }]
+      : []),
+    ...(isSiteCoordinator(keycloak)
+      ? [{ to: "/users", label: "Usuarios del centro", icon: <ManageAccounts fontSize="small" /> }]
       : []),
   ];
 

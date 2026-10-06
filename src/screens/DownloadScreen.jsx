@@ -32,7 +32,6 @@ import {
     isStudyCoordinator,
 } from '../utils/auth';
 
-const SCIENTIFIC_EXPORT_CENTERS = ["", "HURYC", "H12O"];
 const CODE_STATUS_OPTIONS = ["", "PENDING_CODE", "CODE_ASSIGNED", "CODE_CONFLICT"];
 const CASE_STATUS_OPTIONS = ["", "OPEN", "READY_FOR_REVIEW", "LOCKED", "EXCLUDED", "WITHDRAWN"];
 const EVALUATION_TYPE_OPTIONS = ["", "PRIMARY", "SECONDARY"];
@@ -298,7 +297,7 @@ const DownloadScreen = () => {
 
     const centerOptions = useMemo(() => {
         if (studyCoordinator) {
-            return SCIENTIFIC_EXPORT_CENTERS;
+            return ["", ...allowedCenters];
         }
         if (allowedCenters.length === 1) {
             return allowedCenters;

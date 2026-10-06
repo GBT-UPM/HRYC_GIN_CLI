@@ -23,7 +23,7 @@ import {
 } from '../utils/caseMetadata';
 import { DEFAULT_CARE_SETTING, getCareSettingDisplay, normalizeCareSetting } from '../utils/careSetting';
 import { generateClinicalReportPdf } from '../utils/pdfReport';
-import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS, extractEcoScoreInputs } from '../utils/ecoScore';
+import { calculateEcoScoreFromQuestionnaireResponse, ECO_SCORE_STATUS, extractEcoScoreInputs, isSolidAdnexalMass, normalizeEcoScoreText } from '../utils/ecoScore';
 import { formatProbabilityFromDecimal } from '../utils/riskDisplay';
 import { getAllowedCenters } from '../utils/auth';
 import {
@@ -388,8 +388,8 @@ const ResponsesProbability = ({
     if (!responses || responses.length === 0) return;
 
     const generated = responses.map((r) => generateReport(r));
-    const hasMassInReports = generated.some(
-      (report) => report.ecoScoreStatus !== ECO_SCORE_STATUS.NOT_APPLICABLE
+    const hasMassInReports = responses.some((response) =>
+      ['si', 'yes', 'true', '1'].includes(normalizeEcoScoreText(extractEcoScoreInputs(response).hasMass))
     );
     const hasCalculatedScore = generated.some(
       (report) => report.ecoScoreStatus === ECO_SCORE_STATUS.CALCULATED
@@ -966,6 +966,14 @@ const ResponsesProbability = ({
                 <em>
                   (Rodríguez-Rubio C, Vegas-Viedma S, Del Olmo-Reillo M, Quintana-Zapata P, Sancho-Sauco J, Pablos-Antona MJ, Alcázar JL, Pelayo-Delgado I. ECO-SCORE: Development of a New Ultrasound Score for the Study of Cystic and Solid-Cystic Adnexal Masses Based on Imaging Characteristics. Biomedicines. 2025 Jan 29;13(2):317. doi: 10.3390/biomedicines13020317. PMID: 40002730; PMCID: PMC11852474)
                 </em>
+              </p>
+            </section>
+          )}
+          {isSolidAdnexalMass(responses[index]) && (
+            <section className="parts responses-review-section responses-score-box" role="status">
+              <span className="tlabel">ECO-SCORE no aplicable</span>
+              <p className="responses-review-panel__supporting">
+                El ECO-SCORE no se calcula para masas sólidas. El informe ecográfico puede guardarse sin una probabilidad de malignidad calculada.
               </p>
             </section>
           )}

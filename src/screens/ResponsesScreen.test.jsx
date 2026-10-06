@@ -794,7 +794,7 @@ describe('ResponsesScreen', () => {
     fireEvent.change(screen.getByLabelText('NHC'), { target: { value: '123456' } });
     fireEvent.click(screen.getAllByRole('button', { name: 'Buscar' })[0]);
 
-    expect(await screen.findByText('No se pudo completar la búsqueda. Revise los datos introducidos o inténtelo de nuevo.')).toBeInTheDocument();
+    expect(await screen.findByText('No hay casos para ese NHC en el centro seleccionado. Introduzca el NHC original usado en el cuestionario, no el código de estudio.')).toBeInTheDocument();
     expect(screen.getByLabelText('NHC')).toHaveValue('');
     expect(screen.queryByText('123456')).not.toBeInTheDocument();
   });

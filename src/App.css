@@ -51,6 +51,18 @@ select {
   font-family: inherit;
 }
 
+/* MUI otherwise falls back to Roboto while the workspace uses Aptos/Segoe. */
+.MuiTypography-root,
+.MuiInputBase-root,
+.MuiInputLabel-root,
+.MuiFormLabel-root,
+.MuiTableCell-root,
+.MuiMenuItem-root,
+.MuiChip-root,
+.MuiTooltip-tooltip {
+  font-family: var(--font-main) !important;
+}
+
 .App {
   min-height: 100vh;
   background: var(--mia-background);

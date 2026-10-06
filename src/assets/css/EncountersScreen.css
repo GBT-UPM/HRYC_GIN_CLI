@@ -1,0 +1,121 @@
+/* Tres niveles visibles: encuentro, caso y evaluación. */
+.clinical-table .encounter-row--expanded > .MuiTableCell-root {
+  background: #f0f5f8 !important;
+  border-bottom: 0;
+}
+
+.clinical-table .encounter-row--expanded > .MuiTableCell-root:first-child {
+  border-left: 3px solid #2f658f;
+}
+
+.clinical-table .encounter-detail-row > .MuiTableCell-root {
+  padding: 0 !important;
+  background: #f7f9fa;
+}
+
+.encounter-detail {
+  padding: 18px 24px 22px 42px;
+  border-bottom: 1px solid var(--color-outline-variant);
+}
+
+.encounter-detail-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.encounter-detail-heading .MuiTypography-subtitle2 {
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.encounter-detail-heading .MuiTypography-body2 {
+  color: var(--color-on-surface-variant);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.encounter-case {
+  overflow: hidden;
+  border: 1px solid var(--color-outline-variant);
+  border-left: 3px solid #9db4c6;
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.encounter-case-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--color-outline-variant);
+  background: #f9fbfc;
+}
+
+.encounter-case-index {
+  display: block;
+  color: var(--color-on-surface-variant);
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  line-height: 1.2;
+}
+
+.encounter-case-id {
+  margin-top: 3px !important;
+  font-size: 0.83rem !important;
+  font-weight: 700 !important;
+}
+
+.encounter-case-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.encounter-case-context .MuiTypography-root {
+  color: var(--color-on-surface-variant);
+  font-size: 0.77rem;
+}
+
+.encounter-case-context .MuiTypography-root:first-child {
+  color: var(--color-on-surface);
+  font-weight: 650;
+}
+
+.encounter-evaluations {
+  overflow-x: auto;
+}
+
+.encounter-evaluations .MuiTable-root {
+  min-width: 710px;
+}
+
+.clinical-table .encounter-evaluations .MuiTableHead-root .MuiTableCell-root {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--color-outline-variant) !important;
+  background: #fff !important;
+  color: var(--color-on-surface-variant) !important;
+  font-size: 0.71rem;
+  font-weight: 700;
+}
+
+.clinical-table .encounter-evaluations .MuiTableBody-root .MuiTableCell-root {
+  padding: 9px 16px;
+  font-size: 0.78rem;
+  vertical-align: top;
+}
+
+@media (max-width: 768px) {
+  .encounter-detail {
+    padding: 14px 12px 18px;
+  }
+
+  .encounter-detail-heading {
+    flex-wrap: wrap;
+  }
+}

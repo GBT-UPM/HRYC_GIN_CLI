@@ -78,6 +78,20 @@ describe('ecoScore', () => {
     expect(result.probability).toBeNull();
   });
 
+  it('does not calculate ECO-SCORE for a solid mass even when MA_PROB is Sí', () => {
+    const result = calculateEcoScoreFromQuestionnaireResponse(qr({
+      PAT_MA: 'Sí',
+      MA_TIPO: 'Sólida',
+      MA_PROB: 'Sí',
+      MA_SOL_CONTORNO: 'Regular',
+      MA_SA: 'No',
+    }));
+
+    expect(result.status).toBe(ECO_SCORE_STATUS.NOT_APPLICABLE);
+    expect(result.probability).toBeNull();
+    expect(result.missingVariables).toEqual([]);
+  });
+
   it('returns CALCULATED for a questionnaire response with complete variables', () => {
     const result = calculateEcoScoreFromQuestionnaireResponse(qr({
       PAT_MA: 'Sí',

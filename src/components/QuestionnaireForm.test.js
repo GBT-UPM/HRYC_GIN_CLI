@@ -28,7 +28,7 @@ const buildChoiceItem = ({ linkId, text, required = false, answerOptions, ...res
   ...rest,
 });
 
-const buildVisibilityQuestionnaire = ({ enableBehavior, includeMassProbability = false } = {}) => {
+const buildVisibilityQuestionnaire = ({ enableBehavior, includeMassProbability = false, legacyProbabilityCondition = false } = {}) => {
   const yesNoOptions = [
     { code: "yes", display: "Sí" },
     { code: "no", display: "No" },
@@ -66,7 +66,11 @@ const buildVisibilityQuestionnaire = ({ enableBehavior, includeMassProbability =
           required: true,
           answerOptions: yesNoOptions,
           enableBehavior: "any",
-          enableWhen: [
+          enableWhen: legacyProbabilityCondition ? [{
+            question: "PAT_MA",
+            operator: "=",
+            answerCoding: { code: "yes" },
+          }] : [
             {
               question: "MA_TIPO",
               operator: "=",
@@ -361,6 +365,39 @@ describe("QuestionnaireForm visibility rules", () => {
     expect(screen.getByText("Centro asignado: HURYC")).toBeInTheDocument();
   });
 
+  it("shows a center absent from the packaged questionnaire options", async () => {
+    const dropdownQuestionnaire = {
+      title: "Registro ginecológico",
+      item: [{
+        linkId: "HOSPITAL_REF",
+        text: "Hospital",
+        type: "choice",
+        required: true,
+        answerOption: [{ valueCoding: { display: "Hospital Universitario Ramón y Cajal" } }],
+        extension: [{
+          url: "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+          valueCodeableConcept: { coding: [{ code: "drop-down" }] },
+        }],
+      }],
+    };
+
+    render(
+      <QuestionnaireForm
+        questionnaire={dropdownQuestionnaire}
+        event={jest.fn()}
+        eventContinue={jest.fn()}
+        transientNhc="123456"
+        onTransientNhcChange={jest.fn()}
+        authorizedCenters={["CENTRO_03"]}
+      />
+    );
+
+    const centerSelect = screen.getByRole("option", { name: "CENTRO_03" }).closest("select");
+    await waitFor(() => expect(centerSelect).toHaveValue("CENTRO_03"));
+    expect(centerSelect).toBeDisabled();
+    expect(screen.getByRole("option", { name: "CENTRO_03" })).toBeInTheDocument();
+  });
+
   it("keeps all-of semantics when enableBehavior is omitted", async () => {
     renderForm(buildVisibilityQuestionnaire());
 
@@ -444,6 +481,33 @@ describe("QuestionnaireForm visibility rules", () => {
     await answerRadioQuestion("MA_TIPO", "Sólida");
 
     expect(screen.queryByText("Probabilidad")).not.toBeInTheDocument();
+    expect(screen.getByText(/El ECO-SCORE no se calcula para masas sólidas/)).toBeInTheDocument();
+  });
+
+  it("hides and clears MA_PROB from an older Questionnaire when the lesion changes to solid", async () => {
+    const onQuestionnaireInteraction = jest.fn();
+    render(
+      <QuestionnaireForm
+        questionnaire={buildVisibilityQuestionnaire({ includeMassProbability: true, legacyProbabilityCondition: true })}
+        event={jest.fn()}
+        eventContinue={jest.fn()}
+        transientNhc="123456"
+        onTransientNhcChange={jest.fn()}
+        onQuestionnaireInteraction={onQuestionnaireInteraction}
+      />
+    );
+
+    await answerRadioQuestion("PAT_MA", "Sí");
+    await answerRadioQuestion("MA_TIPO", "Quística");
+    await answerRadioQuestion("MA_PROB", "Sí");
+    await answerRadioQuestion("MA_TIPO", "Sólida");
+
+    expect(screen.queryByText("Probabilidad")).not.toBeInTheDocument();
+    expect(screen.getByText(/El ECO-SCORE no se calcula para masas sólidas/)).toBeInTheDocument();
+
+    expect(onQuestionnaireInteraction).toHaveBeenLastCalledWith(expect.not.arrayContaining([
+      expect.objectContaining({ linkId: "MA_PROB" }),
+    ]), expect.objectContaining({ linkId: "MA_TIPO" }));
   });
 
   it("does not block validation when MA_PROB is hidden", async () => {

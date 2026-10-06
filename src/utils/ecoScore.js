@@ -9,6 +9,7 @@ export const ECO_SCORE_STATUS = {
 
 const LINK_IDS = {
   HAS_MASS: 'PAT_MA',
+  LESION_TYPE: 'MA_TIPO',
   CONTOUR: 'MA_Q_CONTORNO',
   SHADOW: 'MA_SA',
   SOLID_AREA_PRESENT: 'MA_Q_AS',
@@ -63,6 +64,11 @@ export const getQuestionnaireAnswerValue = (questionnaireResponse, linkId) => {
   return answerValue(item?.answer?.[0]);
 };
 
+export const isSolidAdnexalMass = (questionnaireResponse) => {
+  const type = normalizeEcoScoreText(getQuestionnaireAnswerValue(questionnaireResponse, LINK_IDS.LESION_TYPE));
+  return type === 'solida' || type === '0';
+};
+
 const normalizeContour = (value) => {
   const normalized = normalizeEcoScoreText(value);
   if (normalized.includes('irregular')) return 'irregular';
@@ -82,6 +88,7 @@ const normalizeVascularizationScore = (value) => {
 
 export const extractEcoScoreInputs = (questionnaireResponse) => ({
   hasMass: getQuestionnaireAnswerValue(questionnaireResponse, LINK_IDS.HAS_MASS),
+  lesionType: getQuestionnaireAnswerValue(questionnaireResponse, LINK_IDS.LESION_TYPE),
   contour: getQuestionnaireAnswerValue(questionnaireResponse, LINK_IDS.CONTOUR),
   shadow: getQuestionnaireAnswerValue(questionnaireResponse, LINK_IDS.SHADOW),
   solidAreaPresent: getQuestionnaireAnswerValue(questionnaireResponse, LINK_IDS.SOLID_AREA_PRESENT),
@@ -115,6 +122,17 @@ export const calculateEcoScore = (inputs = {}) => {
       score: null,
       text_score: '',
       missingVariables: [LINK_IDS.HAS_MASS],
+    };
+  }
+
+  // ECO-SCORE V1 is defined for cystic and solid-cystic masses, not solid masses.
+  if (normalizeEcoScoreText(inputs.lesionType) === 'solida' || normalizeEcoScoreText(inputs.lesionType) === '0') {
+    return {
+      status: ECO_SCORE_STATUS.NOT_APPLICABLE,
+      probability: null,
+      score: null,
+      text_score: '',
+      missingVariables: [],
     };
   }
 

@@ -78,7 +78,7 @@ export const generateClinicalReportPdf = ({
   const centerBrand = CENTER_BRANDS[resolvedCode] || {
     logo: null,
     shortName: resolvedCode || '—',
-    fullName: 'Centro no especificado',
+    fullName: resolvedCode ? `Centro ${resolvedCode}` : 'Centro no especificado',
     serviceName: 'Servicio de Ginecología y Obstetricia',
   };
 

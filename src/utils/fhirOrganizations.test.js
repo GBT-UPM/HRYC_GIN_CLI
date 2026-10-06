@@ -23,6 +23,15 @@ describe("FHIR organization helpers", () => {
     });
   });
 
+  it("uses a center-specific FHIR reference for a newly configured center", () => {
+    expect(getOrganizationForCenter("CENTRO_03")).toEqual({
+      reference: "Organization/centro_03",
+      display: "Centro CENTRO_03",
+    });
+    expect(getLocationForCenter("CENTRO_03", "EMERGENCY").reference)
+      .toBe("Location/centro_03-emergency-department");
+  });
+
   it("maps known center locations and keeps a generic fallback", () => {
     expect(getLocationForCenter("HURYC").reference).toBe("Location/huryc-gyn-unit");
     expect(getLocationForCenter("unknown").reference).toBe("Location/gyn-unit");

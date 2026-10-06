@@ -25,10 +25,10 @@ describe("TopNavigation", () => {
     expect(screen.getByText("Citas / encuentros")).toBeInTheDocument();
   });
 
-  it("shows pending participants and exports for site coordinators", () => {
+  it("shows active study views without the legacy pending-code workflow", () => {
     renderNavigation(["ROLE_SITE_COORDINATOR"]);
 
-    expect(screen.getByText("Pendientes")).toBeInTheDocument();
+    expect(screen.queryByText("Pendientes")).not.toBeInTheDocument();
     expect(screen.getByText("Exportaciones")).toBeInTheDocument();
     expect(screen.getByText("Trazabilidad")).toBeInTheDocument();
   });

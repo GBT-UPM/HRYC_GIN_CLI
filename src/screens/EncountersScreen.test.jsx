@@ -230,6 +230,43 @@ describe('EncountersScreen', () => {
     expect(screen.getAllByText('Izquierdo · Ovario').length).toBeGreaterThanOrEqual(2);
   });
 
+  it('keeps two evaluations of one case under the same case heading', async () => {
+    const baseRow = {
+      caseId: 30,
+      encounterId: 'enc-same-case',
+      caseDisplayId: 'HURYC-C000030',
+      centerId: 'HURYC',
+      codeStatus: 'CODE_ASSIGNED',
+      caseStatus: 'OPEN',
+      evaluationStatus: 'COMPLETED',
+      studyPatientCode: 'HURYC-0030',
+      lateralityDisplay: 'Derecho',
+      anatomicalStructureDisplay: 'Ovario',
+      careSettingDisplay: 'Urgencias',
+      hasAdnexalMass: true,
+      createdAt: '2026-06-05T10:00:00',
+    };
+    ApiService.mockResolvedValueOnce({
+      status: 200,
+      json: async () => ([
+        { ...baseRow, evaluationId: 31, evaluationDisplayId: 'HURYC-C000030-E000031', evaluationType: 'PRIMARY', primaryEvaluation: true },
+        { ...baseRow, evaluationId: 32, evaluationDisplayId: 'HURYC-C000030-E000032', evaluationType: 'SECONDARY', primaryEvaluation: false },
+      ]),
+    });
+
+    render(<EncountersScreen />);
+
+    expect(await screen.findByText('1 masa detectada; 1 evaluación secundaria')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver' }));
+
+    expect(screen.getByText('1 caso · 2 evaluaciones')).toBeInTheDocument();
+    expect(screen.getByText('Caso 1')).toBeInTheDocument();
+    expect(screen.queryByText('Caso 2')).not.toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Evaluaciones del caso HURYC-C000030' })).toBeInTheDocument();
+    expect(screen.getByText('HURYC-C000030-E000031')).toBeInTheDocument();
+    expect(screen.getByText('HURYC-C000030-E000032')).toBeInTheDocument();
+  });
+
   it('records REPORT_GENERATED from the encounters screen without sensitive payloads', async () => {
     ApiService
       .mockResolvedValueOnce({

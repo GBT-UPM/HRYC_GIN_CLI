@@ -130,7 +130,7 @@ describe('generateClinicalReportPdf', () => {
     );
   });
 
-  it('uses safe text fallback and no logo for an unknown center', () => {
+  it('shows a center code without borrowing another hospital logo', () => {
     generateClinicalReportPdf({
       responses:          [makeQR('UNKNOWN_CENTER')],
       reports:            [makeReport()],
@@ -139,7 +139,7 @@ describe('generateClinicalReportPdf', () => {
       centerIdHint:       'UNKNOWN_CENTER',
     });
 
-    expect(pdfText()).toContain('Centro no especificado');
+    expect(pdfText()).toContain('Centro UNKNOWN_CENTER');
     expect(pdfText()).not.toContain('Rio Hortega');
     expect(pdfText()).not.toContain('Río Hortega');
     expect(mockDoc.addImage).not.toHaveBeenCalled();

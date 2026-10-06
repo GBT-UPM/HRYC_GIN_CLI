@@ -322,6 +322,23 @@ describe("ResponsesProbability automatic study code flow", () => {
     expect(screen.getByRole("textbox")).toBeInTheDocument();
   });
 
+  it("explains that ECO-SCORE does not apply to a solid mass while retaining the mass review", async () => {
+    renderComponent({
+      responses: [{
+        ...questionnaireResponse,
+        item: [
+          ...questionnaireResponse.item,
+          { linkId: "MA_TIPO", answer: [{ valueCoding: { code: "0", display: "Sólida" } }] },
+          { linkId: "MA_PROB", answer: [{ valueCoding: { code: "yes", display: "Sí" } }] },
+        ],
+      }],
+    });
+
+    expect(await screen.findAllByText("Masa anexial #1")).not.toHaveLength(0);
+    expect(screen.getByText("ECO-SCORE no aplicable")).toBeInTheDocument();
+    expect(screen.queryByText("Probabilidad de malignidad")).not.toBeInTheDocument();
+  });
+
   it("saves with automatic study code assignment and keeps manual code out of payloads", async () => {
     setupApi();
     const event = jest.fn();

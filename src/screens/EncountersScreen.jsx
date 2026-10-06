@@ -11,6 +11,7 @@ import { Close, KeyboardArrowDown, KeyboardArrowUp } from '@mui/icons-material';
 import { v4 as uuidv4 } from 'uuid';
 import StudyPageHeader from '../components/StudyPageHeader';
 import '../assets/css/ResponsesScreen.css';
+import '../assets/css/EncountersScreen.css';
 import { useKeycloak } from '@react-keycloak/web';
 import ApiService from '../services/ApiService';
 import { generateClinicalReportPdf } from '../utils/pdfReport';
@@ -123,21 +124,6 @@ const PRIMARY_BTN_SX = {
     '&:hover': { backgroundColor: '#173050' },
 };
 
-const DETAIL_TH_SX = {
-    color: '#52616B',
-    fontWeight: 800,
-    fontSize: '0.72rem',
-    borderBottom: '1px solid #D9E2EC',
-    py: 1,
-};
-
-const DETAIL_STATUS_CHIP_SX = {
-    height: 22,
-    fontSize: '0.68rem',
-    fontWeight: 700,
-    maxWidth: '100%',
-};
-
 const tipoMap = {
     'sólida': 'sólido',
     'quística': 'quístico',
@@ -243,12 +229,27 @@ const EncountersScreen = () => {
         if (secondaryCount > 0) parts.push(pluralize(secondaryCount, 'secundaria', 'secundarias'));
         return parts.length > 0 ? parts.join(' + ') : pluralize(items.length, 'evaluación', 'evaluaciones');
     };
-    const getEncounterSummary = (items) => {
-        const massCount = items.filter(hasAdnexalMass).length;
+    const buildCaseGroups = (items) => {
+        const cases = new Map();
+        items.forEach((item, index) => {
+            const key = item.caseId != null
+                ? `case-${item.caseId}`
+                : item.caseDisplayId || `legacy-${item.evaluationId || index}`;
+            cases.set(key, [...(cases.get(key) || []), item]);
+        });
+        return Array.from(cases.entries()).map(([key, evaluations]) => ({
+            key,
+            evaluations,
+            representative: evaluations.find((item) => item.primaryEvaluation || item.evaluationType === 'PRIMARY') || evaluations[0],
+        }));
+    };
+    const getEncounterSummary = (caseGroups) => {
+        const massCount = caseGroups.filter((caseGroup) => caseGroup.evaluations.some(hasAdnexalMass)).length;
         if (massCount === 0) {
             return 'Sin masa anexial';
         }
-        const secondaryCount = items.filter((item) => item.evaluationType === 'SECONDARY').length;
+        const secondaryCount = caseGroups.flatMap((caseGroup) => caseGroup.evaluations)
+            .filter((item) => item.evaluationType === 'SECONDARY').length;
         const massSummary = pluralize(massCount, 'masa detectada', 'masas detectadas');
         return secondaryCount > 0
             ? `${massSummary}; ${pluralize(secondaryCount, 'evaluación secundaria', 'evaluaciones secundarias')}`
@@ -262,8 +263,9 @@ const EncountersScreen = () => {
         });
         return Array.from(groups.entries()).map(([key, items]) => {
             const first = items[0] || {};
+            const caseGroups = buildCaseGroups(items);
             const hasAnyMass = items.some(hasAdnexalMass);
-            const lesionLabels = Array.from(new Set(items.map(getLesionLabel)));
+            const lesionLabels = Array.from(new Set(caseGroups.map((caseGroup) => getLesionLabel(caseGroup.representative))));
             const riskLabels = items
                 .map((item) => formatRiskDisplay(item))
                 .filter((risk) => risk !== null && risk !== undefined && String(risk).trim() !== '');
@@ -279,7 +281,7 @@ const EncountersScreen = () => {
                 codeStatusLabel: getCodeStatus(first),
                 caseStatusLabel: Array.from(new Set(items.map(getCaseStatus).filter(Boolean))).join(', '),
                 evaluationStatusLabel: Array.from(new Set(items.map(getEvaluationStatus).filter(Boolean))).join(', '),
-                findingsSummary: getEncounterSummary(items),
+                findingsSummary: getEncounterSummary(caseGroups),
                 lesionLabels,
                 lesionSummary: lesionLabels.length > 3 ? `${lesionLabels.slice(0, 3).join('; ')} +${lesionLabels.length - 3}` : lesionLabels.join('; '),
                 evaluationsSummary: getEvaluationsSummary(items),
@@ -287,6 +289,7 @@ const EncountersScreen = () => {
                     ? riskLabels.join(', ')
                     : hasAnyMass ? 'No calculado' : 'No procede',
                 lesions: items,
+                cases: caseGroups,
             };
         });
     };
@@ -808,11 +811,12 @@ const EncountersScreen = () => {
                                 const isExpanded = expandedEncounterId === encounter.key;
                                 return (
                                     <React.Fragment key={encounter.key}>
-                                        <TableRow hover sx={{ '&:hover': { backgroundColor: '#F5F8FC' } }}>
+                                        <TableRow hover className={`encounter-row${isExpanded ? ' encounter-row--expanded' : ''}`}>
                                             <TableCell sx={{ width: 42, py: 1, px: 1 }}>
                                                 <IconButton
                                                     size="small"
                                                     aria-label={isExpanded ? 'Contraer detalle del encuentro' : 'Expandir detalle del encuentro'}
+                                                    aria-expanded={isExpanded}
                                                     onClick={() => setExpandedEncounterId(isExpanded ? null : encounter.key)}
                                                 >
                                                     {isExpanded ? <KeyboardArrowUp fontSize="small" /> : <KeyboardArrowDown fontSize="small" />}
@@ -910,58 +914,73 @@ const EncountersScreen = () => {
                                                 </Stack>
                                             </TableCell>
                                         </TableRow>
-                                        <TableRow>
+                                        <TableRow className="encounter-detail-row">
                                             <TableCell colSpan={10} sx={{ py: 0, borderBottom: isExpanded ? '1px solid #D9E2EC' : 0 }}>
                                                 <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                                                    <Box sx={{ p: 2, backgroundColor: '#F8FAFC' }}>
-                                                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1F2933', mb: 1.5 }}>
-                                                            Casos y evaluaciones del encuentro
-                                                        </Typography>
-                                                        <Table size="small">
-                                                            <TableHead>
-                                                                <TableRow>
-                                                                    <TableCell sx={DETAIL_TH_SX}>Caso</TableCell>
-                                                                    <TableCell sx={DETAIL_TH_SX}>Evaluación</TableCell>
-                                                                    <TableCell sx={DETAIL_TH_SX}>Tipo</TableCell>
-                                                                    <TableCell sx={DETAIL_TH_SX}>Lesión</TableCell>
-                                                                    <TableCell sx={DETAIL_TH_SX}>Ámbito</TableCell>
-                                                                    <TableCell sx={DETAIL_TH_SX}>Ecografista</TableCell>
-                                                                    <TableCell sx={DETAIL_TH_SX}>Estados</TableCell>
-                                                                    <TableCell sx={DETAIL_TH_SX}>Riesgo</TableCell>
-                                                                    <TableCell sx={DETAIL_TH_SX}>Histología</TableCell>
-                                                                </TableRow>
-                                                            </TableHead>
-                                                            <TableBody>
-                                                                {encounter.lesions.map((item) => {
-                                                                    const typeLabel = getEvaluationType(item);
-                                                                    const histologyLabel = !hasAdnexalMass(item)
-                                                                        ? 'No aplicable'
-                                                                        : item.evaluationType === 'SECONDARY'
-                                                                            ? 'Compartida con caso'
-                                                                            : item.histology || item.histologyStatus || 'Pendiente';
-                                                                    const riskDisplay = formatRiskDisplay(item);
-                                                                    return (
-                                                                        <TableRow key={item.evaluationId || item.caseId}>
-                                                                            <TableCell>{item.caseDisplayId || '—'}</TableCell>
-                                                                            <TableCell>{item.evaluationDisplayId || '—'}</TableCell>
-                                                                            <TableCell>{typeLabel}</TableCell>
-                                                                            <TableCell>{getLesionLabel(item)}</TableCell>
-                                                                            <TableCell>{getCareSetting(item)}</TableCell>
-                                                                            <TableCell>{item.observerInitials || '—'}</TableCell>
-                                                                            <TableCell>
-                                                                                <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
-                                                                                    <Chip label={getCodeStatus(item)} size="small" variant="outlined" sx={{ ...DETAIL_STATUS_CHIP_SX, ...getStatusChipSx(getCodeStatus(item)) }} />
-                                                                                    <Chip label={`Caso: ${getCaseStatus(item)}`} size="small" variant="outlined" sx={{ ...DETAIL_STATUS_CHIP_SX, ...getStatusChipSx(getCaseStatus(item)) }} />
-                                                                                    <Chip label={`Evaluación: ${getEvaluationStatus(item)}`} size="small" variant="outlined" sx={{ ...DETAIL_STATUS_CHIP_SX, ...getStatusChipSx(getEvaluationStatus(item)) }} />
-                                                                                </Stack>
-                                                                            </TableCell>
-                                                                            <TableCell>{riskDisplay}</TableCell>
-                                                                            <TableCell>{histologyLabel}</TableCell>
-                                                                        </TableRow>
-                                                                    );
-                                                                })}
-                                                            </TableBody>
-                                                        </Table>
+                                                    <Box className="encounter-detail">
+                                                        <Box className="encounter-detail-heading">
+                                                            <Typography component="h3" variant="subtitle2">Casos y evaluaciones del encuentro</Typography>
+                                                            <Typography variant="body2">
+                                                                {pluralize(encounter.cases.length, 'caso', 'casos')} · {pluralize(encounter.lesions.length, 'evaluación', 'evaluaciones')}
+                                                            </Typography>
+                                                        </Box>
+                                                        <Stack spacing={1.5}>
+                                                            {encounter.cases.map((caseGroup, index) => {
+                                                                const caseItem = caseGroup.representative;
+                                                                return (
+                                                                    <Box className="encounter-case" key={caseGroup.key}>
+                                                                        <Box className="encounter-case-heading">
+                                                                            <Box>
+                                                                                <Typography className="encounter-case-index" variant="caption">Caso {index + 1}</Typography>
+                                                                                <Typography component="h4" variant="subtitle2" className="clinical-identifier encounter-case-id">
+                                                                                    {caseItem.caseDisplayId || 'Caso sin identificador'}
+                                                                                </Typography>
+                                                                            </Box>
+                                                                            <Box className="encounter-case-context">
+                                                                                <Typography variant="body2">{getLesionLabel(caseItem)}</Typography>
+                                                                                <Typography variant="body2">{`Caso: ${getCaseStatus(caseItem)}`}</Typography>
+                                                                                <Typography variant="body2">{pluralize(caseGroup.evaluations.length, 'evaluación', 'evaluaciones')}</Typography>
+                                                                            </Box>
+                                                                        </Box>
+                                                                        <TableContainer className="encounter-evaluations">
+                                                                            <Table size="small" aria-label={`Evaluaciones del caso ${caseItem.caseDisplayId || index + 1}`}>
+                                                                                <TableHead>
+                                                                                    <TableRow>
+                                                                                        <TableCell>Evaluación</TableCell>
+                                                                                        <TableCell>Tipo</TableCell>
+                                                                                        <TableCell>Ámbito</TableCell>
+                                                                                        <TableCell>Ecografista</TableCell>
+                                                                                        <TableCell>Estado</TableCell>
+                                                                                        <TableCell>Riesgo</TableCell>
+                                                                                        <TableCell>Histología</TableCell>
+                                                                                    </TableRow>
+                                                                                </TableHead>
+                                                                                <TableBody>
+                                                                                    {caseGroup.evaluations.map((item) => {
+                                                                                        const histologyLabel = !hasAdnexalMass(item)
+                                                                                            ? 'No aplicable'
+                                                                                            : item.evaluationType === 'SECONDARY'
+                                                                                                ? 'Compartida con caso'
+                                                                                                : item.histology || item.histologyStatus || 'Pendiente';
+                                                                                        return (
+                                                                                            <TableRow key={item.evaluationId || item.questionnaireResponseFhirId || `${caseGroup.key}-legacy`}>
+                                                                                                <TableCell className="clinical-identifier">{item.evaluationDisplayId || '—'}</TableCell>
+                                                                                                <TableCell>{getEvaluationType(item)}</TableCell>
+                                                                                                <TableCell>{getCareSetting(item)}</TableCell>
+                                                                                                <TableCell>{item.observerInitials || '—'}</TableCell>
+                                                                                                <TableCell>{getEvaluationStatus(item)}</TableCell>
+                                                                                                <TableCell>{formatRiskDisplay(item)}</TableCell>
+                                                                                                <TableCell>{histologyLabel}</TableCell>
+                                                                                            </TableRow>
+                                                                                        );
+                                                                                    })}
+                                                                                </TableBody>
+                                                                            </Table>
+                                                                        </TableContainer>
+                                                                    </Box>
+                                                                );
+                                                            })}
+                                                        </Stack>
                                                     </Box>
                                                 </Collapse>
                                             </TableCell>

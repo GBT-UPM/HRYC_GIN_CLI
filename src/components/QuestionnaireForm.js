@@ -4,6 +4,7 @@ import '../assets/css/QuestionnaireForm.css';
 import Modal from "./Modal";
 import { CARE_SETTING_OPTIONS, normalizeCareSetting } from "../utils/careSetting";
 import { mapCenterToCode } from "../utils/caseMetadata";
+import { isSolidAdnexalMass } from "../utils/ecoScore";
 
 export const HIDDEN_LINK_IDS = new Set(["PAT_CODIGO", "PAT_NHC", "PAT_NOMBRE"]);
 export const isHiddenQuestionnaireItem = (linkId) => HIDDEN_LINK_IDS.has(linkId);
@@ -76,6 +77,7 @@ const QuestionnaireForm = ({
   const [disabledFields, setDisabledFields] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const sessionCenter = authorizedCenters.length === 1 ? String(authorizedCenters[0]).trim().toUpperCase() : "";
+  const solidMassSelected = isSolidAdnexalMass({ item: answers });
 
   // A single-centre account cannot accidentally register a case under another
   // hospital. The server remains the authority, but the form reflects the same
@@ -120,6 +122,7 @@ function getEnabledLinkIds(items, currentAnswers) {
   let enabledIds = [];
 
   for (const item of items) {
+    if (item.linkId === "MA_PROB" && isSolidAdnexalMass({ item: currentAnswers })) continue;
     // Verificamos si este ítem está habilitado con sus condiciones
     const thisItemEnabled = checkEnableWhen(
       item.enableWhen,
@@ -145,65 +148,51 @@ function getEnabledLinkIds(items, currentAnswers) {
 
   const handleInputChange = (questionText,linkId, type, value,display) => {
     onDirtyChange(true);
-    let nextAnswersSnapshot = answers;
-    setAnswers((prevAnswers) => {
-      const existingAnswerIndex = prevAnswers.findIndex(
+      const existingAnswerIndex = answers.findIndex(
         (answer) => answer.linkId === linkId
       );
-  
+      let updatedAnswers = [...answers];
+
       if (value === null || value === "") {
         if (existingAnswerIndex >= 0) {
-          const updatedAnswers = [...prevAnswers];
           updatedAnswers.splice(existingAnswerIndex, 1);
-          return updatedAnswers;
         }
-        return prevAnswers;
-      }
-      const newAnswer = { questionText,linkId, answer: [] };
-
-      switch (type) {
-        case "choice":
-        //newAnswer.answer = [{ valueCoding: { code: value, display: display } }];
-         newAnswer.answer = value;
-          break;
-        case "date":
-          newAnswer.answer = [{ valueDate: value }];
-          break;
-        case "decimal":
-          newAnswer.answer = [{ valueDecimal: parseFloat(value) }];
-          break;
-        case "integer":
-          newAnswer.answer = [{ valueInteger: parseInt(value, 10) }];
-          break;
-        case "string":
-        case "text":
-          newAnswer.answer = [{ valueString: value }];
-          break;
-        default:
-          return prevAnswers;
-      }
-
-      let updatedAnswers = [];
-      if (existingAnswerIndex >= 0) {
-        updatedAnswers = [...prevAnswers];
-        updatedAnswers[existingAnswerIndex] = newAnswer;
       } else {
-        updatedAnswers = [...prevAnswers, newAnswer];
+        const newAnswer = { questionText,linkId, answer: [] };
+        switch (type) {
+          case "choice":
+            newAnswer.answer = value;
+            break;
+          case "date":
+            newAnswer.answer = [{ valueDate: value }];
+            break;
+          case "decimal":
+            newAnswer.answer = [{ valueDecimal: parseFloat(value) }];
+            break;
+          case "integer":
+            newAnswer.answer = [{ valueInteger: parseInt(value, 10) }];
+            break;
+          case "string":
+          case "text":
+            newAnswer.answer = [{ valueString: value }];
+            break;
+          default:
+            return;
+        }
+        if (existingAnswerIndex >= 0) {
+          updatedAnswers[existingAnswerIndex] = newAnswer;
+        } else {
+          updatedAnswers.push(newAnswer);
+        }
       }
 
-      // --- Nuevo paso para limpiar respuestas de ítems no habilitados ---
+      // Limpiar también las respuestas de ítems que acaban de quedar ocultos.
       const enabledLinkIds = getEnabledLinkIds(questionnaire.item, updatedAnswers);
       const cleanedAnswers = updatedAnswers.filter((ans) =>
         enabledLinkIds.includes(ans.linkId) && !HIDDEN_LINK_IDS.has(ans.linkId)
       );
-
-      nextAnswersSnapshot = cleanedAnswers;
-
-      return cleanedAnswers;
-   
-    });
-
-    onQuestionnaireInteraction(nextAnswersSnapshot, {
+      setAnswers(cleanedAnswers);
+      onQuestionnaireInteraction(cleanedAnswers, {
       linkId,
       questionText,
       type,
@@ -282,8 +271,15 @@ const getAnswerDisplayValue = (linkId) => {
    * Se llama en tiempo de render para saber si mostrar o no el ítem.
    */
 const isItemEnabled = (item) => {
+  if (item.linkId === "MA_PROB" && solidMassSelected) return false;
   return checkEnableWhen(item.enableWhen, answers, item.enableBehavior);
 };
+
+const renderSolidMassScoreNotice = (linkId) => linkId === "MA_TIPO" && solidMassSelected ? (
+  <div className="questionnaire-help-box" role="status">
+    <small>El ECO-SCORE no se calcula para masas sólidas. Puede continuar y guardar la evaluación ecográfica sin una probabilidad de malignidad calculada.</small>
+  </div>
+) : null;
 
 const getItemClassName = (item, extraClassName = "") => {
   const itemClasses = ["questionnaire-item"];
@@ -329,13 +325,16 @@ const renderInput = (item) => {
             return { value: option.valueString, label: option.valueString };
           } else if (option.valueCoding) {
             return {
-              value: option.valueCoding.code,
+              value: option.valueCoding.code || (item.linkId === "HOSPITAL_REF" ? mapCenterToCode(option.valueCoding.display) : ""),
               label: option.valueCoding.display,
             };
           }
           return null;
         })
         .filter(Boolean);
+      if (item.linkId === "HOSPITAL_REF" && sessionCenter && !options.some((option) => option.value === sessionCenter)) {
+        options.push({ value: sessionCenter, label: sessionCenter });
+      }
 
       // 1) Dropdown
       if (isDropDown) {
@@ -734,6 +733,7 @@ const renderInput = (item) => {
                     chipText: child.linkId === "HOSPITAL_REF" && sessionCenter ? `Centro asignado: ${sessionCenter}` : "",
                   })}
                   {renderInput(child)}
+                  {renderSolidMassScoreNotice(child.linkId)}
                 </div>
               );
             })}
@@ -889,6 +889,7 @@ const renderInput = (item) => {
                   chipText: item.linkId === "HOSPITAL_REF" && sessionCenter ? `Centro asignado: ${sessionCenter}` : "",
                 })}
               {renderInput(item)}
+              {renderSolidMassScoreNotice(item.linkId)}
               </div>
             );
           }

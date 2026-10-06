@@ -1,65 +1,64 @@
-/* Estilos generales */
-.container {
-    margin-top: 40px;
-    max-width: 900px;
+/* Casos y evaluaciones: un registro denso y sereno, sin estilos globales. */
+.cases-workflow-note {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 16px;
+  padding: 9px 14px;
+  border-left: 2px solid var(--color-outline);
+  background: var(--color-surface-container-low);
+  color: var(--color-on-surface-variant);
 }
 
-/* Título */
-.title {
-    text-align: center;
-    font-weight: bold;
-    color: #1976d2;
-    margin-bottom: 30px;
+.cases-workflow-note .MuiTypography-root {
+  font-size: 0.8rem;
+  line-height: 1.45;
 }
 
-/* Campo de búsqueda */
-.search-box {
-    margin-bottom: 20px;
+.cases-workflow-label {
+  color: var(--color-primary);
+  font-weight: 700 !important;
 }
 
-/* Tabla */
-.table-container {
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+.cases-search-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 
-.table-header {
-    background-color: #ed6c02;
-    color: white !important;
-    font-weight: bold;
-}
-.table-header2 {
-    background-color: #2e7d32;
-    ;
-    color: white !important;
-    font-weight: bold;
-}
-.table-header  span{
-    color: white !important;
-}
-.table-header2  span{
-    color: white !important;
-}
-/* Efecto de hover en filas */
-.table-row:hover {
-    background-color: #e3f2fd;
-    cursor: pointer;
+.cases-search-heading .MuiTypography-subtitle2 {
+  color: var(--color-primary);
+  font-size: 0.84rem;
+  font-weight: 700;
 }
 
-/* Modal */
-.modal-box {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 500px;
-    background-color: white;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-    padding: 30px;
-    border-radius: 10px;
+.cases-search-heading .MuiTypography-body2 {
+  color: var(--color-on-surface-variant);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
 }
-.no-bullets {
-    list-style-type: none;  /* Elimina los puntos de la lista */
-    padding: 0;  /* Elimina el relleno por defecto */
-    margin: 0;  /* Elimina el margen por defecto */
+
+.cases-status-line {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  line-height: 1.35;
+}
+
+.cases-status-name,
+.cases-status-value {
+  font-size: 0.73rem !important;
+  line-height: 1.35 !important;
+}
+
+.cases-status-name {
+  color: var(--color-on-surface-variant);
+}
+
+.cases-status-value {
+  font-weight: 650 !important;
 }
