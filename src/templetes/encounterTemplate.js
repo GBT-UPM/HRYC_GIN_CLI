@@ -12,7 +12,6 @@ export const EncounterTemplate = {
                 {
                     system: "http://snomed.info/sct",
                     code: "83607001",
-                    display: "Examen ginecológico (procedimiento) ",
                 },
             ],
             text: "Examen ginecológico",
@@ -24,17 +23,9 @@ export const EncounterTemplate = {
                 {
                     system: "http://snomed.info/sct",
                     code: "74601000119101",
-                    display: "Examen ginecológico de rutina realizado",
                 },
             ],
             text: "Examen ginecológico de rutina realizado",
         },
-    ],
-    location: [
-        {
-            location: {
-                reference: "Location/gyn-unit"
-            }
-        }
     ]
 };

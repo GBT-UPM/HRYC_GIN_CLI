@@ -1,113 +1,60 @@
 import { renderHook } from "@testing-library/react";
 import { useEncounterTemplate } from "./useEncounterTemplate";
 
+const generate = (overrides = {}) => {
+  const { result } = renderHook(() => useEncounterTemplate());
+  return result.current.generateEncounter({
+    encId: "enc-1",
+    patientId: "pat-1",
+    period: { start: "2026-06-01T10:00:00.000Z", end: "2026-06-01T10:15:00.000Z" },
+    centerId: "HURYC",
+    ...overrides,
+  });
+};
+
 describe("useEncounterTemplate", () => {
-  it("uses centerId to populate serviceProvider for HURYC", () => {
-    const { result } = renderHook(() => useEncounterTemplate());
-
-    const encounter = result.current.generateEncounter({
-      encId: "enc-1",
-      patientId: "pat-1",
-      period: { start: "2026-06-01T10:00:00.000Z" },
-      centerId: "HURYC",
+  it("preserves the clinical concepts without non-canonical SNOMED CT displays", () => {
+    const encounter = generate();
+    expect(encounter.type[0]).toEqual({
+      coding: [{ system: "http://snomed.info/sct", code: "83607001" }],
+      text: "Examen ginecológico",
     });
-
-    expect(encounter.serviceProvider).toEqual({
-      reference: "Organization/huryc",
-      display: "Hospital Universitario Ramón y Cajal",
+    expect(encounter.reasonCode[0]).toEqual({
+      coding: [{ system: "http://snomed.info/sct", code: "74601000119101" }],
+      text: "Examen ginecológico de rutina realizado",
     });
-    expect(encounter.location[0].location.reference).toBe("Location/huryc-gyn-unit");
   });
 
-  it("maps EMERGENCY care setting to Encounter class and location", () => {
-    const { result } = renderHook(() => useEncounterTemplate());
-
-    const encounter = result.current.generateEncounter({
-      encId: "enc-1",
-      patientId: "pat-1",
-      period: { start: "2026-06-01T10:00:00.000Z" },
-      centerId: "HURYC",
-      careSettingCode: "EMERGENCY",
-    });
-
-    expect(encounter.class.code).toBe("EMER");
-    expect(encounter.class.display).toBe("Emergency");
-    expect(encounter.location[0].location.reference).toBe("Location/huryc-emergency-department");
+  it("does not invent Organization or Location references in the browser", () => {
+    const encounter = generate({ centerId: "MIA_DEV", careSettingCode: "EMERGENCY" });
+    expect(encounter).not.toHaveProperty("serviceProvider");
+    expect(encounter).not.toHaveProperty("location");
+    expect(JSON.stringify(encounter)).not.toContain("Organization/");
+    expect(JSON.stringify(encounter)).not.toContain("Location/");
   });
 
-  it("maps INPATIENT care setting to Encounter class", () => {
-    const { result } = renderHook(() => useEncounterTemplate());
-
-    const encounter = result.current.generateEncounter({
-      encId: "enc-1",
-      patientId: "pat-1",
-      period: { start: "2026-06-01T10:00:00.000Z" },
-      centerId: "H12O",
-      careSettingCode: "INPATIENT",
-    });
-
-    expect(encounter.class.code).toBe("IMP");
-    expect(encounter.location[0].location.reference).toBe("Location/h12o-inpatient-ward");
-  });
-
-  it("maps GYNE_ULTRASOUND care setting to ambulatory class and ultrasound location", () => {
-    const { result } = renderHook(() => useEncounterTemplate());
-
-    const encounter = result.current.generateEncounter({
-      encId: "enc-1",
-      patientId: "pat-1",
-      period: { start: "2026-06-01T10:00:00.000Z" },
-      centerId: "HURYC",
-      careSettingCode: "GYNE_ULTRASOUND",
-    });
-
-    expect(encounter.class.code).toBe("AMB");
-    expect(encounter.location[0].location.reference).toBe("Location/huryc-gyne-ultrasound-unit");
-  });
-
-  it("uses centerId to populate serviceProvider for H12O", () => {
-    const { result } = renderHook(() => useEncounterTemplate());
-
-    const encounter = result.current.generateEncounter({
-      encId: "enc-1",
-      patientId: "pat-1",
-      period: { start: "2026-06-01T10:00:00.000Z" },
-      centerId: "Hospital Universitario 12 de Octubre",
-    });
-
-    expect(encounter.serviceProvider.reference).toBe("Organization/h12o");
+  it.each([
+    ["EMERGENCY", "EMER", "Urgencias"],
+    ["INPATIENT", "IMP", "Hospitalización"],
+    ["OUTPATIENT", "AMB", "Consulta externa"],
+    ["GYNE_ULTRASOUND", "AMB", "Unidad de ecografía ginecológica"],
+    ["OTHER", "AMB", "Otro"],
+    ["UNKNOWN", "AMB", "No especificado"],
+  ])("maps %s to Encounter class and serviceType without a Location", (careSettingCode, classCode, serviceText) => {
+    const encounter = generate({ careSettingCode });
+    expect(encounter.class.code).toBe(classCode);
+    expect(encounter.serviceType).toEqual({ text: serviceText });
+    expect(encounter).not.toHaveProperty("location");
   });
 
   it("does not generate Practitioner/null without a real practitionerId", () => {
-    const { result } = renderHook(() => useEncounterTemplate());
-
-    const encounter = result.current.generateEncounter({
-      encId: "enc-1",
-      patientId: "pat-1",
-      period: { start: "2026-06-01T10:00:00.000Z" },
-      centerId: "HURYC",
-      practitionerId: null,
-    });
-
+    const encounter = generate({ practitionerId: null });
     expect(encounter).not.toHaveProperty("participant");
     expect(JSON.stringify(encounter)).not.toContain("Practitioner/null");
-    expect(JSON.stringify(encounter)).not.toContain("PAT_NHC");
-    expect(JSON.stringify(encounter)).not.toContain("PAT_NOMBRE");
-    expect(JSON.stringify(encounter)).not.toContain("patientPseudonym");
   });
 
   it("generates Practitioner reference only when practitionerId is valid", () => {
-    const { result } = renderHook(() => useEncounterTemplate());
-
-    const encounter = result.current.generateEncounter({
-      encId: "enc-1",
-      patientId: "pat-1",
-      period: { start: "2026-06-01T10:00:00.000Z" },
-      centerId: "HURYC",
-      practitionerId: "practitioner-1",
-      practitionerDisplay: "Profesional 1",
-    });
-
+    const encounter = generate({ practitionerId: "practitioner-1", practitionerDisplay: "Profesional 1" });
     expect(encounter.participant[0].individual).toEqual({
       reference: "Practitioner/practitioner-1",
       display: "Profesional 1",

@@ -232,6 +232,21 @@ describe('generateClinicalReportPdf', () => {
     expect(pdfText()).toContain('Conclusiones del ecografista');
   });
 
+  it('keeps the originating mass number when an earlier conclusion is empty', () => {
+    generateClinicalReportPdf({
+      responses:          [makeQR('HURYC'), makeQR('HURYC')],
+      reports:            [makeReport('Masa derecha'), makeReport('Masa izquierda')],
+      observations:       ['', 'Conclusión exclusiva de la segunda masa'],
+      includeProbability: false,
+      centerIdHint:       'HURYC',
+    });
+
+    const textCalls = mockDoc.text.mock.calls.map((call) => String(call[0]));
+    const conclusionIndex = textCalls.indexOf('Conclusión exclusiva de la segunda masa');
+    expect(conclusionIndex).toBeGreaterThan(0);
+    expect(textCalls[conclusionIndex - 1]).toBe('Masa anexial 2');
+  });
+
   it('does not include NHC, patientPseudonym or hash in any field', () => {
     generateClinicalReportPdf({
       responses:          [makeQR('HURYC')],

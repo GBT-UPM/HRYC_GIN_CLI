@@ -8,7 +8,6 @@ import Modal from "./Modal";
 import { useKeycloak } from '@react-keycloak/web';
 import { useEncounterTemplate } from "../hooks/useEncounterTemplate";
 import { useObservationTemplate } from "../hooks/useObservationTemplate";
-import { useImageStudyTemplate } from "../hooks/useImageStudyTemplate";
 import ApiService from '../services/ApiService';
 import { generateId } from '../screens/QuestionnaireScreen';
 import { generatePeriod } from '../screens/QuestionnaireScreen';
@@ -126,7 +125,6 @@ const ResponsesProbability = ({
 
   const { generateEncounter } = useEncounterTemplate();
   const { generateObservation } = useObservationTemplate();
-  const { generateImagingStudy } = useImageStudyTemplate();
   const { generateRiskAssessment } = useRiskAssessmentTemplate();
   const { generatePatient } = usePatientTemplate();
 
@@ -521,8 +519,6 @@ const ResponsesProbability = ({
     }
 
     const encId = generateId();
-    const imgStuId = generateId();
-    const serieId = generateId();
     setEncounterId(encId);
     const Encounter = generateEncounter({
       encId,
@@ -531,23 +527,17 @@ const ResponsesProbability = ({
       centerId,
       careSettingCode,
     });
-    const ImageStudy = generateImagingStudy(imgStuId, encId, patientId, serieId);
 
-    const encounter = await ApiService(keycloak.token, 'POST', `/fhir/Encounter`, Encounter);
-    if (encounter.status !== 200) {
+    const encounterEndpoint = `/fhir/Encounter?centerId=${encodeURIComponent(centerId)}&careSettingCode=${encodeURIComponent(careSettingCode)}`;
+    const encounter = await ApiService(keycloak.token, 'POST', encounterEndpoint, Encounter);
+    if (!encounter.ok) {
       throw new Error(`Error en el encounter: ${encounter.status}`);
-    }
-
-    const imageStudy = await ApiService(keycloak.token, 'POST', `/fhir/ImagingStudy`, ImageStudy);
-    if (process.env.NODE_ENV === "development") {
-      console.debug("ImageStudy status:", imageStudy.status);
     }
 
     return {
       hasMassInReports,
       patientId,
       encId,
-      imgStuId,
     };
   };
 
@@ -678,8 +668,16 @@ const ResponsesProbability = ({
       setProbality(true);
 
       const contextCenterId = preparedResponses[startIndex]?.metadata?.centerId || preparedResponses[0]?.metadata?.centerId;
+      const questionnaireResponseLogicalIds = preparedResponses.map((preparedResponse) =>
+        preparedResponse.questionnaireResponse.id || generateId()
+      );
+      questionnaireResponseLogicalIds.slice(startIndex).forEach((logicalId) => {
+        if (!/^[A-Za-z0-9\-.]{1,64}$/.test(String(logicalId || "").trim())) {
+          throw new Error("QuestionnaireResponse.id lógico FHIR no válido antes de la persistencia.");
+        }
+      });
       const context = persistenceContext || await createPersistenceContext(contextCenterId, normalizedCareSetting.code);
-      const { patientId, encId, imgStuId } = context;
+      const { patientId, encId } = context;
       const savedUsageContext = [];
       const assignedStudyPatientCodes = [];
       const studyCodeAssignments = [];
@@ -687,13 +685,10 @@ const ResponsesProbability = ({
       for (let index = startIndex; index < preparedResponses.length; index++) {
         const preparedResponse = preparedResponses[index];
         try {
+          const questionnaireResponseLogicalId = questionnaireResponseLogicalIds[index];
           const sanitizedQuestionnaireResponse = sanitizeQuestionnaireResponse({
             ...preparedResponse.questionnaireResponse,
-            partOf: [
-              {
-                reference: `Encounter/${encId}`
-              }
-            ],
+            id: questionnaireResponseLogicalId,
             subject: {
               reference: `Patient/${patientId}`
             },
@@ -747,7 +742,13 @@ const ResponsesProbability = ({
           }
 
           const obsId = generateId();
-          const ObservationImagen = generateObservation(obsId, encId, patientId, imgStuId, observations[index]);
+          const ObservationImagen = generateObservation(
+            obsId,
+            encId,
+            patientId,
+            observations[index],
+            questionnaireResponseLogicalId
+          );
           await ApiService(keycloak.token, 'POST', `/fhir/Observation`, ObservationImagen);
           let riskAssessmentFhirId = null;
           if (reports[index]?.ecoScoreStatus === ECO_SCORE_STATUS.CALCULATED) {
@@ -759,7 +760,7 @@ const ResponsesProbability = ({
               null,
               reports[index].probability,
               "",
-              questionnaireResponseId
+              questionnaireResponseLogicalId
             );
             await ApiService(keycloak.token, 'POST', `/fhir/RiskAssessment`, RiskAssessment);
             riskAssessmentFhirId = riskId;

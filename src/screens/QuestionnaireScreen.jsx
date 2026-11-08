@@ -100,7 +100,7 @@ const findAnswerByLinkId = (answers = [], linkId) =>
 
 const resolveQuestionnaireCenterId = (answers = []) => {
   const answer = findAnswerByLinkId(answers, "HOSPITAL_REF");
-  return mapCenterToCode(answer?.valueString || answer?.valueCoding?.display || "");
+  return mapCenterToCode(answer?.valueCoding?.display || answer?.valueCoding?.code || answer?.valueString || "");
 };
 
 const resolveHasAdnexalMass = (answers = []) => {

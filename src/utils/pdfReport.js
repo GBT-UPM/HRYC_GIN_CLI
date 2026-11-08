@@ -55,10 +55,11 @@ export const generateClinicalReportPdf = ({
       (resp) => resp.linkId?.toLowerCase() === key.toLowerCase()
     )?.answer?.[0];
     return (
+      answer?.valueCoding?.display ||
+      answer?.valueCoding?.code ||
       answer?.valueString ||
       answer?.valueInteger ||
       answer?.valueDate ||
-      answer?.valueCoding?.display ||
       ''
     );
   };
@@ -279,22 +280,24 @@ export const generateClinicalReportPdf = ({
   });
 
   // ── Conclusiones del ecografista ────────────────────────────────────────────
-  const validObservations = observations.filter((o) => String(o || '').trim().length > 0);
+  const validObservations = observations
+    .map((observation, massIndex) => ({ observation, massIndex }))
+    .filter(({ observation }) => String(observation || '').trim().length > 0);
   if (validObservations.length > 0) {
     addSectionTitle('Conclusiones del ecografista');
-    validObservations.forEach((observation, index) => {
+    validObservations.forEach(({ observation, massIndex }) => {
       const textLines   = doc.splitTextToSize(String(observation), contentWidth - 14);
-      const blockHeight = (validObservations.length > 1 ? 17 : 10) + textLines.length * 5 + 8;
+      const blockHeight = (observations.length > 1 ? 17 : 10) + textLines.length * 5 + 8;
       ensureSpace(blockHeight);
       doc.setFillColor(255, 255, 255);
       doc.setDrawColor(217, 226, 236);
       doc.roundedRect(marginX, yPosition, contentWidth, blockHeight, 3, 3, 'FD');
       let blockY = yPosition + 9;
-      if (validObservations.length > 1) {
+      if (observations.length > 1) {
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 58, 95);
-        doc.text(`Masa anexial ${index + 1}`, marginX + 7, blockY);
+        doc.text(`Masa anexial ${massIndex + 1}`, marginX + 7, blockY);
         blockY += 8;
       }
       doc.setFontSize(11);

@@ -1,25 +1,36 @@
 import { ObservationTemplate } from "../templetes/observationTemplate";
 
+const requireFhirLogicalId = (value, resourceType) => {
+  const logicalId = String(value || "").trim();
+  if (!/^[A-Za-z0-9\-.]{1,64}$/.test(logicalId)) {
+    throw new Error(`${resourceType}.id lógico FHIR no válido.`);
+  }
+  return logicalId;
+};
+
 export const useObservationTemplate = () => {
-  const generateObservation = (obsId,encId, patientId, imagingStudyId, observation) => {
-    return {
+  const generateObservation = (obsId, encId, patientId, observation, questionnaireResponseId) => {
+    const questionnaireResponseLogicalId = requireFhirLogicalId(
+      questionnaireResponseId,
+      "QuestionnaireResponse"
+    );
+    const resource = {
       ...ObservationTemplate,
       id: obsId,
       subject: {
         reference: `Patient/${patientId}`,
-        display: "",
       },
       encounter: {
         reference: `Encounter/${encId}`
       },
-
-      basedOn: [
-        {
-          reference: `ImagingStudy/${imagingStudyId}`
-        }
-      ],
       valueString: observation
     };
+
+    resource.derivedFrom = [{
+      reference: `QuestionnaireResponse/${questionnaireResponseLogicalId}`,
+    }];
+
+    return resource;
   };
 
   return { generateObservation };

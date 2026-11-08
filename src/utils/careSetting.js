@@ -86,20 +86,6 @@ export const getEncounterClassForCareSetting = (value) => {
   };
 };
 
-export const getCareSettingLocationSuffix = (value) => {
-  switch (normalizeCareSetting(value).code) {
-    case "EMERGENCY":
-      return { suffix: "emergency-department", display: "Urgencias" };
-    case "OUTPATIENT":
-      return { suffix: "outpatient-clinic", display: "Consulta externa" };
-    case "GYNE_ULTRASOUND":
-      return { suffix: "gyne-ultrasound-unit", display: "Unidad de ecografía ginecológica" };
-    case "INPATIENT":
-      return { suffix: "inpatient-ward", display: "Hospitalización" };
-    case "OTHER":
-      return { suffix: "other", display: "Otro" };
-    case "UNKNOWN":
-    default:
-      return { suffix: "gyn-unit", display: "Unidad de Ginecología / No especificado" };
-  }
-};
+export const getEncounterServiceType = (value) => ({
+  text: normalizeCareSetting(value).display,
+});

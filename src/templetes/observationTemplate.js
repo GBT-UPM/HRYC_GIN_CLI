@@ -16,10 +16,9 @@ export const ObservationTemplate = {
       coding: [
         {
           system: "http://loinc.org",
-          code: "45030-1",
-          display: "Findings of Ultrasound study"
+          code: "19005-8"
         }
       ],
-      text: "Findings from transvaginal ultrasound"
+      text: "Conclusión ecográfica narrativa"
     }
   };

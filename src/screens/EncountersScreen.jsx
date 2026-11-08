@@ -173,12 +173,12 @@ const EncountersScreen = () => {
     };
 
     const getAnswerValue = (answer) => {
+        if (answer.valueCoding) return answer.valueCoding.display || answer.valueCoding.code;
         if (answer.valueString) return answer.valueString;
         if (answer.valueDate) return new Date(answer.valueDate).toLocaleDateString();
         if (answer.valueInteger) return answer.valueInteger.toString();
         if (answer.valueDecimal) return answer.valueDecimal.toString();
         if (answer.valueBoolean) return answer.valueBoolean ? "Sí" : "No";
-        if (answer.valueCoding) return answer.valueCoding.display || answer.valueCoding.code;
         return "No disponible";
     };
 
@@ -623,15 +623,18 @@ const EncountersScreen = () => {
             return firstValue > secondValue ? -1 : 1;
         }
     });
-    const fetchQuestionnaireResponsesForEncounter = async (encounter) => {
-        const responses = [];
+    const fetchEncounterReportData = async (encounter) => {
+        const reportData = [];
         for (const item of encounter.lesions) {
             const questionnaireResponse = await fetchQuestionnaireResponseByFhirId(item.questionnaireResponseFhirId);
             if (questionnaireResponse) {
-                responses.push(questionnaireResponse);
+                reportData.push({
+                    questionnaireResponse,
+                    observation: { text: item.ultrasoundConclusion || '' },
+                });
             }
         }
-        return responses;
+        return reportData;
     };
     const questionnaireHasCalculatedEcoScore = (questionnaireResponse) =>
         calculateEcoScoreFromQuestionnaireResponse(questionnaireResponse).status === ECO_SCORE_STATUS.CALCULATED;
@@ -643,18 +646,17 @@ const EncountersScreen = () => {
     });
     const handleEncounterReport = async (encounter) => {
         try {
-            const responses = await fetchQuestionnaireResponsesForEncounter(encounter);
+            const reportData = await fetchEncounterReportData(encounter);
+            const responses = reportData.map((item) => item.questionnaireResponse);
+            const observations = reportData.map((item) => item.observation);
             if (responses.length === 0) {
                 return;
             }
             if (responses.some(questionnaireHasCalculatedEcoScore)) {
-                setPendingPrintData({ encounter, responses });
+                setPendingPrintData({ encounter, responses, observations });
                 setIsModalOpen(true);
                 return;
             }
-            const observations = encounter.lesions
-                .map((item) => item.histology ? { text: item.histology } : null)
-                .filter(Boolean);
             handlePrintButtonClick(false, responses, observations, encounter.observerInitials, buildReportRowItem(encounter));
         } catch (error) {
             console.error("Error al obtener los cuestionarios del encuentro:", error);
@@ -1040,13 +1042,10 @@ const EncountersScreen = () => {
                     <Button
                         variant="outlined"
                         onClick={() => {
-                            const observations = (pendingPrintData?.encounter?.lesions || [])
-                                .map((item) => item.histology ? { text: item.histology } : null)
-                                .filter(Boolean);
                             handlePrintButtonClick(
                                 false,
                                 pendingPrintData?.responses || [],
-                                observations,
+                                pendingPrintData?.observations || [],
                                 pendingPrintData?.encounter?.observerInitials || '',
                                 buildReportRowItem(pendingPrintData?.encounter)
                             );
@@ -1060,13 +1059,10 @@ const EncountersScreen = () => {
                     <Button
                         variant="contained"
                         onClick={() => {
-                            const observations = (pendingPrintData?.encounter?.lesions || [])
-                                .map((item) => item.histology ? { text: item.histology } : null)
-                                .filter(Boolean);
                             handlePrintButtonClick(
                                 true,
                                 pendingPrintData?.responses || [],
-                                observations,
+                                pendingPrintData?.observations || [],
                                 pendingPrintData?.encounter?.observerInitials || '',
                                 buildReportRowItem(pendingPrintData?.encounter)
                             );

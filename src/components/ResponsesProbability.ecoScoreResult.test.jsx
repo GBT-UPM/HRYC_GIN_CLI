@@ -4,6 +4,7 @@ import ResponsesProbability from "./ResponsesProbability";
 import ApiService from "../services/ApiService";
 import { createCase, addSecondaryEvaluation, checkDuplicateCase } from "../services/caseService";
 import { upsertEcoScoreResult } from "../services/ecoScoreResultService";
+import { generateId } from "../screens/QuestionnaireScreen";
 
 jest.mock("../services/ApiService", () => jest.fn());
 jest.mock("../utils/pdfReport", () => ({
@@ -27,9 +28,22 @@ jest.mock("../services/ecoScoreResultService", () => ({
 const mockGenerateRiskAssessment = jest.fn((riskId, encId, patientId, practitioner, prob, mitigation, quesRId) => ({
   resourceType: "RiskAssessment",
   id: riskId,
-  derivedFrom: [{ reference: `QuestionnaireResponse/${quesRId}` }],
+  basis: [{ reference: `QuestionnaireResponse/${quesRId}` }],
   prediction: [{ probabilityDecimal: prob }],
 }));
+const buildObservation = (obsId, encId, patientId, observation, questionnaireResponseId) => ({
+  resourceType: "Observation",
+  id: obsId,
+  subject: { reference: `Patient/${patientId}` },
+  encounter: { reference: `Encounter/${encId}` },
+  code: {
+    coding: [{ system: "http://loinc.org", code: "19005-8" }],
+    text: "Conclusión ecográfica narrativa",
+  },
+  valueString: observation,
+  derivedFrom: [{ reference: `QuestionnaireResponse/${questionnaireResponseId}` }],
+});
+const mockGenerateObservation = jest.fn(buildObservation);
 
 jest.mock("@react-keycloak/web", () => ({
   useKeycloak: () => ({
@@ -53,13 +67,7 @@ jest.mock("../hooks/useEncounterTemplate", () => ({
 
 jest.mock("../hooks/useObservationTemplate", () => ({
   useObservationTemplate: () => ({
-    generateObservation: jest.fn(() => ({ resourceType: "Observation" })),
-  }),
-}));
-
-jest.mock("../hooks/useImageStudyTemplate", () => ({
-  useImageStudyTemplate: () => ({
-    generateImagingStudy: jest.fn(() => ({ resourceType: "ImagingStudy" })),
+    generateObservation: mockGenerateObservation,
   }),
 }));
 
@@ -91,6 +99,7 @@ const baseMassItems = [
 
 const calculableResponse = {
   resourceType: "QuestionnaireResponse",
+  id: "qr-calculable-logical",
   status: "completed",
   item: [
     ...baseMassItems,
@@ -160,6 +169,9 @@ describe("ResponsesProbability ECO-SCORE persistence", () => {
     addSecondaryEvaluation.mockReset();
     checkDuplicateCase.mockReset();
     upsertEcoScoreResult.mockReset();
+    generateId.mockReturnValue("generated-id");
+    mockGenerateObservation.mockClear();
+    mockGenerateObservation.mockImplementation(buildObservation);
     mockGenerateRiskAssessment.mockClear();
 
     checkDuplicateCase.mockResolvedValue({ matches: [] });
@@ -169,7 +181,7 @@ describe("ResponsesProbability ECO-SCORE persistence", () => {
       questionnaireResponseFhirId: 501,
     });
     ApiService.mockImplementation((token, method, endpoint, body) => {
-      if (["/audit/register", "/fhir/Patient/check-or-create", "/fhir/Encounter", "/fhir/ImagingStudy"].includes(endpoint)) {
+      if (["/audit/register", "/fhir/Patient/check-or-create"].includes(endpoint) || endpoint.startsWith("/fhir/Encounter?")) {
         return Promise.resolve({ ok: true, status: 200 });
       }
       if (endpoint === "/fhir/Observation" || endpoint === "/fhir/RiskAssessment") {
@@ -189,11 +201,20 @@ describe("ResponsesProbability ECO-SCORE persistence", () => {
 
     expect(mockGenerateRiskAssessment).toHaveBeenCalled();
     expect(ApiService.mock.calls.some((call) => call[2] === "/fhir/RiskAssessment")).toBe(true);
+    expect(ApiService.mock.calls.some((call) => call[2] === "/fhir/ImagingStudy")).toBe(false);
+    expect(ApiService.mock.calls.some((call) => call[2] === "/fhir/Observation")).toBe(true);
+    expect(mockGenerateObservation).toHaveBeenCalledWith(
+      "generated-id",
+      "generated-id",
+      "generated-id",
+      "Observacion",
+      "qr-calculable-logical"
+    );
     const riskAssessmentArgs = mockGenerateRiskAssessment.mock.calls[0];
     expect(riskAssessmentArgs[3]).toBeNull();
     expect(riskAssessmentArgs[4]).toEqual(expect.any(Number));
     expect(riskAssessmentArgs[5]).toBe("");
-    expect(riskAssessmentArgs[6]).toBe(501);
+    expect(riskAssessmentArgs[6]).toBe("qr-calculable-logical");
     const expectedRiskAssessmentFhirId = riskAssessmentArgs[0];
 
     expect(upsertEcoScoreResult).toHaveBeenCalledWith(

@@ -38,7 +38,7 @@ const buildCenterAnswer = (item, centerCode) => {
   if (item?.type === "choice") {
     const code = matchingOption?.valueCoding?.code || centerCode;
     const display = matchingOption?.valueCoding?.display || centerCode;
-    return [{ valueString: code, valueCoding: { code, display } }];
+    return [{ valueCoding: { code, display } }];
   }
 
   return [{ valueString: centerCode }];
@@ -98,7 +98,7 @@ const QuestionnaireForm = ({
       if (currentCenter === sessionCenter) return currentAnswers;
 
       const nextCenterAnswer = {
-        questionText: centerItem.text,
+        text: centerItem.text,
         linkId: "HOSPITAL_REF",
         answer: buildCenterAnswer(centerItem, sessionCenter),
       };
@@ -146,7 +146,7 @@ function getEnabledLinkIds(items, currentAnswers) {
   return enabledIds;
 }
 
-  const handleInputChange = (questionText,linkId, type, value,display) => {
+  const handleInputChange = (text,linkId, type, value,display) => {
     onDirtyChange(true);
       const existingAnswerIndex = answers.findIndex(
         (answer) => answer.linkId === linkId
@@ -158,7 +158,7 @@ function getEnabledLinkIds(items, currentAnswers) {
           updatedAnswers.splice(existingAnswerIndex, 1);
         }
       } else {
-        const newAnswer = { questionText,linkId, answer: [] };
+        const newAnswer = { text,linkId, answer: [] };
         switch (type) {
           case "choice":
             newAnswer.answer = value;
@@ -194,7 +194,7 @@ function getEnabledLinkIds(items, currentAnswers) {
       setAnswers(cleanedAnswers);
       onQuestionnaireInteraction(cleanedAnswers, {
       linkId,
-      questionText,
+      text,
       type,
       display,
     });
@@ -319,21 +319,24 @@ const renderInput = (item) => {
         ) ?? false;
 
       // Preparar las opciones (valueString o valueCoding)
-      const options = item.answerOption
+      let options = (item.answerOption || [])
         .map((option) => {
           if (option.valueString) {
             return { value: option.valueString, label: option.valueString };
           } else if (option.valueCoding) {
             return {
-              value: option.valueCoding.code || (item.linkId === "HOSPITAL_REF" ? mapCenterToCode(option.valueCoding.display) : ""),
+              value: option.valueCoding.code || (item.linkId === "HOSPITAL_REF" ? mapCenterToCode(option.valueCoding.display) : option.valueCoding.display) || "",
               label: option.valueCoding.display,
             };
           }
           return null;
         })
         .filter(Boolean);
-      if (item.linkId === "HOSPITAL_REF" && sessionCenter && !options.some((option) => option.value === sessionCenter)) {
-        options.push({ value: sessionCenter, label: sessionCenter });
+      if (item.linkId === "HOSPITAL_REF" && authorizedCenters.length > 0) {
+        options = authorizedCenters.map((center) => {
+          const code = String(center).trim().toUpperCase();
+          return { value: code, label: code };
+        });
       }
 
       // 1) Dropdown
@@ -341,8 +344,8 @@ const renderInput = (item) => {
         return (
           <select
             value={
-              currentAnswer?.answer?.[0]?.valueString ||
               currentAnswer?.answer?.[0]?.valueCoding?.code ||
+              currentAnswer?.answer?.[0]?.valueString ||
               initialValue?.valueString ||
               ""
             }
@@ -354,7 +357,6 @@ const renderInput = (item) => {
                 item.type,
                 [
                   {
-                    valueString: e.target.value,
                     valueCoding: {
                       code: e.target.value,
                       display: selectedOption.text,
@@ -399,7 +401,6 @@ const renderInput = (item) => {
                         ? [
                             ...selectedOptions,
                             {
-                              valueString: option.value,
                               valueCoding: { code: option.value },
                             },
                           ]
@@ -453,7 +454,6 @@ const renderInput = (item) => {
                         item.type,
                         [
                           {
-                            valueString: option.value,
                             valueCoding: {
                               code: option.value,
                               display: option.label,
@@ -678,9 +678,9 @@ const renderInput = (item) => {
       "ECO_EXP", // Ecografista experto
       "CENTRO_REF", // Centro de referencia
       "PAT_MA",  // ¿Hay alguna masa anexial?
-      "MA_PROB" // Probabilidad
     ];
 
+    // La solicitud de probabilidad pertenece a cada masa y debe volver a responderse.
     setAnswers((prevAnswers) => {
       return prevAnswers.filter(answer => preservedLinkIds.includes(answer.linkId));
     });

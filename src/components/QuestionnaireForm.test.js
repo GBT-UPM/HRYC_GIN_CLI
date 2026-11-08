@@ -137,6 +137,79 @@ const answerRadioQuestion = async (label, value) => {
   await userEvent.click(screen.getByLabelText(value, { selector: `input[name=\"${label}\"]` }));
 };
 
+describe("QuestionnaireForm independent probability answers for successive masses", () => {
+  it.each([
+    ["Quística", "Quística", "before"],
+    ["Quística", "Sólido-quística", "after"],
+    ["Sólido-quística", "Quística", "after"],
+    ["Sólido-quística", "Sólido-quística", "before"],
+    ["Sólida", "Quística", "before"],
+  ])("allows %s then %s with location entered %s the second type", async (firstType, secondType, locationOrder) => {
+    const onAddMass = jest.fn();
+    const onFinish = jest.fn();
+    const massQuestionnaire = buildVisibilityQuestionnaire({ includeMassProbability: true });
+    massQuestionnaire.item.push(
+      { linkId: "HOSPITAL_REF", text: "Synthetic hospital", type: "string", required: true },
+      { linkId: "MA_LADO", text: "Synthetic location", type: "string" },
+    );
+    render(<QuestionnaireForm
+      questionnaire={massQuestionnaire}
+      event={onFinish}
+      eventContinue={onAddMass}
+      transientNhc="SYNTHETIC-ONLY"
+      onTransientNhcChange={jest.fn()}
+    />);
+    await userEvent.type(getHospitalInput(), "SYNTHETIC-CENTER");
+    await answerRadioQuestion("PAT_MA", "Sí");
+    await answerRadioQuestion("MA_TIPO", firstType);
+    await userEvent.type(document.querySelector("#MA_LADO input"), "First location");
+    if (firstType !== "Sólida") await answerRadioQuestion("MA_PROB", "Sí");
+    await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Añadir masa anexial" }));
+
+    expect(onAddMass).toHaveBeenCalledTimes(1);
+    const firstAnswers = onAddMass.mock.calls[0][0];
+    expect(getHospitalInput()).toHaveValue("SYNTHETIC-CENTER");
+    expect(getHospitalInput()).toBeDisabled();
+    expect(screen.getByLabelText("Sí", { selector: 'input[name="PAT_MA"]' })).toBeChecked();
+    expect(document.querySelector("#MA_LADO input")).toHaveValue("");
+    if (locationOrder === "before") {
+      await userEvent.type(document.querySelector("#MA_LADO input"), "Second location");
+    }
+    await answerRadioQuestion("MA_TIPO", secondType);
+    if (locationOrder === "after") {
+      await userEvent.type(document.querySelector("#MA_LADO input"), "Second location");
+    }
+    const yes = screen.getByLabelText("Sí", { selector: 'input[name="MA_PROB"]' });
+    const no = screen.getByLabelText("No", { selector: 'input[name="MA_PROB"]' });
+    expect(yes).toBeEnabled();
+    expect(no).toBeEnabled();
+    expect(yes).not.toBeChecked();
+    expect(no).not.toBeChecked();
+
+    // Each mass must answer independently; an unanswered second mass cannot finish.
+    await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+    expect(screen.queryByRole("button", { name: "Continuar", exact: true })).not.toBeInTheDocument();
+    await userEvent.click(no);
+    expect(no).toBeChecked();
+    await userEvent.click(yes);
+    expect(yes).toBeChecked();
+    await userEvent.click(no);
+    await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Continuar", exact: true }));
+
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    const secondAnswers = onFinish.mock.calls[0][0];
+    const coding = (answers, linkId) => answers.find((a) => a.linkId === linkId)?.answer[0]?.valueCoding?.display;
+    expect(coding(secondAnswers, "MA_PROB")).toBe("No");
+    expect(coding(secondAnswers, "MA_TIPO")).toBe(secondType);
+    expect(coding(firstAnswers, "MA_TIPO")).toBe(firstType);
+    expect(coding(firstAnswers, "MA_PROB")).toBe(firstType === "Sólida" ? undefined : "Sí");
+    expect(firstAnswers.find((a) => a.linkId === "MA_LADO").answer[0].valueString).toBe("First location");
+    expect(secondAnswers.find((a) => a.linkId === "MA_LADO").answer[0].valueString).toBe("Second location");
+  });
+});
+
 describe("QuestionnaireForm visibility rules", () => {
   it("hides PAT_CODIGO so it is not required in the rendered questionnaire", () => {
     expect(isHiddenQuestionnaireItem("PAT_CODIGO")).toBe(true);
@@ -396,6 +469,41 @@ describe("QuestionnaireForm visibility rules", () => {
     await waitFor(() => expect(centerSelect).toHaveValue("CENTRO_03"));
     expect(centerSelect).toBeDisabled();
     expect(screen.getByRole("option", { name: "CENTRO_03" })).toBeInTheDocument();
+  });
+
+  it("offers only authorized centers to a multi-center user", async () => {
+    const dropdownQuestionnaire = {
+      title: "Registro ginecológico",
+      item: [{
+        linkId: "HOSPITAL_REF",
+        text: "Hospital",
+        type: "choice",
+        required: true,
+        answerOption: [{ valueCoding: { code: "UNAUTHORIZED", display: "No autorizado" } }],
+        extension: [{
+          url: "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+          valueCodeableConcept: { coding: [{ code: "drop-down" }] },
+        }],
+      }],
+    };
+
+    render(
+      <QuestionnaireForm
+        questionnaire={dropdownQuestionnaire}
+        event={jest.fn()}
+        eventContinue={jest.fn()}
+        transientNhc="123456"
+        onTransientNhcChange={jest.fn()}
+        authorizedCenters={["HURYC", "H12O"]}
+      />
+    );
+
+    const centerSelect = screen.getByRole("option", { name: "HURYC" }).closest("select");
+    expect(centerSelect).not.toBeDisabled();
+    expect(screen.getByRole("option", { name: "H12O" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "No autorizado" })).not.toBeInTheDocument();
+    await userEvent.selectOptions(centerSelect, "H12O");
+    expect(centerSelect).toHaveValue("H12O");
   });
 
   it("keeps all-of semantics when enableBehavior is omitted", async () => {

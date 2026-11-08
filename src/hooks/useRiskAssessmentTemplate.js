@@ -5,8 +5,20 @@ const hasUsablePractitionerId = (practitionerId) => {
   return value !== "" && value !== "null" && value !== "undefined";
 };
 
+const requireFhirLogicalId = (value, resourceType) => {
+  const logicalId = String(value || "").trim();
+  if (!/^[A-Za-z0-9\-.]{1,64}$/.test(logicalId)) {
+    throw new Error(`${resourceType}.id lógico FHIR no válido.`);
+  }
+  return logicalId;
+};
+
 export const useRiskAssessmentTemplate = () => {
-  const generateRiskAssessment = (riskId, encId, patientId, practitioner, prob, mitigation,quesRId) => {
+  const generateRiskAssessment = (riskId, encId, patientId, practitioner, prob, mitigation, questionnaireResponseId) => {
+    const questionnaireResponseLogicalId = requireFhirLogicalId(
+      questionnaireResponseId,
+      "QuestionnaireResponse"
+    );
     const riskAssessment = {
       ...RiskAssessmentTemplate,
       id: riskId,
@@ -16,12 +28,12 @@ export const useRiskAssessmentTemplate = () => {
       encounter: {
         reference: `Encounter/${encId}`
       },
-      derivedFrom: [
+      basis: [
         {
-          reference: `QuestionnaireResponse/${quesRId}`
+          reference: `QuestionnaireResponse/${questionnaireResponseLogicalId}`
         }
       ],
-      date: new Date().toISOString(),
+      occurrenceDateTime: new Date().toISOString(),
       prediction: [
         {
           outcome: {
@@ -37,9 +49,12 @@ export const useRiskAssessmentTemplate = () => {
           probabilityDecimal: prob,
           rationale: "Probabilidad calculada a partir de las respuestas del cuestionario."
         }
-      ],
-      mitigation: mitigation
+      ]
     };
+
+    if (String(mitigation || "").trim()) {
+      riskAssessment.mitigation = String(mitigation).trim();
+    }
 
     if (hasUsablePractitionerId(practitioner)) {
       riskAssessment.performer = {

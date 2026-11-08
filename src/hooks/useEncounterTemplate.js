@@ -1,6 +1,5 @@
 import { EncounterTemplate } from "../templetes/encounterTemplate";
-import { getLocationForCenter, getOrganizationForCenter } from "../utils/fhirOrganizations";
-import { getEncounterClassForCareSetting, normalizeCareSetting } from "../utils/careSetting";
+import { getEncounterClassForCareSetting, getEncounterServiceType, normalizeCareSetting } from "../utils/careSetting";
 
 const hasUsablePractitionerId = (practitionerId) => {
   const value = String(practitionerId || "").trim();
@@ -25,12 +24,7 @@ export const useEncounterTemplate = () => {
       subject: {
         reference: `Patient/${patientId}`,
       },
-      serviceProvider: getOrganizationForCenter(centerId),
-      location: [
-        {
-          location: getLocationForCenter(centerId, careSetting.code),
-        },
-      ],
+      serviceType: getEncounterServiceType(careSetting.code),
       period,
     };
 

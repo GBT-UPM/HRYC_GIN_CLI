@@ -1,50 +1,10 @@
-import { getLocationForCenter, getOrganizationForCenter, resolveCenterCode } from "./fhirOrganizations";
+import { resolveCenterCode } from "./fhirOrganizations";
 
-describe("FHIR organization helpers", () => {
-  it("maps HURYC to its FHIR Organization", () => {
-    expect(getOrganizationForCenter("HURyC")).toEqual({
-      reference: "Organization/huryc",
-      display: "Hospital Universitario Ramón y Cajal",
-    });
+describe("FHIR center normalization", () => {
+  it("normalizes known and future center codes without generating references", () => {
     expect(resolveCenterCode("Hospital Universitario Ramón y Cajal")).toBe("HURYC");
-  });
-
-  it("maps H12O to its FHIR Organization", () => {
-    expect(getOrganizationForCenter("Hospital Universitario 12 de Octubre")).toEqual({
-      reference: "Organization/h12o",
-      display: "Hospital Universitario 12 de Octubre",
-    });
-  });
-
-  it("returns safe fallback organization for unknown centers", () => {
-    expect(getOrganizationForCenter("")).toEqual({
-      reference: "Organization/unknown",
-      display: "Centro no especificado",
-    });
-  });
-
-  it("uses a center-specific FHIR reference for a newly configured center", () => {
-    expect(getOrganizationForCenter("CENTRO_03")).toEqual({
-      reference: "Organization/centro_03",
-      display: "Centro CENTRO_03",
-    });
-    expect(getLocationForCenter("CENTRO_03", "EMERGENCY").reference)
-      .toBe("Location/centro_03-emergency-department");
-  });
-
-  it("maps known center locations and keeps a generic fallback", () => {
-    expect(getLocationForCenter("HURYC").reference).toBe("Location/huryc-gyn-unit");
-    expect(getLocationForCenter("unknown").reference).toBe("Location/gyn-unit");
-  });
-
-  it("maps care setting locations by center", () => {
-    expect(getLocationForCenter("HURYC", "EMERGENCY")).toEqual({
-      reference: "Location/huryc-emergency-department",
-      display: "Urgencias",
-    });
-    expect(getLocationForCenter("H12O", "GYNE_ULTRASOUND")).toEqual({
-      reference: "Location/h12o-gyne-ultrasound-unit",
-      display: "Unidad de ecografía ginecológica",
-    });
+    expect(resolveCenterCode("Hospital Universitario 12 de Octubre")).toBe("H12O");
+    expect(resolveCenterCode("MIA_DEV")).toBe("MIA_DEV");
+    expect(resolveCenterCode("CENTRO_03")).toBe("CENTRO_03");
   });
 });

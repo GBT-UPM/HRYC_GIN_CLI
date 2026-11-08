@@ -346,12 +346,12 @@ const ResponsesScreen = () => {
     };
 
     const getAnswerValue = (answer) => {
+        if (answer.valueCoding) return answer.valueCoding.display || answer.valueCoding.code;
         if (answer.valueString) return answer.valueString;
         if (answer.valueDate) return new Date(answer.valueDate).toLocaleDateString();
         if (answer.valueInteger) return answer.valueInteger.toString();
         if (answer.valueDecimal) return answer.valueDecimal.toString();
         if (answer.valueBoolean) return answer.valueBoolean ? "Sí" : "No";
-        if (answer.valueCoding) return answer.valueCoding.display || answer.valueCoding.code;
         return "No disponible";
     };
 

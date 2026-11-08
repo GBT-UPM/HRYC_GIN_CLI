@@ -88,4 +88,36 @@ describe("privacy utilities", () => {
     });
     expect(result).not.toBe(questionnaireResponse);
   });
+
+  it("normalizes legacy QuestionnaireResponse fields without changing clinical answers", () => {
+    const result = sanitizeQuestionnaireResponse({
+      resourceType: "QuestionnaireResponse",
+      partOf: [{ reference: "Encounter/legacy-encounter" }],
+      encounter: { reference: "Encounter/legacy-encounter" },
+      item: [{
+        linkId: "PAT_MA",
+        questionText: "¿Hay alguna masa anexial?",
+        answer: [{ valueCoding: { code: "0", display: "No" }, valueString: "0" }],
+      }],
+    });
+
+    expect(result).toEqual({
+      resourceType: "QuestionnaireResponse",
+      encounter: { reference: "Encounter/legacy-encounter" },
+      item: [{
+        linkId: "PAT_MA",
+        text: "¿Hay alguna masa anexial?",
+        answer: [{ valueCoding: { code: "0", display: "No" } }],
+      }],
+    });
+  });
+
+  it("rejects divergent duplicate FHIR answer values instead of discarding clinical information", () => {
+    expect(() => sanitizeQuestionnaireResponse({
+      item: [{
+        linkId: "PAT_MA",
+        answer: [{ valueCoding: { code: "0", display: "No" }, valueString: "Sí" }],
+      }],
+    })).toThrow("valores FHIR incompatibles");
+  });
 });

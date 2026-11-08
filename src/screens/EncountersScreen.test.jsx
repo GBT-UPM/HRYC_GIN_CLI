@@ -517,6 +517,8 @@ describe('EncountersScreen', () => {
         anatomicalStructureDisplay: 'Ovario',
         careSettingDisplay: 'Urgencias',
         hasAdnexalMass: true,
+        ultrasoundConclusion: 'Conclusión masa derecha',
+        histology: 'Histología derecha no debe imprimirse',
         observerInitials: 'ABC',
         createdAt: '2026-06-05T10:00:00',
         questionnaireResponseFhirId: 501,
@@ -538,6 +540,8 @@ describe('EncountersScreen', () => {
         anatomicalStructureDisplay: 'Ovario',
         careSettingDisplay: 'Urgencias',
         hasAdnexalMass: true,
+        ultrasoundConclusion: 'Conclusión masa izquierda',
+        histology: 'Histología izquierda no debe imprimirse',
         observerInitials: 'ABC',
         createdAt: '2026-06-05T10:00:00',
         questionnaireResponseFhirId: 502,
@@ -577,6 +581,11 @@ describe('EncountersScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'No incluir' }));
 
     await waitFor(() => expect(window.open).toHaveBeenCalledTimes(1));
+    const renderedText = mockEncountersPdfDoc.text.mock.calls.map((c) => String(c[0])).join(' ');
+    expect(renderedText).toContain('Conclusión masa derecha');
+    expect(renderedText).toContain('Conclusión masa izquierda');
+    expect(renderedText).not.toContain('Histología derecha no debe imprimirse');
+    expect(renderedText).not.toContain('Histología izquierda no debe imprimirse');
     expect(screen.queryByText('patientPseudonym')).not.toBeInTheDocument();
     expect(screen.queryByText('hash')).not.toBeInTheDocument();
 
@@ -708,7 +717,8 @@ describe('EncountersScreen', () => {
       careSettingCode: 'EMERGENCY',
       careSettingDisplay: 'Urgencias',
       risk: null,
-      histology: null,
+      ultrasoundConclusion: 'Conclusión ecográfica recuperada',
+      histology: 'Histopatología independiente no debe imprimirse',
       observerInitials: 'ABC',
       createdAt: '2026-06-01T08:00:00',
       questionnaireResponseFhirId: 103,
@@ -757,6 +767,8 @@ describe('EncountersScreen', () => {
     expect(renderedText).not.toContain('patientPseudonym');
     expect(renderedText).not.toContain('hash');
     expect(renderedText).not.toContain('ECO-SCORE');
+    expect(renderedText).toContain('Conclusión ecográfica recuperada');
+    expect(renderedText).not.toContain('Histopatología independiente no debe imprimirse');
 
     window.open.mockRestore();
   });
